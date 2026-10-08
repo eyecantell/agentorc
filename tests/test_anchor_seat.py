@@ -149,13 +149,16 @@ def test_a_start_creates_the_seat_after_the_techlead_under_the_manager(tmp_path,
     assert ("occupancy", {"dir": str(tmp_path / "alpha")}) in calls
 
 
-def test_a_held_checkout_starts_the_team_without_the_seat_and_says_who_holds_it(tmp_path, monkeypatch):
+def test_a_held_checkout_starts_the_team_and_writes_the_seat_alone_saying_who_holds_it(tmp_path, monkeypatch):
+    """TD-386: the seat's record is written `held` — closed, no pane — for rule 3 to fill once free."""
     org = _org(tmp_path, monkeypatch, {"t": _team()})
     call, calls = _fake(["claude-1 (claude-code, outside agentorc)"])
     _, out = teamrun.start(call, org, "t", HOST)
-    assert [p["name"] for m, p in calls if m == "create"] == ["lead", "tl", "g"]
+    made = [p for m, p in calls if m == "create"]
+    assert [p["name"] for p in made] == ["lead", "tl", "t-anchor", "g"]
+    assert made[2].get("held") is True and not any(p.get("held") for p in made if p["name"] != "t-anchor")
     (said,) = [n for n in out["notes"] if n.startswith("t-anchor")]
-    assert "held by claude-1 (claude-code, outside agentorc)" in said and "next Start" in said
+    assert "held by claude-1 (claude-code, outside agentorc)" in said and "filled once the checkout is free" in said
 
 
 def test_ao_team_list_names_the_seat_and_reads_it_as_a_seat(tmp_path, monkeypatch):

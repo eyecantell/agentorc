@@ -780,8 +780,14 @@ class HostAgent(
         context_bound: int | None = None,
         start_at: str | None = None,
         start_of: str | None = None,
+        held: bool = False,
     ) -> dict[str, Any]:
-        """`start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
+        """`held` (design §4.9b *The anchor seat*, TD-386): a seat's record written alone, `closed`
+        with no pane, for a team's start whose seat's checkout another session holds — the occupancy
+        that refuses every other create is why it is asked — so §6 rule 3 fills it once the checkout
+        is free. Refused without `seat` and `unattended`, and beside `start_at` or a resume.
+
+        `start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
         **record** now — the name taken, the worktree made, the launch record written, the slot held
         — in the state `scheduled`, with no pane, and the home's tick creates the session at the
         instant. Refused without `unattended`, in the past, and with a `run_until` not after it.
@@ -819,6 +825,11 @@ class HostAgent(
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
         reading, bound = _review(review), _context_bound(context_bound)
         starts = _start_time(start_at, unattended, run_until)
+        if held and (not (seat and unattended) or starts or resume):
+            raise RpcError(
+                "held writes a seat's record alone, closed, for rule 3 to fill: it takes a seat and unattended, "
+                "and no start_at or resume (design §4.9b The anchor seat)"
+            )
         # the scheduled record this create starts (the tick's replay, §6 *Start time*), if it is one
         starting = self.sessions.get(str(start_of)) if start_of else None
         if start_of and (starting is None or starting.state != "scheduled"):
@@ -893,7 +904,7 @@ class HostAgent(
                 # one create per conversation at a time, whatever the directory: two concurrent
                 # resumes of one id would otherwise both pass the holder check below (TD-012)
                 await locks.enter_async_context(self._dir_locks[f"conversation:{resume}"])
-            if kind == "interactive" and adapter != "shell":
+            if kind == "interactive" and adapter != "shell" and not held:
                 for who in await asyncio.to_thread(self.occupants, directory):
                     if starting is not None and who.split(" ", 1)[0] == starting.id:
                         continue  # the scheduled record holds the slot for exactly this start
@@ -915,14 +926,14 @@ class HostAgent(
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)
             if resume:
-                for held in [r for r in self.sessions.values() if r.adapter_id == resume and r.suspended]:
-                    self._refuse_suspended(held, caller, "a resume of that conversation")
+                for gone in [r for r in self.sessions.values() if r.adapter_id == resume and r.suspended]:
+                    self._refuse_suspended(gone, caller, "a resume of that conversation")
                     # a person got past that line, which **is** the lift (§4.8a) — and it lifts
                     # here rather than only in `_take_name`, because a resume under another name
                     # leaves this record standing, and a mark nothing can clear would hold its
                     # old name for ever (review of PR #301)
-                    held.suspended = None
-                    self._save(held)
+                    gone.suspended = None
+                    self._save(gone)
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
                 if start_context is None:
@@ -930,6 +941,12 @@ class HostAgent(
                     start_context = self._start_context_of(resume, holder)
             if starts:
                 return await self._schedule(locals(), holder, directory, repo, name, starts)
+            if held:
+                if isinstance(holder, Session) and holder.state not in ("exited", "closed"):
+                    # the name's record is running (or scheduled): the seat is there already, and a
+                    # record written over it would take its name and kill its pane (review of TD-386)
+                    raise RpcError(f"{holder.id} is {holder.state}: the seat is already there, nothing to write")
+                return await self._schedule(locals(), holder, directory, repo, name, None, state="closed")
             try:
                 spec = ad.launch(
                     profile=profile,
@@ -1049,13 +1066,17 @@ class HostAgent(
         directory: Path,
         repo: str | None,
         name: str,
-        starts: str,
+        starts: str | None,
+        state: str = "scheduled",
     ) -> dict[str, Any]:
         """A create with `start_at` (design §6 *Start time*, TD-152): the record now, in the state
         `scheduled` — the name taken under §4.1's rule, the worktree already made, the launch record
         written (the one the tick replays at the instant), the directory's slot held by being a
         record that is neither exited nor closed — and no pane, no run log, no conversation yet.
-        Called from `create` under its locks, with `given` its own arguments as they stand."""
+        Called from `create` under its locks, with `given` its own arguments as they stand. With
+        `state="closed"` it is a `held` seat's record (§4.9b *The anchor seat*, TD-386): the same
+        record, holding no slot, whose `lane_seen` is empty so everything in its lane is the first
+        fill's."""
         if given.get("resume"):
             raise RpcError("start_at is a fresh start: a resume runs now or not at all (design §6 Start time)")
         previous_run, freed = await self._take_name(holder)
@@ -1094,7 +1115,11 @@ class HostAgent(
             start_context=given.get("start_context"),
             start_at=starts,
         )
-        s.set_state("scheduled", confidence="hook")
+        s.set_state(state, confidence="hook")  # type: ignore[arg-type]
+        if state == "closed":
+            s.closed_at = s.created
+            s.closer = {"by": "start", "why": "held"}
+            s.lane_seen = {"at": s.created, "ids": []}
         if isinstance(holder, Session):
             s.supersedes = [{"id": holder.id, "mail": False, "at": s.created}]
         self.sessions[sid] = s
@@ -1102,7 +1127,10 @@ class HostAgent(
         self._remember_dir(directory)
         if self.mode != "node":
             self._write_launch(s.id, s, launch_params(given))
-        log.info("%s scheduled to start at %s", sid, starts)
+        if starts:
+            log.info("%s scheduled to start at %s", sid, starts)
+        else:
+            log.info("%s written %s with no pane: rule 3 fills it", sid, state)
         return s.view()
 
     def _start_context_of(self, resume: str, holder: Session | str | None) -> str | None:
@@ -2375,7 +2403,10 @@ class HostAgent(
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
             s.balance_refused = None  # taken, so the mark has gone: nothing left to ring
-            s.lane_seen = None  # a second `none` is a declaration like the first: the tick looks afresh
+            # a second `none` is a declaration like the first: the tick looks afresh — but a `work` seat's
+            # (§6 rule 3, TD-386) is the reading now, so an id that lands before the next tick fills it
+            ids = self._seat_lane(s) if (s.seat or {}).get("trigger") == "work" else None
+            s.lane_seen = {"at": now_iso(), "ids": ids} if ids is not None else None
         else:
             # The word stands whenever it is said — it is the session's — but one said inside
             # `RESTART_EARLY` of this record's own start is marked, and a controller does not act

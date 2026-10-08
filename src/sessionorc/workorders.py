@@ -13,11 +13,11 @@ never work orders; a line whose `Decided:` is gone leaves on the next reading.""
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import re
 import subprocess
 import sys
+import types
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -49,14 +49,20 @@ def _item_key(script: Path) -> Callable[[str], str] | None:
     if held is not None and held[0] == stamp:
         return held[1]
     got: Callable[[str], str] | None = None
-    spec = importlib.util.spec_from_file_location(f"_ao_board_reader_{abs(hash(str(script)))}", script)
-    if spec is not None and spec.loader is not None:
-        mod = importlib.util.module_from_spec(spec)
+    # compiled from its text, never imported: an import writes `scripts/__pycache__` into the repo's
+    # checkout, which reads as the person's uncommitted work to everything that asks (TD-386's gate)
+    mod = types.ModuleType(f"_ao_board_reader_{abs(hash(str(script)))}")
+    mod.__file__ = str(script)
+    try:
+        code = compile(script.read_text(encoding="utf-8"), str(script), "exec")
+        sys.modules[mod.__name__] = mod  # a dataclass in the reader looks its module up by name
         try:
-            spec.loader.exec_module(mod)
-            got = getattr(mod, "item_key", None)
-        except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
-            got = None
+            exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
+        finally:
+            sys.modules.pop(mod.__name__, None)
+        got = getattr(mod, "item_key", None)
+    except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
+        got = None
     got = got if callable(got) else None
     _keys[str(script)] = (stamp, got)
     return got

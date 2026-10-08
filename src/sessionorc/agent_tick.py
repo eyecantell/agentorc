@@ -2028,10 +2028,11 @@ class TickMixin:
         sits idle with nothing due and nothing left unpushed."""
         if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
             return
-        filled = s.seat_filled
+        filled, seen = s.seat_filled, s.lane_seen
         due = self._seat_due(s, now, records)
-        if due != s.seat_due or s.seat_filled != filled:
-            s.seat_due = due
+        held = s.seat_held if due else None  # nothing due, nothing waits on the checkout
+        if due != s.seat_due or s.seat_filled != filled or s.lane_seen != seen or held != s.seat_held:
+            s.seat_due, s.seat_held = due, held
             self._save(s)
             await self._push_changes()
         if s.host != self.host and s.host not in self._link_muxes:
@@ -2064,6 +2065,9 @@ class TickMixin:
         fill is for, since a fill starts cold on the one reading its `seat_due` names (§6 rule 3,
         TD-259). A question waiting is the idle seat's own to read, as the techlead's is."""
         if not s.seat_due:
+            return True
+        # the anchor's (TD-386): ids its lane gained while it sat idle are the next fill's, from cold
+        if (s.seat or {}).get("trigger") == "work":
             return True
         return (s.seat or {}).get("trigger") == "team" and s.seat_due.get("by") != "asks"
 
@@ -2120,6 +2124,8 @@ class TickMixin:
             return {"at": now_iso(), **fresh[0]} if fresh else None
         if trigger == "asks":
             return (s.seat_due or {"at": now_iso(), "by": "asks"}) if s.asks_waiting(home=self.host) else None
+        if trigger == "work":
+            return self._work_due(s)
         if s.seat_due:
             return s.seat_due
         met = False
@@ -2132,6 +2138,74 @@ class TickMixin:
             met = every is not None and now - _parse(s.created) >= every
         return {"at": now_iso(), "by": trigger} if met else None
 
+    def _seat_lane(self, s: Session) -> list[str] | None:
+        """The ids the anchor seat's lane takes of its repo's reading (§6 rule 3 and rule 6, TD-386):
+        the ledger's entries and the board's work orders by `lane_matches`, its lane `[anchor]` as
+        its preset writes it; None where the ledger was not read, which changes nothing."""
+        r = self._repos.get(s.repo or "") or {}
+        led = r.get("ledger") or {}
+        if "error" in led or not isinstance(led.get("entries"), list):
+            return None
+        lane = list(s.lane or [ledger_mod.ANCHOR_OWNER])
+        got = [*led["entries"], *((r.get("work_orders") or {}).get("orders") or [])]
+        ids = [str(e["id"]) for e in got if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(lane, e)]
+        return list(dict.fromkeys(ids))
+
+    def _work_due(self, s: Session) -> dict[str, Any] | None:
+        """The `work` trigger (§6 rule 3 *The anchor seat*, TD-386): `seat_due: {at, by: work, ids}`
+        while the seat's lane holds ids its `lane_seen` does not. `lane_seen` is written from the
+        reading the first time it is missing — at the record's create, or after a `none`, which
+        clears it — so what stood then is the run's that saw it, and a cause fills once per stretch:
+        the same ids after a `none` raise nothing. A due whose ids all left the lane before the fill
+        is cleared. No reading keeps what stands."""
+        ids = self._seat_lane(s)
+        if ids is None:
+            return s.seat_due
+        if s.lane_seen is None:
+            s.lane_seen = {"at": now_iso(), "ids": ids}
+        seen = set(s.lane_seen.get("ids") or [])
+        new = [i for i in ids if i not in seen]
+        if not new:
+            return None
+        at = (s.seat_due or {}).get("at") if (s.seat_due or {}).get("by") == "work" else None
+        return {"at": at or now_iso(), "by": "work", "ids": new}
+
+    async def _checkout_held(self, s: Session) -> dict[str, Any] | None:
+        """Why the anchor seat may not be filled into its checkout now (§6 rule 3, §4.9b, TD-386), as
+        `seat_held: {by, why}`, or None: a session holding the checkout (§9 invariant 2's occupancy,
+        a person's hand-started one included), else the tree itself dirty or off its default branch
+        — the person's work, which the seat never touches. A node's checkout is read for occupancy
+        alone, from its records, since its tree is not this host's to read."""
+        directory = Path(s.dir)
+        if s.host == self.host:
+            holders = await asyncio.to_thread(self.occupants, directory)
+        else:
+            holders = [
+                f"{r.id} ({r.state})"
+                for r in (self.remote.get(s.host) or {}).values()
+                if r is not s
+                and r.kind == "interactive"
+                and r.adapter != "shell"
+                and r.state not in ("exited", "closed")
+                and r.dir == s.dir
+            ]
+        holders = [h for h in holders if not h.startswith(f"{s.id} ")]
+        if holders:
+            return {"by": holders[0].split(" ", 1)[0], "why": f"held by {holders[0]}"}
+        if s.host != self.host:
+            return None
+        git = await asyncio.to_thread(git_info, directory)
+        if git is None:
+            return {"by": "checkout", "why": "git state unknown"}
+        # cadence's default-branch rule (`origin/HEAD`, `init.defaultBranch`, main, master on origin);
+        # a checkout with no origin to ask reads either usual name as its default
+        ref = await asyncio.to_thread(ledger_mod.default_ref, directory)
+        defaults = (ref.removeprefix("origin/"),) if ref else ("main", "master")
+        why = [f"branch {git.branch}"] if git.branch not in defaults else []
+        if git.dirty:
+            why.append(f"{git.dirty} file{'' if git.dirty == 1 else 's'} uncommitted")
+        return {"by": "checkout", "why": ", ".join(why)} if why else None
+
     async def _fill(self, s: Session, now: datetime, records: list[Session]) -> None:
         """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at
         the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
@@ -2139,6 +2213,19 @@ class TickMixin:
         fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`."""
         if s.restart_ceiling or self._profile_gated(s.profile, now, s.team):
             return
+        work = (s.seat or {}).get("trigger") == "work"
+        if work:
+            # the anchor's fill is a `create` in the checkout itself: never over a holder, never into
+            # the person's uncommitted work or branch; `seat_due` stands and the next tick tries again
+            held = await self._checkout_held(s)
+            if held != s.seat_held:
+                s.seat_held = held
+                if held:
+                    log.info("%s: the seat is due but its checkout is not free — %s", s.id, held["why"])
+                self._save(s)
+                await self._push_changes()
+            if held:
+                return
         mine = set(self._ctl(s))
         fellows = [
             r for r in records if r.seat and not r.superseded_by and (r is s or (mine and mine & set(self._ctl(r))))
@@ -2173,6 +2260,12 @@ class TickMixin:
         if cause and new is not None and new is not s:
             # the fill was made: the cause is remembered on the record that took the seat
             new.seat_filled = [*s.seat_filled, {**{k: v for k, v in cause.items() if k != "at"}, "at": now_iso()}]
+            self._save(new)
+        if work and new is not None and new is not s:
+            # the stretch it was filled for is the new run's: the same ids raise no second fill
+            ids = [*((s.lane_seen or {}).get("ids") or []), *((s.seat_due or {}).get("ids") or [])]
+            new.lane_seen = {"at": now_iso(), "ids": list(dict.fromkeys(ids))}
+            new.seat_due = new.seat_held = None
             self._save(new)
 
     def _seat_prs(self, s: Session, records: list[Session]) -> list[str]:

@@ -6259,3 +6259,29 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Done when** a node probe drives the sort, a filter, and a delta whose group lacks the card, over a small fake DOM, and asserts the + card stays last, is hidden under a filter and is restored; the substring asserts are dropped.
 
 **Related:** TD-379, TD-383, TD-389.
+
+## TD-386: Build TD-381 (the tick): rule 3's `work` trigger from the seat's `lane_seen`, the fill gated by occupancy and a clean checkout with `seat_held`, rule 6's lane word `anchor`
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-07 (the designer, from TD-381's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Blocked by:** TD-385
+**Location:** `src/sessionorc/ledger.py` (`lane_matches`: the word `anchor` — a pickable entry with `Owner: anchor` of any kind, and every work order), `src/sessionorc/agent_tick.py` (rule 3: `seat_due` with `by: work` and `ids` from the seat's `lane_seen`, a cause once per stretch; the fill's gate — occupancy of the checkout, then `git status` clean and on the default branch — writing `seat_held: {by, why}` and clearing it on the fill; rule 6's `lane_seen` kept on the seat), `src/sessionorc/models.py` (`seat_held`); tests `tests/test_tick_seats*.py`, `tests/test_ledger_derived.py`, `tests/test_lane_news.py`; design §6 rule 3 and rule 6. `src/sessionorc/**` is a held path: the techlead reads it.
+
+**Why:** TD-381's seat is filled by the tick on its lane, and only into a checkout nobody holds.
+
+**Fix:**
+1. The lane word `anchor` in the reading and the lanes line (§4.4 *In a team's lanes*: the anchor's entries are the team's once it has the seat).
+2. The trigger: `lane_seen` on the seat's record, `seat_due` when it gains an id, once per stretch.
+3. The gate: a held fill writes `seat_held` with the holder or the checkout's state and tries again next tick; a fill clears it.
+4. The held Start (from TD-385, the techlead's ruling `m-2eac0f07717a`): where a session holds the checkout at `ao team start`, the seat's record is written `closed` with no pane, `seat: {trigger: work}` — a `create` that writes the record alone (`src/sessionorc/agent.py`), which `teamrun.start` (`src/agentorc/teamrun.py`) then calls in place of its note naming the holder — so rule 3 can fill it once the checkout is free (design §4.9b *The anchor seat*).
+
+
+**Resolved:** 2026-10-08 (PR #1248, grinder-ao-1) — the lane word `anchor` in `ledger.lane_matches` (an `Owner: anchor` entry of any kind, a live check once live, `decision (anchor)`, every work order); rule 3's `work` trigger in `agent_tick._work_due` from the seat's `lane_seen`, once per stretch, the seat's `none` writing it at the declaration; the fill gated in `_checkout_held` by occupancy, then a clean tree on its default branch, with `seat_held: {by, why}`; `create` with `held` writing the seat's record closed with no pane for a Start over a held checkout (`teamrun.start`). Read on a scratch home: an `Owner: anchor` entry made the seat due on the next tick; an uncommitted file held the fill (*1 file uncommitted*); the clean tree filled it on the next tick; a `none` on the same ids raised no second fill. The gate also showed `workorders` importing the board reader and writing `scripts/__pycache__` into the checkout; it now compiles the reader. Tests: `tests/test_anchor_tick.py`, `tests/test_anchor_seat.py`, `tests/test_workorders.py`.
+
+**Done when** on the scratch home an `Owner: anchor` entry filed in the fixture ledger fills the seat within a tick when the checkout is free, a person's session in the checkout (or a dirty tree) holds the fill with `seat_held` saying why and the fill lands once it is free, a `none` on the same ids raises no second fill, and the tests cover each.
+
+**Related:** TD-381, TD-385, TD-387, TD-380 / TD-384 (work orders in the lane).
