@@ -6108,7 +6108,7 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 - The *keys* row was not touched: it still reads "snoozed rows only while *n snoozed — show* is open", naming a control the same PR retired, so the design names two controls for one fold.
 - TD-373's Fix does not list this row, so the build would leave it.
 
-**Resolved:** 2026-10-08 (PR #1226, grinder-ao-2, with TD-373's build) — the *keys* row of §4.5a now reads "snoozed rows while the **Snoozed (n)** fold is open (TD-373)"; `grep -rn "n snoozed — show" docs/design` finds only the "where … was" clauses of §4.5 screen 6 and §4.5a *Inbox: Snoozed (n) fold*. Archived by this ledger-only PR.
+**Resolved:** 2026-10-07 (PR #1226, grinder-ao-2, with TD-373's build) — the *keys* row of §4.5a now reads "snoozed rows while the **Snoozed (n)** fold is open (TD-373)"; `grep -rn "n snoozed — show" docs/design` finds only the "where … was" clauses of §4.5 screen 6 and §4.5a *Inbox: Snoozed (n) fold*. Archived by this ledger-only PR.
 
 **Done when** `grep -rn "n snoozed — show" docs/design` finds only the "where … was" history clause.
 
