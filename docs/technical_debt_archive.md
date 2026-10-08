@@ -6441,3 +6441,23 @@ The design is §4.4 *Repo facts*, §6 rule 6, §4.5 screen 6, §4.5a *Inbox: For
 **Related:** TD-395, TD-381, TD-385, TD-386, TD-387.
 
 ---
+
+## TD-396: §4.9b's anchor Start paragraph still reads the dirty and off-branch cases as TD-395's to build, after PR #1257 built them
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1248–#1257)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/design/4.9b-techlead.md` (*The anchor seat*, the Start paragraph, line 83)
+
+**Why:** PR #1257 marked built the three places that name TD-395 as the build (`4.9b-techlead.md` line 74, `6-policies.md` rules 3's Start gate and `none`, `4.9-org-team-project.md` `anchor`) but not this one. Line 83 reads *"(built — TD-386: `create` with `held`, which writes the record alone, its `lane_seen` empty so everything in its lane is the first fill's; the dirty and off-branch cases — TD-395)"*, which says the dirty and off-branch cases are still TD-395's. `src/agentorc/teamrun.py` (`checkout_held`) and the archived TD-395 entry say they are built. The design is written in the present tense; this parenthesis is the one place that still reads as future work.
+
+**Fix:** write *built — TD-395* after the dirty and off-branch cases in that parenthesis; nothing else.
+
+**Resolved:** 2026-10-08 (PR #1261, grinder-ao-1) — line 83 reads *the dirty and off-branch cases, built — TD-395*; no mention of TD-395 in §4.9b reads as unbuilt.
+
+**Done when** `grep -n "TD-395" docs/design/4.9b-techlead.md` shows no mention of TD-395 as unbuilt.
+
+**Related:** TD-395, TD-394, TD-386.
