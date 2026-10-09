@@ -132,6 +132,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-09 (TD-472, the designer): *Attachment drop*'s clipboard paste names the terminal beside the composer. Built by TD-479.
 - 2026-10-09 (TD-473, the designer; Paul: *someone will need to post a large PowerPoint, Word or PDF file*): the attachment goes up **in pieces** of 2 MiB, each one `attach` call under the 8 MiB line, appended to a `.part` the host agent links into the final name only when the size is whole; the bound becomes the setting `person.attach.max` (`256M` by default, `1M`–`4G`) in place of the 4 MiB constant, which was the transport's limit and never a choice. A cancel deletes the `.part`; one untouched for an hour is swept. Built by TD-478.
 - 2026-10-09 (TD-419, the designer): **an attachment's life** — kept while the session is live, then deleted by the run-log sweep past `runs_keep_days`; not at Close, not at Forget. Built by TD-469.
 - 2026-10-07 (TD-384 slice 1, grinder-ao-1): work orders built in the repo reading — `sessionorc/workorders.py` runs the repo's own `nudge_user_attention.py --report --json --fetch` (a plain read when the fetch fails) and keys each open decided line, `fyi` left out, `board:<key>` by the reader's own `item_key`, loaded from that file; `_read_repo` reads them with the PRs every `REPOS_EVERY` as `work_orders`, a failed read keeping the last with the error; `ao repo` lists them first among the pickable rows and counts them.
@@ -328,6 +329,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-472, the designer; Paul asked why a screenshot pastes into the composer and not the terminal): a paste on the terminal that carries a file and no text takes the attachment road and its path is pasted into the terminal as a bracketed paste; until then the terminal's Paste read the clipboard's text alone, so an image paste sent nothing and said nothing. Built by TD-479.
 - 2026-10-09 (TD-473, the designer): the **Attach** row's bound reads `person.attach.max` (256 MiB by default) in place of 4 MiB, and an upload past one piece shows its progress with a ✕ that cancels it. Built by TD-478.
 - 2026-10-09 (TD-428 slice 3, grinder-ao-2): the team header's one row is built — the flow chip linking to the team's Settings card (`#team-<team>`), ✉ n on every header, the session count on the fold alone, the counts by state only folded, *n ready to close* a mark of its own; the **Flow** pick and its route `POST /api/teams/<team>/flow` gone; Members…, Open file, *Flow on Settings →* and *not concluded:* on the *i* panel's Definition line. The *Flow pick* row's route is corrected to the Settings Save's, `POST /api/settings/teams`.
 - 2026-10-09 (TD-428 slice 2, grinder-ao-2): the rollup's Agents *i*, *answer needed* above 0 only, Agents and Needs you alone with one team live, the one-height heads and bars, the summary's 1.15 : 0.85 : 1.2, a stopped team's empty facets left out, and Doing's *0m* are built; the rows say so.
