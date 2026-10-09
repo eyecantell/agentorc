@@ -80,7 +80,7 @@
   // sessions share the lane. Read from the ledger on main at the capture: the anchor's lane takes 14
   // unheld (its evaluations and builds; it holds TD-159); the grinders' shared lane takes TD-422 alone,
   // held by grinder-ao-2, so 0; the designer's lane 0.
-  const OWN = { 'ao-grind-anchor': { n: 14, k: 'k-pickable', shared: 1, what: 'pickable' } };
+  const OWN = { 'ao-grind-anchor': { n: 26, k: 'k-pickable', shared: 1, what: 'pickable' } };
   $$('.tgroup[data-team="ao-grind"] .card').forEach((c) => {
     const o = OWN[c.dataset.name]; const pill = $('.r1 .pill', c); if (!o || !pill) return;
     const role = $('.cline', c)?.textContent || '';
