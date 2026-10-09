@@ -2,7 +2,7 @@
 
 ```
 laptop browser ──https──▶ agentorc UI (one process on the home, `agentorc[ui]`; a pty per open
-                              │  terminal: `tmux attach` ↔ xterm.js websocket, §4.6)
+                              │  terminal: `tmux attach` ↔ xterm.js websocket; ssh to a node's host, §4.6)
                               ▼  Unix socket
                         home host agent (kmaster, §4.4a): the org's graph, mail, settings
                           ├─ tmux server (systemd user unit, linger on)
@@ -10,7 +10,7 @@ laptop browser ──https──▶ agentorc UI (one process on the home, `agent
                           ├─ run logs   ~/.agentorc/runs/<session>.log  ◀── tmux pipe-pane, continuous
                           ├─ policies   (§6: the tick — stop time, usage gate, seats, restarts, promote)
                           └─ repos from ~/.config/dev-cadence/repos.txt (+ ~/.agentorc/hosts.yml)
-                              ▲ the node→home link (ssh, or a per-node socket): nodes dial out
+                              ▲ the node→home link (ssh, or a per-node socket)
               ┌───────────────┴───────────────┐
         node host agent                  node host agent
         (a container on kmaster)         (laptop, vps … — a machine node, not yet in use)
