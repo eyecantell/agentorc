@@ -1198,7 +1198,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         teams = list(dict.fromkeys([*(g["team"] for g in serving), *([named] if named else [])]))
         first = serving[0] if serving else None
         if first:
-            summary = first["summary"]
+            # the Repo page draws all three facets, whatever a stopped team's card leaves out (TD-418)
+            summary = {**first["summary"], "drawn": list(FACETS)}
             members = first["members"]
         elif named:
             # a team the definitions give this repo, with nothing live now (between runs, stopped):
