@@ -61,6 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Open |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Open |
+| TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Open |
 
 ---
 
@@ -947,3 +948,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first: split a file larger than one chunk into pieces on the page — an upload id, each piece's offset, one `attach` call per piece well under the line — written by the host agent to a `.part` beside the final name and renamed into place only when the last piece lands and the size matches, so a dropped upload never leaves a file a prompt could name; a `.part` left behind is swept (TD-469's sweep, or its own age bound). The new bound is a setting, not a constant (§5, the Settings page), with a default the designer picks against disk, the RPC's memory and what Claude Code can read (it reads a PDF or a document by path; an image it resizes). The page shows progress for an upload that takes more than a moment and can cancel it. The bounds that stay: a session on this host only until the copy over the link is designed (§4.4 *does not cross the link*, phase 2), desktop only. **Done when** the design says the chunked road and the bound, the build lands, and a 50 MB PDF dropped on a Focus composer comes back as a path Claude Code reads.
 
 **Related:** TD-002 (the attach), TD-469 (the attachment's life), TD-472 (paste on the terminal), TD-003 (the phone's share sheet).
+
+## TD-474: The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul: the terminal sometimes freezes or gets jittery — is it the connection, and should the page say so?)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.6 *Reconnect contract* and *Attach behaviour with another client present*, §4.5 *Browser mechanics* (the host agent's down banner, TD-372); `src/agentorc/ui/static/app.js` (the terminal socket's reconnect, ~L3263: the only sign today is a grey `[agentorc] terminal … — retrying in Ns` line written into the terminal)
+
+**Why:** a frozen or jittery Focus terminal has three likely causes the person cannot tell apart: (1) another client on the same tmux session — tmux's `window-size latest` makes a second tab or a VS Code attach resize the pane each time either is used, and Claude Code repaints in full (§4.6 accepts this and names `window-size manual` as the fallback); (2) the terminal socket dropped and is reconnecting with backoff — a node's session crosses one more hop than a local one; (3) the socket is open and no pane output arrives. The Org's down banner covers the host agent's event socket only; the terminal's own socket has no mark on the page, and (3) has none anywhere.
+
+**Fix:** design first: a quiet mark in the Focus header beside the state pill, drawn after a grace as TD-372's banner is (no flicker on a navigation or a promote's restart): *reconnecting…* while the terminal socket is down, *no output for Ns* while it is open, the session reads `working` and no byte has come — never on an idle session, where silence is the normal case — and *resized by another client* when the pane's size changes under a Focus that did not ask for it (the count of attached clients is tmux's `#{session_attached}`). Hover says what each means and what to do. Record each kind of event with its time in the browser's console, so the next freeze names its cause. **Done when** the design says the marks and their graces, the build lands, and each of the three is drawn on a scratch home by forcing it (kill the socket, a silent `working` pane, a second `tmux attach` resizing).
+
+**Related:** TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-022 (scrollback through tmux).
