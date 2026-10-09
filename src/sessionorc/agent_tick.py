@@ -2959,9 +2959,13 @@ class TickMixin:
         if live_ids is None:
             return
         for folder in paths.attachments_dir().glob("*"):
-            if folder.name in live_ids or not folder.is_dir():
+            if folder.name in live_ids or folder.is_symlink() or not folder.is_dir():
                 continue
-            for f in folder.iterdir():
+            try:
+                files = [f for f in folder.iterdir() if f.is_file() and not f.is_symlink()]
+            except OSError:  # gone meanwhile
+                continue
+            for f in files:
                 try:
                     if f.stat().st_mtime < cutoff:
                         f.unlink()
