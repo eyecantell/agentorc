@@ -594,7 +594,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        still one start, removes the mark, and is counted *n of m* from the records), the records
        other ones name as a controller first so the lead is up before its members, and every
        record's mail kept, as a fill's and a Restart's is (§4.10 *The name coming back adopts it*).
-       It starts **the whole team**, a member whose lane gained nothing included. Five bounds, each
+       It starts **the whole team**, a member whose lane gained nothing included: the manager decides
+       who runs, and a member with nothing to pick declares `none` again at the cost of one short
+       run. Five bounds, each
        read before the first replay and each leaving the row of `ask` in its place, saying which: a
        profile of any member **over its usage line** (§6 *Usage gate*); the team's **stop time**
        passed and not cleared; **`WORK_STARTS_DAY`** (three) starts of that team by this rule in the
@@ -610,7 +612,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        as the standing hold once that bound lifts, so a reading that fails at that moment does not
        start a team that was over its line. Under `on_work: ask` the rule starts nothing, so it
        holds nothing back: the mark drops every hold, the balance one with it, and a later `start`
-       reads the line afresh, a failed reading writing no new hold. A bound that holds writes
+       reads the line afresh, a failed reading writing no new hold. A person's turn of `on_work` is
+       the person's own start or stop, and is read so. A bound that holds writes
        **`held: {why}`** on `work_waiting` — `usage` with the `profile` and, when the reading has
        one, the window's `resets`, `until` with the instant, `day` with the `count`, `early` with
        the last start, `balance` with the `repo` and the `crossed` lines in the mark's shape —
@@ -1016,7 +1019,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   turn may be under way or about to resume — and every live session the adapters see there outside
   agentorc (a plain `claude` in a terminal, `external_sessions`, §4.3) reports `idle` from the
   tool's own registry (`status`: busy | idle | shell). One the home cannot read the state of is
-  taken as mid-turn, and the pass waits. No session at all is idle. A `shell` record running a
+  taken as mid-turn, and the pass waits (no pull, and the note stays). No session at all is idle. A `shell` record running a
   foreground command is `working` and counts: it may be `git` itself. So tracked files move under
   the anchor only while it sits at the composer, which is where a person's own `git pull --ff-only`
   (cadence §1.10) finds it. **It says nothing**: a pull is routine, so no mail, no state change and
