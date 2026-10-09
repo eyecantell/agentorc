@@ -71,6 +71,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-415 | Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words | Low | Open |
 | TD-416 | Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282) | Low | Open |
 | TD-417 | Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested | Low | Open |
+| TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Open — mockup reviewed with Paul 2026-10-08; three calls open |
+| TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Open |
 
 ---
 
@@ -1226,3 +1228,30 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** `tests/test_ui_focus_rail.py` (#1286, TD-412) opens with a docstring that says *«* and every glyph bring the panel back, *a glyph opening its card*, and *the choice is this browser's (`focus.side`)*. Its four tests call `AO.railGlyphs` (the pure glyph list), assert strings in `app.css` (`.focus .side.rail { width: 28px; }`) and in the rendered template, and `AO.keyEntry("focus","s")`. None runs `putAway`, the `#sideaway`, `#sideback` and `#railglyphs` click handlers, `renderRail` or the `store.set("focus.side", …)` write, so deleting the handler body, the `store.set` call, or `d.open = true` in `src/agentorc/ui/static/app.js` keeps every test green (read from the diff; the handlers live inside `AO.focus`, which the node probe never calls). (This one is read from the diff, not shown by a revert.) The inline script in `focus.html` reads `ao.focus.side` and `store.set("focus.side")` writes it (`store` prefixes `ao.`); no test pins that the two agree.
 
 **Fix:** a Playwright run (the repo's `~/ao-shots/pwlib`, headless-screenshots memory) or a probe of `AO.focus` against a stubbed DOM: press `#sideaway` (`#side` gains `rail`, localStorage `ao.focus.side` is `"away"`), reload (the class is there before the first paint), press a glyph (`rail` leaves, its `details.side[data-side]` is `open`), press `#sideback`. Skip like the existing probe where the tool is absent. **Done when** removing each handler in `app.js` fails a test.
+
+## TD-418: The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet
+
+**Priority:** Medium
+**Added:** 2026-10-08 (ao-paul, a UI/UX review with Paul)
+**Owner:** paul
+**Kind:** decision
+**Status:** Open — the mockup is up (`docs/mockups/reviews/2026-10-08-org-declutter.html`, published at https://claude.ai/artifact/B8ybKFKeu3n1n4PUzYgktP); Paul approved the seven changes below as recommended and has three calls open on the page. Next: a design PR for §4.5 / §4.5a (and the history), then a build entry.
+**Blocked by:** decision (paul) — the three calls on the mockup page: the lane chip's words, whether the observations join this round
+**Location:** `src/agentorc/ui/templates/org.html`, `group_head.html`, `rollup.html`, `lanes_line.html`, `team_summary.html`, `card.html`, `base.html`; `static/app.css`, `app.js`; design §4.5, §4.5a
+
+**Why:** Paul's screenshot of the live Org page, 2026-10-08, and his list: the *mine* toggle and *show command runs* box sit in the title row though rarely used; the rollup's TDs-in-motion bar and PRs-in-motion blocks sit at different heights (the PR facet's header holds the window picker, and `.blk` is 30px against `.bar`'s 22px); the Agents facet's *in urgency order…* line is help text on the page; Shell and + New session are two top-bar buttons though a team's sessions start from its + card; the team header says *9 sessions* twice (meta and fold), the flow twice (strip and dropdown, and Settings has the same picker per team), and spends a line on a disabled Members…, its reason and Open file, and another on *not concluded:*; the team's ✉ n shows only while folded (TD-071), which reads as a bug; the lanes line (TD-361) sits mid repo facet though its counts are members' lanes.
+
+**Fix:** the seven changes on the mockup page — (1) `mine` and `kind:command` become filter words, both controls go; (2) every rollup and repo-facet header reserves the picker's height and bars and blocks share one height; (3) the Agents line becomes an i, and Needs you hides *answer needed* at 0; (4) Shell and + New session merge into **+ New ▾** (Session, Shell); (5) the team header is one row — name, place, a `flow: <name>` chip linked to Settings (to the flow's own page once flows have pages, Paul 2026-10-08), the marks, Wind down, Stop now, fold, i — with Members…, the definition's source, Open file and *not concluded:* in the i panel, and *flow changed · Apply* kept on the header; (6) ✉ n drawn folded or not; (7) the lanes line becomes an i on TECHNICAL DEBT, each member card carrying its lane's count, amber when out of work with entries in it. Seen and not yet decided: the rollup's PR counts disagree with the repo facet's without saying what they sum; the rollup restates a lone live team; a stopped team draws empty facets; the summary's equal columns. The capture and transform that made the shots are in `docs/mockups/reviews/org-declutter-src/`. **Done when** the design says the new shape and the build entry it names is open.
+
+## TD-419: A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget
+
+**Priority:** Low
+**Added:** 2026-10-08 (ao-paul, Paul asked when a pasted screenshot is deleted)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_write_attachment`, the `attach` RPC); `src/sessionorc/paths.py` (`attachments_dir`); design §4.4 *Attachment drop*
+
+**Why:** the `attach` RPC (TD-002) writes each file under `attachments/<session>/` and nothing removes it: not Close, not Forget, not the tick. 524K on 2026-10-08, one session's pastes, so nothing is pressing, but it grows without bound and §4.4 says nothing of its life.
+
+**Fix:** design the attachment's life in §4.4: the folder goes with the record's Forget, and the tick removes a file older than a bound (14 days suggested; a sent prompt may still name a file, so not at Close). Then a build entry.

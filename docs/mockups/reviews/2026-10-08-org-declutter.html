@@ -1,0 +1,95 @@
+<title>Org Page Declutter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* layout: one reading column; a shot switcher on top, the change list under it, open calls last */
+:root {
+  --bg: #f4f6f9; --fg: #18202b; --muted: #5a6575; --line: #d6dce5; --card: #ffffff;
+  --accent: #2b5fd9; --accent-fg: #ffffff; --warn: #a15c00; --warn-bg: #fff3df;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1117; --fg: #e3e8ef; --muted: #8b96a6; --line: #273141; --card: #151b24;
+  --accent: #5b8cff; --accent-fg: #0d1117; --warn: #f0b45a; --warn-bg: #2c2210; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0d1117; --fg: #e3e8ef; --muted: #8b96a6; --line: #273141; --card: #151b24;
+  --accent: #5b8cff; --accent-fg: #0d1117; --warn: #f0b45a; --warn-bg: #2c2210; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 60px; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-size: 26px; margin: 0; text-wrap: balance; } h2 { font-size: 18px; margin: 0 0 10px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+.mono, code { font-family: var(--mono); font-size: .88em; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { font: 500 14px var(--sans); padding: 6px 14px; border-radius: 4px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shot { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #0b0f14; }
+.shot img { display: block; width: 100%; height: auto; }
+.cap { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.changes { display: grid; gap: 10px; counter-reset: c; }
+.chg { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 4px 10px; }
+.chg::before { counter-increment: c; content: counter(c); font: 600 14px var(--mono); color: var(--accent); }
+.chg b { display: block; } .chg p { margin: 2px 0 0; color: var(--muted); grid-column: 2; }
+.chg .t { grid-column: 2; }
+ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { max-width: 80ch; }
+.ask { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 6px; padding: 14px 18px; }
+.ask h2 { color: var(--warn); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+</style>
+<div class="wrap">
+  <header>
+    <h1>Org page: declutter round</h1>
+    <p class="sub">The live Org page from 2026-10-08 18:50, captured read-only. Both shots show the same data: the "after" applies the proposed changes to that captured page, so only the design differs.</p>
+  </header>
+
+  <section>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="t-after" aria-selected="true" data-img="2026-10-08-org-declutter-after.png" data-cap="After: one header row per team, aligned bars, no mine/command controls, lane counts on the member cards.">After</button>
+      <button role="tab" id="t-before" aria-selected="false" data-img="2026-10-08-org-declutter-before.png" data-cap="Before: the live page as it stands.">Before</button>
+      <button role="tab" id="t-open" aria-selected="false" data-img="2026-10-08-org-declutter-after-open.png" data-cap="After, with the team's i panel and the + New menu open: the definition (Members…, where it is defined, Open file, the flow link) and not concluded now live in the panel.">After, menus open</button>
+      <button role="tab" id="t-afull" aria-selected="false" data-img="2026-10-08-org-declutter-after-full.png" data-cap="After, the whole page, the stopped teams included.">After, full page</button>
+      <button role="tab" id="t-bfull" aria-selected="false" data-img="2026-10-08-org-declutter-before-full.png" data-cap="Before, the whole page.">Before, full page</button>
+    </div>
+    <div class="shot" style="margin-top:12px"><img id="shot" src="2026-10-08-org-declutter-after.png" alt="The Org page after the proposed changes"></div>
+    <div class="cap" id="cap">After: one header row per team, aligned bars, no mine/command controls, lane counts on the member cards.</div>
+  </section>
+
+  <section>
+    <h2>What changes</h2>
+    <div class="changes">
+      <div class="chg"><span class="t"><b><span class="mono">mine</span> and <span class="mono">show command runs</span> become filter words</b></span><p>Both controls leave the title row. The filter box takes <code>mine</code> and <code>kind:command</code> next to <code>team:</code> and <code>state:</code>, and its placeholder lists them.</p></div>
+      <div class="chg"><span class="t"><b>The rollup's bars line up</b></span><p>Every facet header reserves the height of the day/week/month picker, and the phase bar and the opened/closed blocks are drawn at one height (26px). The repo facet's bars get the same height.</p></div>
+      <div class="chg"><span class="t"><b>The Agents text moves into an i</b></span><p>"in urgency order, as the cards sort · a pill filters the page to that state" becomes the tooltip on an i beside AGENTS. Needs you also drops its "0 answer needed" row at zero, as <em>asked you</em> already does.</p></div>
+      <div class="chg"><span class="t"><b>Shell and + New session merge into + New ▾</b></span><p>One button with two choices, Session and Shell. A team's own sessions still start from its + card.</p></div>
+      <div class="chg"><span class="t"><b>The team header fits on one row</b></span><p>The header keeps the name, host / repo, a <code>flow: td</code> chip (its stages in the tooltip, linked to Settings), the marks, Wind down, Stop now, the fold and the i. Dropped from the header: the second "9 sessions", the flow strip, and the flow dropdown (Settings already has the same picker per team). Members…, "defined in … changed by PR", Open file and <em>not concluded:</em> move into the i panel under a Definition line. <em>flow changed · Apply</em> stays on the header because it asks you to act.</p></div>
+      <div class="chg"><span class="t"><b>✉ n shows folded or not</b></span><p>The team's unread total sits beside the flow chip in both states. TD-071 drew it only while folded; that rule is reversed.</p></div>
+      <div class="chg"><span class="t"><b>The lanes line leaves the repo facet</b></span><p>Its full text becomes an i on TECHNICAL DEBT. Each member card whose lane it is carries its count (<code>lane 18</code> on the grinders, <code>lane 0</code> on the designer), tinted amber when that member is out of work with entries in its lane.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Seen while capturing, not mocked</h2>
+    <ul class="obs">
+      <li><b>Two PR counts that disagree.</b> The rollup reads 84 opened / 83 closed (93 / 92 in your screenshot) and the repo facet reads 84 / 83 here but 85 / 85 there. Whatever the rollup sums, the page should say what it covers.</li>
+      <li><b>The rollup repeats a lone live team.</b> With one team live, its TDs-in-motion and PR facets restate that team's own facets.</li>
+      <li><b>A stopped team draws empty facets.</b> dc-grind shows "no repo here" and "nothing claimed" in full-height boxes while stopped.</li>
+      <li><b>Equal columns waste the summary row.</b> TDs in motion is mostly empty when it holds a few rows, while Doing next to it is cut off.</li>
+      <li><b>The footnote under the page</b> ("Inside a team: the manager, then…") could move into the page's own help.</li>
+    </ul>
+  </section>
+
+  <section class="ask">
+    <h2>Open calls for you</h2>
+    <ol>
+      <li>Is <code>lane n</code> the right chip text on a card, or should it name the kind (<code>18 pickable</code> / <code>0 design-first</code>)?</li>
+      <li>Should the observations above join this round, or wait for the second look-and-feel round?</li>
+      <li>When flows get their own pages, the <code>flow: td</code> chip links to the flow's page instead of Settings. Nothing else in this round depends on it.</li>
+    </ol>
+  </section>
+</div>
+<script>
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', x === b ? 'true' : 'false'));
+  const img = document.getElementById('shot'); img.src = b.dataset.img; img.alt = b.textContent;
+  document.getElementById('cap').textContent = b.dataset.cap;
+}));
+</script>
