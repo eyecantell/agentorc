@@ -218,8 +218,8 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage details.isec[open] > summary::before { content: "▾"; }
 /* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
    thing in a heading — everything bordered is a control, and this is one (§4.5a) */
-.inboxpage .imark, .reports .imark, .helpmark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
-.inboxpage .imark:hover, .reports .imark:hover, .helpmark:hover { background: var(--hover); color: var(--fg); }
+.inboxpage .imark, .reports .imark, .helpmark, .tipmark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
+.inboxpage .imark:hover, .reports .imark:hover, .helpmark:hover, .tipmark:hover { background: var(--hover); color: var(--fg); }
 .inboxpage .imark[aria-expanded="true"], .reports .imark[aria-expanded="true"], .helpmark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
 /* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
    missing one), opened **in place** under the heading so it pushes the rows down, never covers one */
@@ -535,19 +535,24 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 }
 
 /* ---- the team-first Org (design §4.5 screen 1, §4.5a *team card: summary*, TD-176 slice 3) ---- */
-.tsum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.tsum { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); gap: 12px; margin-bottom: 12px; }
 @media (max-width: 1100px) { .tsum { grid-template-columns: minmax(0, 1fr); } }
 .facet { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); }
+/* every facet's head one height, the window picker's, whether it holds one or not (§4.5a *Org: rollup*, TD-418);
+   a label never wraps: where the head runs out of room the selector drops to its own line, at the right */
+.facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
+.facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); white-space: nowrap; }
+.facet .fhead > .seg { margin-left: auto; }
+/* the rollup's ***i*** beside Agents: a tooltip and nothing to press (TD-418) */
+.tipmark { display: inline-flex; align-items: center; justify-content: center; cursor: help; }
 .facet .dim { opacity: .7; }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
 .seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); }
 .seg button:disabled { opacity: .45; cursor: default; }
-.bar, .blocks { display: flex; gap: 2px; min-height: 22px; }
+.bar, .blocks { display: flex; gap: 2px; height: 26px; }  /* one height, so the bars and the blocks line up (TD-418) */
 .bseg, .blk { display: flex; align-items: center; justify-content: center; min-width: 22px; padding: 0 4px; border-radius: 2px; color: var(--seg-fg); font-size: var(--t-small); font-weight: 600; text-decoration: none; white-space: nowrap; overflow: hidden; }
-.blk { min-height: 30px; font-weight: 500; gap: 4px; } .blk b { font-weight: 700; }
+.blk { font-weight: 500; gap: 4px; } .blk b { font-weight: 700; }
 .bseg.p-high { background: var(--p-high); } .bseg.p-medium { background: var(--p-medium); } .bseg.p-low { background: var(--p-low); color: var(--p-high); }
 .bseg.k-pickable, .legend .k-pickable { background: var(--k-pickable); } .bseg.k-design-first, .legend .k-design-first { background: var(--k-design); }
 .bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }
@@ -586,10 +591,10 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .asked { font-size: var(--t-small); margin: -2px 0 6px; }
 .dfeed { display: flex; flex-direction: column; gap: 3px; max-height: 12em; overflow: auto; }
 /* the Doing list's three columns (§4.5a **Ages and columns**, TD-232): the age right-aligned in a width
-   that fits *just now*, the doer in the server's width (`--doer-n` characters, at most 18), the words
+   that fits *59m* (TD-418), the doer in the server's width (`--doer-n` characters, at most 18), the words
    the rest; each width is in its own mono font's `ch`, so the columns line up down the list */
 .drow { display: flex; gap: 8px; align-items: baseline; font-size: var(--t-small); min-width: 0; white-space: nowrap; }
-.drow .dage { flex: none; width: 8ch; text-align: right; }
+.drow .dage { flex: none; width: 4ch; text-align: right; }
 .drow .name { font-family: "JetBrains Mono", monospace; color: var(--fg); text-decoration: none; flex: none; width: calc(var(--doer-n, 12) * 1ch); overflow: hidden; text-overflow: ellipsis; }
 .drow .dtext { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .repopage .rrow.drow .dtext { white-space: normal; overflow-wrap: anywhere; } /* the Repo page's words wrap */
@@ -612,6 +617,8 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 @media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 @media (max-width: 640px) { .rollup { grid-template-columns: minmax(0, 1fr); } }
 .rollup.quiet { grid-template-columns: minmax(0, 22rem); } /* no team live: Needs you alone (TD-406) */
+.rollup.lone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } /* one team live: Agents and Needs you (TD-418) */
+@media (max-width: 640px) { .rollup.lone { grid-template-columns: minmax(0, 1fr); } }
 .rollup button.pill { border: 0; cursor: pointer; font-family: inherit; }
 .rollup .fneeds.answering { background: var(--warn-bg); border-color: var(--warn-line); }
 .rollup .nrow { display: flex; gap: 8px; align-items: baseline; }

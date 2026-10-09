@@ -3,10 +3,13 @@
    needed / Doing. Every variant a selector can show is rendered here and the client picks one by
    the section's data attributes (`data-led`, `data-win`, `data-face`), so a selector never asks
    the server. Rendered on page load and re-sent with the groups on every delta and on the
-   `repos` and `doing` events; the client swaps it whole, as it swaps the header. #}
+   `repos` and `doing` events; the client swaps it whole, as it swaps the header. A team with
+   nothing live draws only the facets that hold something (`m.drawn`, TD-418). #}
 {% set m = g.summary %}
+{%- set drawn = m.drawn if m.drawn is defined else ('repo', 'motion', 'face') %}
 <div class="tsum" id="tsum-{{ g.team }}" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
   {# -- Repo (§4.5a *team card: Repo facet*) -- #}
+  {% if 'repo' in drawn %}
   <div class="facet frepo">
     {% if not m.repo %}
     <div class="fhead"><span class="kind">Repo</span></div>
@@ -48,10 +51,12 @@
     {% endif %}
     {% endif %}
   </div>
+  {% endif %}
   {# -- TDs in motion (§4.5a *team card: TDs in motion*) -- #}
   {# **Columns** (§4.5a, TD-252): phase · priority · reference · title · holders · PR on one grid, every
      track but the title's a fixed width — the reference's, the holders' and the PR's the server's (`ref_w`,
      `who_w`, `pr_w`) — and every cell drawn, empty where a row has no priority or no PR, so a row keeps its place #}
+  {% if 'motion' in drawn %}
   <div class="facet fmotion" style="--ref-n: {{ m.ref_w or 6 }}; --who-n: {{ m.who_w or 12 }}; --pr-n: {{ m.pr_w or 0 }}">
     <div class="fhead"><span class="kind">TDs in motion ({{ m.motion | length }})</span> <span class="meta">{% for ph in ('add', 'design', 'grind', 'review') %}{% if m.phases[ph] %}{{ m.phases[ph] }} {{ ph }}{{ ' · ' if not loop.last }}{% endif %}{% endfor %}</span></div>
     {% for x in m.motion %}
@@ -67,8 +72,9 @@
     <div class="meta">{% if m.noteam %}no team services this repo{% else %}nothing claimed{% endif %}{% if m.repo and not m.noteam and m.repo.ledger.kind %}{% for b in m.repo.ledger.kind if b.key == 'pickable' %} · {{ b.n }} pickable entr{{ 'y waits' if b.n == 1 else 'ies wait' }} for the next claim{% endfor %}{% endif %}</div>
     {% endfor %}
   </div>
+  {% endif %}
   {# -- Answer needed / Doing (§4.5a *team card: Answer needed / Doing*); none on a repo no team services -- #}
-  {% if not m.noteam %}
+  {% if not m.noteam and 'face' in drawn %}
   {#- **asked you** (§4.5a, TD-353, built by TD-354): the team's open asks to you, one link to the
       oldest's Inbox row, the members and first lines its tooltip as text; no tint, no flip, not in
       Answer needed (n) — the Inbox's page answers it. The age moves in the browser (`data-doing-at`) -#}
@@ -94,7 +100,7 @@
       {% endfor %}
     </div>
     <div class="fv" data-fv="doing"{% if m.face != 'doing' %} hidden{% endif %}>
-      <div class="fhead"><span class="kind">Doing</span> <span class="meta">the team's ao doing calls</span><span class="grow"></span>
+      <div class="fhead"><span class="kind">Doing</span><span class="grow"></span>
         <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
       {{ asked_line(m.asked) }}
       {# **Ages and columns** (§4.5a, TD-232): age · doer · words in columns; the doer's width is the

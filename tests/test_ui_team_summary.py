@@ -236,18 +236,18 @@ def test_answer_needed_opens_the_facet_and_doing_is_newest_first():
 
 def test_the_doing_list_reads_a_short_age_in_columns_and_the_script_spells_it_the_same():
     """TD-232 slice 2 (design §4.5a *team card: Answer needed / Doing*, **Ages and columns**): one
-    unit, *just now* under a minute and ahead of the clock, nothing for an unreadable instant; the
-    doer's width is the server's, the longest name up to eighteen; a longer name is cut and whole
-    in its tooltip; the script ages the cell once a minute in the same words."""
+    unit, *0m* under a minute and ahead of the clock (TD-418; *just now* until then), nothing for an
+    unreadable instant; the doer's width is the server's, the longest name up to eighteen; a longer
+    name is cut and whole in its tooltip; the script ages the cell once a minute in the same words."""
     from agentorc.ui.common import _short_age
 
     def ago(**kw):
         return _iso(NOW - timedelta(**kw))
 
-    assert _short_age(ago(seconds=40), NOW) == "just now"
+    assert _short_age(ago(seconds=40), NOW) == "0m"
     assert _short_age(ago(minutes=5), NOW) == "5m" and _short_age(ago(minutes=59, seconds=59), NOW) == "59m"
     assert _short_age(ago(hours=1, minutes=50), NOW) == "1h" and _short_age(ago(hours=26), NOW) == "1d"
-    assert _short_age(_iso(NOW + timedelta(minutes=3)), NOW) == "just now"  # ahead of the clock
+    assert _short_age(_iso(NOW + timedelta(minutes=3)), NOW) == "0m"  # ahead of the clock
     assert _short_age("half six", NOW) == "" and _short_age(None, NOW) == "" and _short_age(7, NOW) == ""
     long = "grinder-with-a-long-nm"  # twenty-two characters
     ms = [member("g1"), member("t1", name=long)]
@@ -270,19 +270,15 @@ def test_the_doing_list_reads_a_short_age_in_columns_and_the_script_spells_it_th
     css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
     assert (
         "width: calc(var(--doer-n, 12) * 1ch)" in css
-        and ".drow .dage { flex: none; width: 8ch; text-align: right; }" in css
+        and ".drow .dage { flex: none; width: 4ch; text-align: right; }" in css  # fits *59m*
     )
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
     fn = js[js.index("function fmtShortAge(iso)") :]
     fn = fn[: fn.index("\n  }\n")]
-    for words in (
-        'return "just now"',
-        'Math.floor(s / 60) + "m"',
-        'Math.floor(s / 3600) + "h"',
-        'Math.floor(s / 86400) + "d"',
-    ):
-        assert words in fn  # the server's shape, unit for unit
-    assert 'if (s < 60) return "just now"' in fn  # a negative age (ahead of the clock) is *just now* too
+    assert fn  # the server's shape, unit for unit, read by running it: below
+    ahead = _iso(NOW + timedelta(minutes=3))
+    ages = _script_ages([ago(seconds=40), ago(minutes=5), ago(hours=2), ago(days=3), ahead, "x"])
+    assert ages == ["0m", "5m", "2h", "3d", "0m", ""]  # ahead of the clock is *0m* too
     assert "setInterval(() => showDoingAges(), 60000)" in js  # once a minute, not the one-second tick
     assert '$$("[data-doing-at]"' in js and ".age[data-doing-at]" not in js
 
@@ -343,11 +339,10 @@ def test_a_wound_down_team_shows_what_it_left():
     assert none["summary"] is None and not any(m.get("compact") for m in none["members"])
     # nothing live: nothing summed, whatever the summaries hold — Needs you alone (TD-406)
     assert ui.rollup(groups) == {"live": False}
-    # nothing claimed: the facet says so
+    assert s["drawn"] == ["repo", "motion", "face"]  # each of the three holds something
+    # nothing here, nothing claimed, no doing row: no facet, and no summary drawn (TD-418)
     (quiet,) = ui.team_groups([member("q", state="exited", rank=1, slot={}, place="x")], (), {}, {})
-    assert quiet["summary"]["motion"] == [] and "nothing claimed" in ui.templates.get_template(
-        "team_summary.html"
-    ).render(g=quiet)
+    assert quiet["summary"]["motion"] == [] and quiet["summary"]["drawn"] == []
 
 
 def test_compact_in_marks_every_team_member_and_no_team_none():
@@ -406,6 +401,103 @@ def test_with_no_team_live_the_rollup_is_needs_you_alone():
     assert "data-inbox-needs>7<" in html and "data-inbox-overdue>2<" in html and 'href="/inbox"' in html
     assert "Agents (" not in html and "TDs in motion" not in html and "PRs in motion" not in html
     assert "answer needed" not in html and "asked you" not in html
+
+
+def _live(team: str, *ms: dict) -> list[dict]:
+    for m in ms:
+        m.update(team=team, rank=1, slot={}, place="kmaster / samscrape", pill_word=m["state"])
+    return list(ms)
+
+
+def test_the_rollup_with_zero_one_and_two_live_teams():
+    """§4.5a *Org: rollup* (TD-418, built by TD-428 slice 2): no team live — Needs you alone (TD-406);
+    one — Agents and Needs you, that team's own facets saying the rest; two — all four. Agents' blurb is
+    an *i* (a tooltip, nothing to press) and nothing is written under the pills; *answer needed* is
+    drawn above 0 only."""
+    render = ui.templates.get_template("rollup.html").render
+    repos = {"/r/samscrape": reading("/r/samscrape")}
+    zero = render(ro=ui.rollup(ui.team_groups([], (), repos, {})), person_needs=1)
+    assert 'class="rollup quiet"' in zero and "Agents (" not in zero and "answer needed" not in zero
+    one = ui.team_groups(_live("grind", member("g1", progress=[claim("TD-301")]), member("g2")), (), repos, {})
+    ro = ui.rollup(one)
+    assert ro["lone"] and ro["answer_needed"] == 0
+    html = render(ro=ro, person_needs=1)
+    assert 'class="rollup lone"' in html and "Agents (2)" in html and "Needs you" in html
+    assert "TDs in motion" not in html and "PRs in motion" not in html
+    assert "answer needed" not in html  # 0: not drawn
+    tip = "in urgency order, as the cards sort · a pill filters the page to that state"
+    assert f'<span class="tipmark" tabindex="0" role="img" aria-label="{tip}" title="{tip}">i</span>' in html
+    assert f'<div class="meta">{tip}</div>' not in html and "helpmark" not in html  # no panel to open
+    perm = {"kind": "permission", "text": "Bash x", "tool_use_id": "t1"}
+    two = ui.team_groups(
+        [
+            *_live("grind", member("g1", progress=[claim("TD-301")])),
+            *_live("other", member("h1", state="needs-you", pending=perm)),
+        ],
+        (),
+        repos,
+        {},
+    )
+    ro2 = ui.rollup(two)
+    html2 = render(ro=ro2, person_needs=1)
+    assert not ro2["lone"] and 'class="rollup"' in html2
+    assert "Agents (2)" in html2 and "TDs in motion (1)" in html2 and "PRs in motion (1)" in html2
+    assert '>1</b> <a href="#tsum-other"' in html2 and "answer needed</a>" in html2
+    css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
+    assert ".rollup.lone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }" in css
+
+
+def test_a_stopped_team_draws_only_the_facets_that_hold_something():
+    """§4.5a *team card: summary* (TD-418, built by TD-428 slice 2): a team with nothing live draws a
+    facet only where it holds something — no *no repo here*, no *nothing claimed*, no empty Doing — and
+    no summary at all where none does; a live team draws all three, empty or not."""
+    repos = {"/r/samscrape": reading("/r/samscrape")}
+    render = ui.templates.get_template("team_summary.html").render
+
+    def stopped(*ms: dict, doing: dict | None = None) -> dict:
+        for m in ms:
+            m.update(state="exited", rank=1, slot={}, place="x")
+        (g,) = [g for g in ui.team_groups(list(ms), (), repos, doing or {}) if g["team"] == "grind"]
+        return g
+
+    # two: a repo here and a claim, no doing row
+    g = stopped(member("a", progress=[claim("TD-301")]))
+    assert g["summary"]["drawn"] == ["repo", "motion"]
+    html = render(g=g)
+    assert 'class="facet frepo"' in html and 'class="facet fmotion"' in html and "fface" not in html
+    # one: the doing log alone, no repo here and nothing claimed
+    g = stopped(member("b", repo="/elsewhere"), doing={"grind": [{"id": "b", "text": "x", "at": _iso(NOW)}]})
+    assert g["summary"]["drawn"] == ["face"]
+    html = render(g=g)
+    assert "fface" in html and "frepo" not in html and "no repo here" not in html and "nothing claimed" not in html
+    # none: no summary drawn, on the page or in a delta's groups
+    g = stopped(member("c", repo="/elsewhere"))
+    assert g["summary"]["drawn"] == []
+    page = ui.templates.get_template("org.html").render(
+        sessions=g["members"], groups=[g], counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+        strip={"teams": [{"name": "grind"}], "source": "", "notes": []}, host="h", active="Org",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    assert 'class="tsum"' not in page
+    # a live team draws all three, however empty
+    (live,) = [x for x in ui.team_groups(_live("grind", member("d", repo="/elsewhere")), (), repos, {}) if x["team"]]
+    assert live["summary"]["drawn"] == ["repo", "motion", "face"] and "no repo here" in render(g=live)
+
+
+def test_the_facets_heads_and_bars_are_one_height_and_the_summary_is_sized_by_what_it_holds():
+    """§4.5a *Org: rollup*, *team card: summary* and *Repo facet* (TD-418): every facet head one height
+    (the window picker's), the bars and blocks one height so they line up, a label that never wraps
+    with the selector dropping to its own line at the right, the summary in 1.15 : 0.85 : 1.2, and
+    Doing's head the word alone."""
+    css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
+    assert ".facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }" in css
+    assert "white-space: nowrap; }\n.facet .fhead > .seg { margin-left: auto; }" in css
+    assert ".bar, .blocks { display: flex; gap: 2px; height: 26px; }" in css and "min-height: 30px" not in css
+    assert "grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr);" in css
+    s = ui.team_summary("grind", [member("g1")], {}, {"grind": [{"id": "g1", "text": "x", "at": _iso(NOW)}]}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    assert '<span class="kind">Doing</span><span class="grow"></span>' in html
+    assert "the team's ao doing calls" not in html
 
 
 def test_every_card_carries_the_word_the_state_filter_matches():
@@ -672,3 +764,39 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     s = ui.team_summary("grind", [member("g1"), member("g2")], {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     assert "laneline" not in html and 'title="24 pickable"' in html
+
+
+def _script_ages(stamps: list[str]) -> list[str]:
+    """`AO.fmtShortAge` run in node over `stamps`, against the real clock: `NOW` is the test's, so each
+    stamp is moved by the difference first."""
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the Doing ages are JavaScript too, and nothing else runs it")
+    shift = datetime.now(UTC) - NOW
+    moved = [_iso(datetime.fromisoformat(t.replace("Z", "+00:00")) + shift) if t.endswith("Z") else t for t in stamps]
+    probe = ui.Path(tempfile.mkdtemp()) / "age_probe.js"
+    probe.write_text(
+        'const fs = require("fs"); const noop = () => {};'
+        " const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,"
+        " classList: { toggle: noop, add: noop, remove: noop, contains: () => false },"
+        " querySelector: () => null, querySelectorAll: () => [] });"
+        " global.window = {}; global.document = { documentElement: el(), body: el(), querySelector: () => null,"
+        " querySelectorAll: () => [], addEventListener: noop, createElement: el };"
+        " global.localStorage = { getItem: () => null, setItem: noop }; global.matchMedia = () => ({ matches: false });"
+        " global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;"
+        ' global.location = { pathname: "/", protocol: "http:", host: "x" };'
+        ' global.fetch = () => Promise.reject(new Error("no calls"));'
+        ' eval(fs.readFileSync(process.argv[2], "utf8"));'
+        " console.log(JSON.stringify(JSON.parse(process.argv[3]).map((t) => window.AO.fmtShortAge(t))));"
+    )
+    app = ui.Path(ui.__file__).parent / "static" / "app.js"
+    out = subprocess.run([node, str(probe), str(app), json.dumps(moved)], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)

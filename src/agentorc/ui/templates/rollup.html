@@ -1,17 +1,19 @@
 {# The Org **rollup** (design §4.5 screen 1 *The Org, team-first*, §4.5a *Org: rollup*, TD-176
    slice 4): four facets under the title, sums over every live team, every number a link; with no
-   team live, the Needs you facet alone and its *in the Inbox* (TD-406). Rendered on page load and
+   team live, the Needs you facet alone and its *in the Inbox* (TD-406); with one, Agents and Needs
+   you, since that team's own facets say the rest (TD-418, built by TD-428 slice 2). Rendered on page load and
    re-sent with the groups on every delta and on the `repos` and `doing` events.
    The window picker is the page's one value (the client sets it); *in the Inbox* is the top bar's
    count, copied in by the client, and *m overdue* beside it the Inbox poll's `overdue_n` (TD-178). #}
 {% if ro %}
-<div class="rollup{% if not ro.live %} quiet{% endif %}">
+<div class="rollup{% if not ro.live %} quiet{% elif ro.lone %} lone{% endif %}">
   {%- if ro.live %}{#- no team live: Needs you alone, its *in the Inbox* (TD-406) #}
   <div class="facet">
-    <div class="fhead"><span class="kind">Agents ({{ ro.n_agents }})</span></div>
+    {#- the ***i***: a tooltip only, and nothing written under the pills (TD-418) #}
+    <div class="fhead"><span class="kind">Agents ({{ ro.n_agents }})</span><span class="tipmark" tabindex="0" role="img" aria-label="in urgency order, as the cards sort · a pill filters the page to that state" title="in urgency order, as the cards sort · a pill filters the page to that state">i</span></div>
     <div class="row gap wrap">{% for a in ro.agents %}<button type="button" class="pill nog s-{{ a.cls }}" data-state-filter="{{ a.word }}" title="show only the {{ a.label }} sessions — the filter box's state:{{ a.word }}">{{ a.label }} ({{ a.n }})</button>{% endfor %}</div>
-    <div class="meta">in urgency order, as the cards sort · a pill filters the page to that state</div>
   </div>
+  {%- if not ro.lone %}{#- one team live: its own facets say TDs and PRs in motion #}
   <div class="facet">
     <div class="fhead"><span class="kind">TDs in motion ({{ ro.motion }})</span></div>
     {% if ro.phases %}
@@ -32,13 +34,14 @@
     {% else %}<div class="meta">no live team's repo is registered here</div>{% endif %}
   </div>
   {%- endif %}
+  {%- endif %}
   <div class="facet fneeds{% if ro.answer_needed %} answering{% endif %}">
     <div class="fhead"><span class="kind">Needs you</span></div>
-    {%- if ro.live %}
+    {%- if ro.answer_needed %}{#- *answer needed*: drawn above 0 only, as *asked you* is (TD-418) #}
     <div class="nrow"><b class="big">{{ ro.answer_needed }}</b> {% if ro.answer_team %}<a href="#tsum-{{ ro.answer_team }}" title="members waiting on a permission or a question in their pane — answered in their team's facet">answer needed</a>{% else %}<span>answer needed</span>{% endif %}</div>
+    {%- endif %}
     {%- if ro.asked %}{#- *asked you* (§4.5a *Org: rollup*, TD-354): the teams' open asks to you, the oldest's age; hidden at 0 #}
     <div class="nrow"><b class="big">{{ ro.asked }}</b> <a href="#tsum-{{ ro.asked_team }}" title="members' open asks to you, waiting in the Inbox — each team's line links its row">asked you</a> <span class="meta">· <span data-doing-at="{{ ro.asked_at }}">{{ ro.asked_age }}</span></span></div>
-    {%- endif %}
     {%- endif %}
     <div class="nrow"><b class="big" data-inbox-needs>{{ person_needs or 0 }}</b> <a href="/inbox">in the Inbox</a>{#- §4.5 screen 1 (TD-178): the board items past their date among them, kept live from the Inbox's poll as the count is -#}
       <span class="meta overdue{% if not person_overdue %} hidden{% endif %}" title="board items in Needs you whose Due: date has passed">· <span data-inbox-overdue>{{ person_overdue or 0 }}</span> overdue</span></div>

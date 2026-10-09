@@ -278,6 +278,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
+    FACETS,  # noqa: F401
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
@@ -298,6 +299,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401
     doing_rows,  # noqa: F401
+    drawn_facets,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
     repo_facet,  # noqa: F401
@@ -579,7 +581,7 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
             "ids": g["ids"],
             "html": head.render(g=g),
             # the summary's facets (TD-176 slice 3), swapped by the client as the header is
-            "summary": summary.render(g=g) if g.get("summary") else "",
+            "summary": summary.render(g=g) if g.get("summary") and g["summary"].get("drawn") else "",
             # the team's + card (§4.5a *team card: + card*, TD-379): put in by the client when missing
             "plus": plus.render(g=g) if g["team"] and g.get("defined") else "",
         }
@@ -1196,7 +1198,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         teams = list(dict.fromkeys([*(g["team"] for g in serving), *([named] if named else [])]))
         first = serving[0] if serving else None
         if first:
-            summary = first["summary"]
+            # the Repo page draws all three facets, whatever a stopped team's card leaves out (TD-418)
+            summary = {**first["summary"], "drawn": list(FACETS)}
             members = first["members"]
         elif named:
             # a team the definitions give this repo, with nothing live now (between runs, stopped):

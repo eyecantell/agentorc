@@ -326,6 +326,22 @@ def team_lanes(team: str, fleet: list[dict[str, Any]], r: Mapping[str, Any] | No
     return lanes_line(team, got, teamrun.lane_kinds(r))
 
 
+# a summary's three facets, in their order: Repo, TDs in motion, Answer needed / Doing
+FACETS = ("repo", "motion", "face")
+
+
+def drawn_facets(summary: Mapping[str, Any]) -> list[str]:
+    """The facets a team with nothing live draws (§4.5a *team card: summary*, TD-418): only those that
+    hold something — a repo here, a claim in motion, a Doing row (or an answer or an ask) — so a stopped
+    team reads no *no repo here* and no *nothing claimed*; none at all draws no summary."""
+    holds = {
+        "repo": bool(summary.get("repo")),
+        "motion": bool(summary.get("motion")),
+        "face": bool(summary.get("doing") or summary.get("answers") or summary.get("asked")),
+    }
+    return [k for k in FACETS if holds[k]]
+
+
 def team_summary(
     team: str,
     members: list[dict[str, Any]],
@@ -363,6 +379,9 @@ def team_summary(
         # the doer column's width, set here from the names in the list so a filter moves no column (§4.5a)
         "doer_w": min(max((len(d["name"]) for d in drows), default=1), DOER_WIDTH),
         "face": "answer" if answers else "doing",
+        # the facets drawn: all three on a live team and on the Repo page; `drawn_facets` narrows it
+        # for a team with nothing live (TD-418)
+        "drawn": list(FACETS),
         # what the toggle's memory keys on: a person's flip holds until the pending set changes (§4.5a)
         "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}" for a in answers)),
     }
@@ -389,7 +408,8 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
     holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
     counted once), and Needs you's *answer needed* and *asked you*. When no team is live there is
     nothing to sum — a wound-down team's summary (TD-192) is not summed — and the rollup is the Needs
-    you facet alone, `live` false, its *in the Inbox* (TD-406). The Inbox's count is the top bar's,
+    you facet alone, `live` false, its *in the Inbox* (TD-406); with one team live, `lone`: Agents and
+    Needs you, that team's own facets saying the rest (TD-418). The Inbox's count is the top bar's,
     filled in by the client."""
     live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
     if not live:
@@ -429,6 +449,7 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
     oldest = min((a for _, a in asked), key=lambda a: a["at"], default=None)
     return {
         "live": True,
+        "lone": len(live) == 1,
         "agents": agents,
         "n_agents": len(members),
         "phases": [

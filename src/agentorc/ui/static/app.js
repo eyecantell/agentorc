@@ -962,7 +962,7 @@
     if (s < 86400) return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m"; return Math.floor(s / 86400) + "d";
   }
   // The Doing list's short age (§4.5a **Ages and columns**, TD-232), in the very words `_short_age` in
-  // `ui/common.py` draws: *just now* under a minute and ahead of the clock, then one unit. "" = unreadable.
+  // `ui/common.py` draws: *0m* under a minute and ahead of the clock (TD-418), then one unit. "" = unreadable.
   // A stamp with no offset is UTC, as `_instant` reads it, never the browser's local time.
   function utcParse(iso) {
     const v = String(iso || "");
@@ -972,9 +972,10 @@
     const t = utcParse(iso);
     if (isNaN(t)) return "";
     const s = Math.floor((Date.now() - t) / 1000);
-    if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 60) return "0m"; if (s < 3600) return Math.floor(s / 60) + "m";
     if (s < 86400) return Math.floor(s / 3600) + "h"; return Math.floor(s / 86400) + "d";
   }
+  AO.fmtShortAge = fmtShortAge;  // for the node probe (tests/test_ui_team_summary.py)
   // Once a minute, the shape's own grain, and at once for rows just put on the page: the age from the
   // row's timestamp and the exact time in the reader's clock as its tooltip — never `.age[data-since]`,
   // whose one-second tick would write *45s* over it. A cell that cannot be read stays empty.
