@@ -32,12 +32,12 @@
     panes are dark regardless, so light chrome is the jarring case at night. The Focus pane
     carries VS Code's Dark Modern terminal palette (the sixteen ANSI colours, foreground, cursor
     and selection) as literals, not tokens, because the pane must not follow the page; the same
-    output is the same colour in Focus as in the editor's terminal beside it (TD-038). Its face
+    output is the same colour in Focus as in the editor's terminal beside it. Its face
     is bundled (JetBrains Mono, OFL) with ligatures off, because it is a pane you type into — the
     person may set the face and size (§5 `person.terminal`, the Settings page), ligatures off and
     `monospace` the fallback whatever they choose; it
     draws through xterm.js's WebGL renderer where the browser has WebGL, the DOM renderer
-    otherwise (TD-038).
+    otherwise.
 13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`, no
     ssh). A host marked `volatile: true` sleeps with the lid; its sessions show `unreachable`
     (not `stalled?`) when the host agent stops answering, its VS Code links use the local

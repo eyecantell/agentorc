@@ -33,7 +33,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-290 | A UI change goes to the person unchecked: the grinder that made it verifies it itself (Playwright, a scratch UI before the PR, the live copy read-only after the promote), a reviewer only for what it cannot settle, and what is left for the person is a look sent as mail — a steer or an ask, in Steering or Needs you — no longer a `watch` | Medium | Designed 2026-10-03 — build TD-292 (TD-291 built) |
 | TD-292 | Build the mail half of a look: the briefs' three cases as a steer or an ask, `--shot` and the envelope's `shots`, screenshots and the pair on the row, Send to reviewer | Medium | Built (#975, #980, #982, #983, #987, #990, #1007); live check waiting on the first look a builder sends |
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
-| TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | In progress — the node rebuilt with Claude Code; the credential steps are Paul's |
+| TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Paul's — contractmatch done; guardians' team, node and `place:` left |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
@@ -49,7 +49,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
-| TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1–13 (every section over 1,000 words) 2026-10-09 |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | In progress |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Partly done — slice 1 PR #1340 |
 | TD-468 | Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start` | Low | Open |
@@ -65,8 +64,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
-| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Open |
+| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
+| TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 
 ---
 
@@ -446,9 +446,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Priority:** Medium
 **Type:** feature
 **Added:** 2026-10-03 (the anchor; Paul lifted the guardians hold the same day: *i think guardians and contractmatch are good candidates for using teams within a container*)
-**Owner:** anchor
+**Owner:** paul
 **Kind:** build
-**Status:** **Read 2026-10-08 (the anchor, TD-426's run):** nothing in it is a member's now — the node's env and logins, `org.yml`'s `place:`, `ao host up guardians` and contractmatch's brief are the person's, or the person's own session's. In progress — (1) and (2) done 2026-10-03: the image installed Claude Code as root, so `developer` had none; contractmatch #108 moved it under `USER developer`, and `ao host rebuild contractmatch` brought up container `9e66a47155fa` with `claude` 2.1.289 at `/home/developer/.local/bin`, the agent on the live wheel (`8b1da05d4214`) and the link up. The image's postCreate *copying credentials from stuff_for_containers_home* copies nothing on the node: that mount is a tmpfs there. **(3) and (4) done 2026-10-03:** the node's `env` (values unquoted: `docker --env-file` keeps quotes) and three profile logins; `place: {cm-grind: contractmatch}` and the project's node path in `org.yml`; the team started on the node, and grinder-cm-1 merged #110–#113 from inside (none touches `frontend/`: a frontend PR checked inside is still to come). Found on the way: TD-301 (hooks, built and live), TD-302 (a node session's own word is refused) and TD-316 (a node rebuild replaces its container and ends the sessions inside without a word: grinder-cm-1 and manager-cm-1 at 23:38). **Left:** contractmatch's brief still sends frontend work to the devcontainer (Paul's cm session is changing it); then guardians, (5). guardians works from the umbrella repo (Paul, 2026-10-03): its team is defined in `guardians-devenv` against that repo's ledger and board alone
+**Status:** **Read 2026-10-09 (the anchor): the owner is paul.** contractmatch's half is done: since 2026-10-06 its grinder gates a frontend PR in its container (`/home/kmaster/contractmatch/.agentorc.yml`). What is left is guardians, (5), and every step of it is the person's: `/home/kmaster/guardians-devenv/.agentorc.yml` does not exist, `hosts.yml` has no guardians node, and `org.yml` has no guardians `place:`. A board line asks for it. **Read 2026-10-08 (the anchor, TD-426's run):** nothing in it is a member's now — the node's env and logins, `org.yml`'s `place:`, `ao host up guardians` and contractmatch's brief are the person's, or the person's own session's. In progress — (1) and (2) done 2026-10-03: the image installed Claude Code as root, so `developer` had none; contractmatch #108 moved it under `USER developer`, and `ao host rebuild contractmatch` brought up container `9e66a47155fa` with `claude` 2.1.289 at `/home/developer/.local/bin`, the agent on the live wheel (`8b1da05d4214`) and the link up. The image's postCreate *copying credentials from stuff_for_containers_home* copies nothing on the node: that mount is a tmpfs there. **(3) and (4) done 2026-10-03:** the node's `env` (values unquoted: `docker --env-file` keeps quotes) and three profile logins; `place: {cm-grind: contractmatch}` and the project's node path in `org.yml`; the team started on the node, and grinder-cm-1 merged #110–#113 from inside (none touches `frontend/`: a frontend PR checked inside is still to come). Found on the way: TD-301 (hooks, built and live), TD-302 (a node session's own word is refused) and TD-316 (a node rebuild replaces its container and ends the sessions inside without a word: grinder-cm-1 and manager-cm-1 at 23:38). **Left:** contractmatch's brief still sends frontend work to the devcontainer (Paul's cm session is changing it); then guardians, (5). guardians works from the umbrella repo (Paul, 2026-10-03): its team is defined in `guardians-devenv` against that repo's ledger and board alone
 **Location:** `~/.agentorc/hosts.yml` (`nodes:`), `~/.agentorc/nodes/<name>/` (`env`, `profiles/`), `~/.agentorc/org.yml` (`place:`), `/home/kmaster/guardians-devenv/.agentorc.yml` (new), `docs/briefs/guardians-orchestrator.md`, `/home/kmaster/contractmatch/.agentorc.yml`; design §4.4a *A container node*, §4.9 *Where a repo's team lands*, §10
 
 **Why:** the hold of 2026-09-23 is lifted: guardians' five repos are checked out at `~/guardians-devenv`, §10 decided that a devcontainer running an `agentorc-agent` is a node, and the contractmatch node reads *running · link: up — linked* (`ao host status contractmatch`). A team in its container gets the project's own toolchain (contractmatch's `frontend/**` PRs are left open today because kmaster cannot run `flutter analyze`), and an unattended worker's reach is the container's mounts, with a repo-scoped token, never the person's credentials. Nothing has run a team on a node yet: TD-057's *Done when* is that run.
@@ -756,25 +756,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-063 and TD-078 (archived; the same family), TD-285, TD-289, TD-326 (archived flakes, each fixed by waiting on its signal).
 
-## TD-464: The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (the anchor, from TD-109 step (6))
-**Owner:** designer
-**Kind:** design-first
-**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,494 words. Slice 2, §6 (2026-10-09): the policies cut to what each does, reads, writes, sends and refuses; 22,961 → 20,849 words. Slice 3, §4.10 (2026-10-09): cut to how mail works, provenance and incident counts to the history; 19,384 → 17,994 words. Slice 4, §4.5 (2026-10-09): cut to what each screen shows and does; 18,406 → 16,799 words. Slice 5, §4.9c (2026-10-09): cut to what a flow is and does, the migration and the build record to the history; 10,689 → 9,445 words. Slice 6, §4.4a (2026-10-09): already written as rules, so provenance alone left it; 10,388 → 10,237 words. Slice 7, §4.8 (2026-10-09): cut to what each capability, channel and role key is; 9,473 → 9,033 words. Slice 8, §4.4 (2026-10-09): cut to what the host agent does; 9,337 → 8,652 words. Slice 9, §4.9b (2026-10-09): cut to what the seat is and does; 7,896 → 7,588 words. Slice 10, §4.9 (2026-10-09): cut to what the definitions are and what the clients do with them; 7,733 → 7,164 words. Slice 11, §4.7 (2026-10-09): cut to what each command does; 6,440 → 6,117 words. Slice 12, §4.8a, §4.2, §4.6 (2026-10-09): provenance alone; 5,056 → 5,031, 3,124 → 3,067, 2,029 → 1,857 words. Slice 13, §5, §4.1, §4.3, §4.2a, §9, §10 (2026-10-09): provenance alone, §10 left as the dated log it is; 2,788 → 2,582, 2,600 → 2,521, 2,121 → 2,048, 1,365 → 1,281, 1,364 → 1,359, 2,808 → 2,807 words. Before the pass the design was 192,692 words across `docs/design/`. Left: §4.5b, §4.5c, §1–§3, §7, §8, §11 (each under 900 words), and the totals written here at the end. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
-**Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
-
-**Why:**
-- Every session that reads a section pays for it in context. TD-410 counts ~60k tokens of design read by a manager fill that found nothing to do, and TD-378's ADR shows reads are most of the week's cost.
-- A rule restated in several sections drifts apart, and every fact-check has to carry each copy.
-- Much of the growth is dated reasoning written in place (*until 2026-…*, *was:*, the review rounds), which by CLAUDE.md belongs in `docs/design-history.md`.
-
-**Fix:** a pass section by section, largest first, each section its own PR with a fact-check. Move dated reasons and *was* clauses to the history. Cut each reason to one sentence, and keep every rule and every number. Shorten the §4.5a cells to the control and its rule, with the rest in the section the cell points to. **Mind** the doc-bound tests (`tests/test_primer.py`, `help.py`'s bound text): a pass never rewords what they read without the same PR fixing them. **Done when** every section has had its pass, no rule lost, each PR fact-checked, and the total is written here before and after.
-
-**Related:** TD-109 (archived; step 6), TD-410 (what a fill reads), TD-378 (what reads cost).
-
 ## TD-465: Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line
 
 **Priority:** Medium
@@ -1024,7 +1005,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (grinder-ao-2, TD-467 slice 2)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-09 (the designer) — §4.5a's **restarted** chip row: the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every `why` but `start` and `fill`, the window's entries and the ceiling count on hover, drawn as the *brief changed* chip is and never in the slot, gone at the window, never on a seat; §4.5's identity line, §4.10 and §6 name it. Built by TD-487. Was: Open.
+**Blocked by:** TD-487
 **Location:** design §4.5 *The card's anatomy* (row 5), §4.5a (the card rows), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the row-5 slot), `src/agentorc/ending.py` (`restart_words`, which `ao status -v` already uses)
 
 **Why:** TD-459's design said *the card's restart note and `ao status -v` say cache lapsed · idle 5h · 191k*, but no card surface draws any restart (the `restarts` field is read only by the ceiling, rule 8's *work started* header note and, since TD-467 slice 2, `ao status -v`'s `restarts:` line). A page change follows a §4.5a row, so the grinder built the CLI half and left the card to a design: where the note sits (row 5's slot, the report line's hover, or a chip as *brief changed* is), which `restarts` entries it names (the newest only, inside `RESTART_WINDOW`, every `why` or the tick's and the doorbell's alone), and how long it stays.
@@ -1048,3 +1030,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a unit test over `restart_words` and `restarts_line` with `idle` as `True`, `nan`, `inf` and `"5"`, `context` as `True` and `"191k"`, an entry that is not a dict, `restarts` as `None` or a string — each returns words (or "") and does not raise.
 
 **Related:** TD-467 (the build), PR #1371.
+
+## TD-487: Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-485's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a **restarted** chip, §4.5 *The Focus screen's anatomy* (the identity line), §6 *Keeping a team running* (the ceiling), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (~L187 `marks`, the `restart_wanted` chip ~L356; `brief_changed` is drawn in the slot ~L874, which this chip never is), `src/agentorc/ui/templates/card.html` (row 4, beside the report line — a new badge; the card has no *brief changed* chip to copy) and `focus.html` (the header chips beside *brief changed*, ~L61), `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`, the same words), `src/sessionorc/agent_common.py` (`RESTART_WINDOW`, `_counted`)
+
+**Why:** TD-485: a member the tick or the doorbell restarted reads like a fresh start on the card; `ao status -v` says it since TD-467 slice 2 and the page says nothing.
+
+**Fix:** as §4.5a says. (1) `cards.py`: from the record's `restarts`, the entries inside `RESTART_WINDOW` of now whose `why` is neither `start` nor `fill`; with any, `d["restarted"] = {"short": "restarted · " + <the why's words alone: cache lapsed, brief, wanted, person, …>, "text": "restarted · " + restart_words(newest), "hover": "<each entry, newest first, full words + age>\n<n> of 3 in 2 h"}`, the count from `agent_common._counted`'s rule so the chip agrees with the ceiling; none on a seat. (2) On the card a new `<span class="badge">` in row 4 beside the report line drawing `short`, on the Focus header a chip beside *brief changed* drawing `text`, each with the hover as its `title`, never pressable. (3) The view is pushed, so the chip appears with the restart and goes when the window passes — the page re-derives it from `restarts` on each render, no new field on the record. Tests: a record with a `cache` entry ten minutes old draws *restarted · cache lapsed · idle 5h · 191k*; one with a `start` entry alone draws none; one whose newest entry is three hours old draws none; a seat with a `fill` entry draws none; the hover lists two entries newest first with *2 of 3 in 2 h*; `cli.restarts_line` and the chip agree on the words (one table of cases). **Done when** the tests pass and, on a scratch home (`scripts/look_home.py`), a member the tick restarts for a changed brief shows *restarted · brief* on its card and its Focus header, with the entry and its age on hover, and the chip is gone two hours later.
+
+**Related:** TD-485 (the design), TD-467 (`ao status -v`'s line), TD-459 (the doorbell's restart), TD-217 (rule 7's restart), TD-103 (the ceiling).
+
