@@ -66,7 +66,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-423 | The Inbox rail's **Clear filters** appears and vanishes with the first pick, shoving the filter list down and up | Medium | Open |
 | TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Open |
 | TD-427 | The Inbox rail's find count appears under the find box with the first word typed, shoving the toggles down 18 px | Low | Open |
 
@@ -1148,27 +1147,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane and its members' `controllers` name the manager's id; the manager is filled the first time one of its readings is due, a Start with a question kept in its mail filling on the first tick; a fill's prompt ends with the cause line; `docs/briefs/manager-ao-1.md` names no first reads of its own; the tests above pin each; `pdm run test` and `pdm run lint` pass. The live check, once this is live: a week's host-agent journal shows no *a seat with nothing due* close of a manager that was never filled for a cause, and `ao team start ao-grind`'s output names the manager *on call*. TD-410 is archived with this entry.
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
-
-## TD-423: The Inbox rail's **Clear filters** appears and vanishes with the first pick, shoving the filter list down and up
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-08 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/templates/inbox_rail.html` (`rail_html`: the `#railclear` button, `hidden` while `rail.filtered` is false), `src/agentorc/ui/static/app.js` (`AO.railCounts`' `classList.toggle("hidden", !c.filtered)` on every press, keystroke and poll; `landOn`, which presses `#railclear` to reveal a row a filter hides; the button's click handler), `src/agentorc/ui/static/app.css` (`.rail .railclear`, `.btn:disabled`), `tests/test_ui_inbox.py` (the first-paint assertion that the button is drawn without `hidden`); design §4.5 screen 6 *The rail* ("drawn only while anything is picked or typed") and *Narrow* (the sheet's copy of the button), §4.5a **Inbox page: the rail**, mockups `Inbox.dc.html`, `InboxRail.dc.html`
-
-**Why:** Paul's words (2026-10-08, the Add entry form): *Right now in the inbox, if you choose a filter the "clear filters" button appears and pushes the filter list down, then if filters are removed it disappears, raising the filter list. This is a little jarring. Lets instead keep the "Clear filters" button in place and disable it when no filters are selected. Open to better ideas as well.* The rail is a sticky column whose head is **Clear filters**, then the find box, then the three groups (§4.5 screen 6 *The rail*, TD-129/TD-135); the design says the button is *drawn only while anything is picked or typed*, and the build does that with `display: none`, so the first pick inserts 26 px plus the column's gap above the find box and every toggle moves down, and the last un-pick moves them back up. The toggle a person is about to press next is the one that moves, under the pointer, on the very press that filters. The fix is Paul's: the button holds its place always and is **disabled** while nothing is picked or typed — the look `.btn:disabled` already gives every button (dimmed, no hover, §4.5a *a control's look*, TD-338/TD-340) — so the rail's head never changes height and a cleared rail reads as *nothing to clear* rather than as a button that was never there. The one caller that presses the button from script, `landOn`, does so only while a row is hidden by a filter, when the button is enabled, so nothing else changes.
-
-**Fix:**
-1. **Design** — in the same PR, §4.5 screen 6 *The rail*: *drawn only while anything is picked or typed* becomes *always in place at the rail's head, disabled while nothing is picked or typed*, with the reason (a rail whose head changes height moves the toggle under the pointer); the same words in §4.5a's **Inbox page: the rail** row and in the *Narrow* sheet's sentence, since the sheet is the rail moved in (one set of toggles, TD-137) and holds the same button.
-2. **Build** — `inbox_rail.html`: `disabled` in place of `hidden` on the first paint; `AO.railCounts`: `$("#railclear").disabled = !c.filtered` in place of the `hidden` toggle; the template comment and the row of `tests/test_ui_inbox.py` that pins the first paint follow (the filtered page's button is enabled and drawn, an unfiltered page's is drawn and disabled). Check `landOn` still clears a filter that hides the landed-on row.
-3. **The check** (§4.9b *A UI change is verified by its builder*): screenshots of the rail before and after a pick under `docs/mockups/reviews/`, showing the find box and the groups at the same height in both.
-
-**Done when** the Inbox rail's **Clear filters** occupies the same place whether or not anything is picked or typed, is disabled and dimmed while nothing is, clears every pick and the find box with one press while something is, the narrow sheet's copy behaves the same, §4.5 screen 6 and §4.5a say so, the test pins both states, and `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-129 (the rail's design), TD-135 (its build), TD-137 (the narrow sheet), TD-338 / TD-340 (a control's look, `.btn:disabled`), TD-368 (the ledger rows under the rail's picks).
 
 ## TD-425: agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself
 
