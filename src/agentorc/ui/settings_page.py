@@ -284,9 +284,9 @@ def team_cards(
     **when work appears** (§6 rule 8) and **balance** (`balance_card`, read against `sessions` and
     the `repos` reading) — as `settings.yml` holds them. The stop time is drawn in the
     reader's clock, as `ao team until` takes it; one already past says so. `on_work` is the picker's
-    value, `ask` while the key is absent, which `on_work_set` tells apart (*ask me* is then marked
-    *default*). `flows` is each team's `teams.flow_rows`, for the **flow** pick (§4.9c): the current
-    one is `flow`, its strip `flow_strip`."""
+    value, `start` while the key is absent (`ON_WORK_DEFAULT`, TD-457), which `on_work_set` tells apart
+    (*start the team* is then marked *default*). `flows` is each team's `teams.flow_rows`, for the
+    **flow** pick (§4.9c): the current one is `flow`, its strip `flow_strip`."""
     now = now or datetime.now(UTC)
     out = []
     for name, d in defs.items():
@@ -300,7 +300,9 @@ def team_cards(
                 "passed": bool(until and until <= now),
                 "reserve": t.get("reserve") if isinstance(t.get("reserve"), int) else 0,
                 "schedule": t.get("schedule") or None,
-                "on_work": t.get("on_work") if t.get("on_work") in settings_mod.ON_WORK else "ask",
+                "on_work": t.get("on_work")
+                if t.get("on_work") in settings_mod.ON_WORK
+                else settings_mod.ON_WORK_DEFAULT,
                 "on_work_set": t.get("on_work") in settings_mod.ON_WORK,
                 "balance": balance_card(name, t.get("balance"), sessions, repos, host),
                 "flows": (rows := list((flows or {}).get(name) or [])),

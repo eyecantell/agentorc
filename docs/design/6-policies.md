@@ -584,8 +584,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **`ask`**: the **Inbox row: team start** (§4.5a) under *Needs you* — *ao-grind · wound down
        00:56 · its lanes gained 3 entries: TD-213, TD-214, TD-223* — whose **Start** is the team
        card's. Nothing starts until the press.
-     - **`start`**, and what a team with no key has (not built: the code still reads `ask` when the
-       key is absent; TD-466 builds it): a person's standing press, as a schedule is. The home
+     - **`start`**, and what a team with no key has (`ON_WORK_DEFAULT`; TD-466 slice 2): a person's standing press, as a schedule is. The home
        replays the team: the launch record of every record carrying the badge that ended by the
        team's own ending, as §6 *Schedule* replays at the reset and under its rules (seats included,
        no launch record no start, a suspended record or one at its ceiling left out — a seat's
@@ -629,9 +628,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      needs no such write, since the records it makes begin with no `lane_seen` and rule 6 writes
      theirs at their next declaration. A person's Start, a schedule's, or Dismiss clears
      `work_waiting`. The note on the team card (§4.5a *work waiting* note) says which of the two
-     happened: *3 entries waiting since 14:02* or *started 14:12 for TD-213 and 2 more*. **A start
-     is still never the host agent's own idea**: with no key it asks, and `start` is written only by
-     `set_settings`, which a session cannot call. Not on a node yet, as rule 4 is not; a team with
+     happened: *3 entries waiting since 14:02* or *started 14:12 for TD-213 and 2 more*. **With no
+     key the home starts the team** (Paul's decision, 2026-10-08, TD-457): `ask` and `off` are written
+     only by `set_settings`, which a session cannot call. Not on a node yet, as rule 4 is not; a team with
      no lane that matches by header (a lane of references) never has work waiting by this rule.
      **A member that finished while its team runs on.** A team is not wound down while a seat or a
      member is live, and a closed member is written to by no rule, so an entry merged into a
@@ -651,7 +650,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      of the team's `WORK_STARTS_DAY`; a named member at its ceiling, suspended, sat out, or without
      a launch record is left, and a mark naming only such members holds as `nothing`. Under `ask`
      the row reads *ao-grind · grinder-ao-1 finished 00:56 · its lane gained TD-428* (§4.5a **Inbox
-     row: team start**; the row's words and the help text not built — TD-466 builds them), and its
+     row: team start**), and its
      **Start** replays the named members and not the team, which is running — `work_start {team}`, a
      person's own RPC and the home's alone (`modes.HOME_EDITS`), the same replay under the same
      bounds, refused in the row's words when one holds; `off` writes nothing. The member started

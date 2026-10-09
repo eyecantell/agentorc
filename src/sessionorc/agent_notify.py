@@ -19,6 +19,7 @@ from typing import Any
 
 from sessionorc import agent_common, notify
 from sessionorc import settings as settings_mod
+from sessionorc import work as work_mod
 from sessionorc.agent_common import RpcError, _parse, log
 from sessionorc.mail import PERSON
 from sessionorc.models import now_iso, reference_of
@@ -103,14 +104,26 @@ class NotifyMixin:
                         str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until
                     )
         doc = settings_mod.load()
-        on_work = {name: (t or {}).get("on_work", "ask") for name, t in settings_mod.teams(doc).items()}
+        on_work = {
+            name: (t or {}).get("on_work", settings_mod.ON_WORK_DEFAULT) for name, t in settings_mod.teams(doc).items()
+        }
         for team, rec in (self._host_rec.get("teams") or {}).items():
             mark = rec.get("work_waiting") if isinstance(rec, dict) else None
-            if not isinstance(mark, dict) or mark.get("held") or on_work.get(team, "ask") != "ask":
+            if (
+                not isinstance(mark, dict)
+                or mark.get("held")
+                or on_work.get(team, settings_mod.ON_WORK_DEFAULT) != "ask"
+            ):
                 continue  # under `on_work: start` a held mark is the home's own wait, and nobody's stop
             if ids := _work_ids(mark):
                 k = f"work:{team}"
-                rows[k] = _Row(str(mark.get("at") or ""), notify.work_line(team, len(ids)), k, f"{k}|work")
+                # a team that runs on names its finished members (TD-466): the home wrote the mark for them alone
+                # *runs on* as the home reads it: its crew alone, a person's session in it keeps nothing live
+                crew = work_mod.crew(r for r in graph.values() if r.team == team)
+                live = any(r.state not in work_mod.DEAD for r in crew)
+                finished = [str(m) for m in mark.get("members") or {}] if live else None  # keyed by name
+                line = notify.work_line(team, len(ids), finished)
+                rows[k] = _Row(str(mark.get("at") or ""), line, k, f"{k}|work")
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:

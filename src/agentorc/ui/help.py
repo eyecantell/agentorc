@@ -300,10 +300,11 @@ HELP: tuple[Help, ...] = (
         "Start",
         "Inbox row: team start",
         (
-            "Starts this team from its definition, exactly as the Start on its card does: every check first, "
-            "then the manager and the members with their briefs. Press it when the entries the row names "
-            "are work you want the team to take now. It is refused, in words, where the card's Start would "
-            "be, and it picks nothing for the team: the manager decides who runs."
+            "Starts this team from its definition, exactly as the Start on its card does: every check first, then the "
+            "manager and the members with their briefs. When the team is running and the row names members that "
+            "finished, it starts those members alone, each on its brief. Press it when the entries the row names are "
+            "work you want the team to take now. It is refused, in words, where the card's Start would be or where a "
+            "bound holds the members back, and it picks nothing for the team: the manager decides who runs."
         ),
     ),
     Help(
@@ -331,12 +332,12 @@ HELP: tuple[Help, ...] = (
         "when work appears",
         "Settings page: Teams",
         (
-            "Says what the home does when this team has wound down and its lanes then gain entries: ask you "
-            "with a row in the Inbox, start the team itself, or nothing. Pick start the team for a team you "
-            "would start every time the row asked, and leave ask me where you want to look first. It does "
-            "nothing while the team is live, and a start it would make is still held back, the row saying "
-            "why, by the usage line, a passed stop time, three starts in a day, a start in the last thirty "
-            "minutes, or the team's balance line."
+            "Says what the home does when this team has wound down and its lanes then gain entries: ask you with a row"
+            " in the Inbox, start the team itself, or nothing. While the team runs on, a member that finished and was "
+            "closed is started alone when its lane gains an entry. Start the team is the default; pick ask me where "
+            "you want to look first. A start it would make is still held back, the row saying why, by the usage line, "
+            "a passed stop time, three starts in a day, a start in the last thirty minutes, or the team's balance "
+            "line."
         ),
     ),
     Help(
