@@ -885,7 +885,7 @@ def focus_orchestrator():
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    {focus_head("orc-1", pill("idle"), '''<span class="badge">stops 06:00</span>''',
+    {focus_head("orc-1", pill("idle"), '''<span class="badge">stops 06:00</span><span class="badge" title="the terminal mark (§4.6 Reconnect contract, TD-474): the terminal socket dropped and retries on its own — reload if it stays; drawn after a three-second grace">reconnecting…</span>''',
                 next_act='<span class="btn sm next">Take over</span>', member=True)}
     <div class="term" style="height: 520px;">{term}</div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">

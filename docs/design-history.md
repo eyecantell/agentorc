@@ -242,6 +242,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-09 (TD-474, the designer): the Focus identity line's marks gain the terminal mark (§4.6 *Reconnect contract*). Built by TD-480.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 4): §4.5 cut to what each screen shows and does — every *designed/built — TD-NNN* clause, Paul's quotes, the incident stories, the *until TD-NNN* was-clauses and the *What it replaces* paragraphs left the text for this history, and what the code has since built reads as built. The section went from 18,406 to 16,799 words.
 - 2026-10-09 (TD-464, the designer): **Inbox: Needs you / Steering** — screen 6 said the answered board item's move to *Waiting on them* and the look rows were *designed, not built*; TD-305 (`BOARD_WAIT_DAYS`, `waiting_on` in `ui/inbox.py`) and TD-292 (`shots` on the rows) built them, and the text now reads them as built.
 - 2026-10-09 (TD-464, the designer): **The message page** — §4.5 screen 6 said the entry's text is drawn *in TD-127's shape when that lands*; `inbox_entry.html` draws the first paragraph and *details* open (TD-127, built), so the text now says the shape as §4.10's.
@@ -329,6 +330,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-474, the designer): the **terminal mark** row — three marks, their graces and hovers. Built by TD-480.
 - 2026-10-09 (TD-472, the designer; Paul asked why a screenshot pastes into the composer and not the terminal): a paste on the terminal that carries a file and no text takes the attachment road and its path is pasted into the terminal as a bracketed paste; until then the terminal's Paste read the clipboard's text alone, so an image paste sent nothing and said nothing. Built by TD-479.
 - 2026-10-09 (TD-473, the designer): the **Attach** row's bound reads `person.attach.max` (256 MiB by default) in place of 4 MiB, and an upload past one piece shows its progress with a ✕ that cancels it. Built by TD-478.
 - 2026-10-09 (TD-428 slice 3, grinder-ao-2): the team header's one row is built — the flow chip linking to the team's Settings card (`#team-<team>`), ✉ n on every header, the session count on the fold alone, the counts by state only folded, *n ready to close* a mark of its own; the **Flow** pick and its route `POST /api/teams/<team>/flow` gone; Members…, Open file, *Flow on Settings →* and *not concluded:* on the *i* panel's Definition line. The *Flow pick* row's route is corrected to the Settings Save's, `POST /api/settings/teams`.
@@ -570,6 +572,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-13 (amendment): the prediction came true — OpenAI's Agents API (public beta 2026-09-10), Anthropic's Managed Agents, AWS Bedrock AgentCore and Microsoft's Foundry Agent Service all sell a managed cloud agent runtime on token billing with no infrastructure fee. Conclusion recorded: the runtime is commodity; the relay sells the neutral view, not a runtime ([ADR](decisions/2026-09-13-openai-agents-api.md)). The spec now states this in the present tense.
 
 ## 4.6 Transport and terminal mechanics
+- 2026-10-09 (TD-474, the designer; Paul: *the terminal sometimes freezes or gets jittery — is it the connection, and should the page say so?*): the **terminal mark** — *reconnecting…* after the banner's three-second grace, *resized by another client* from a `{clients, window}` frame the bridge sends from tmux's `#{session_attached}` and window size every five seconds, *no output for Ns* on a `working` session after thirty seconds of silence — one at a time, with the events logged to the browser console. Until then the only sign was the grey retry line in the terminal, and a second client's resizing or a silent working pane had none. Built by TD-480.
 - 2026-10-09 (TD-419, the designer): the run-log sweep also prunes `attachments/<session>/`.
 - 2026-09-05: the section's decisions came from a review of the `sessionorc` layer before build.
 - 2026-09-05: the original rule was one long-lived ssh from the UI to *each* host; "phase 1 accepts this and tests it (it is what a hand-typed second `tmux attach` does today)" was the reasoning for the `window-size latest` decision.
