@@ -61,7 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
-| TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Open |
@@ -949,22 +948,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §4.6 says. (1) **Page**: one slot in the identity line beside the state pill, drawn by a small state machine with the three marks in precedence order — `reconnecting` set when `ws.onclose` schedules a retry and cleared on the next pane byte, drawn only after a 3 s grace (the down banner's `test_ui_down_grace.py` pattern: a timer the next open or byte cancels); `resized` from the bridge's `{clients, window}` frame, drawn while `clients > 1` and `window` differs from `[term.cols, term.rows]`, cleared when a later frame agrees; `silent` from a timer restarted on every pane byte, firing at 30 s only while the Focus's last-seen state is `working` (the feed's record, hook-confirmed or scraped alike), its text re-drawn each second as *no output for Ns*, cleared on the next byte or a state other than `working`. Hover titles as §4.5a gives them. `console.info("[agentorc] terminal …", new Date().toISOString())` on each close (code, reason), open, first byte after a silence, and resize frame. (2) **Bridge**: `/term/` runs a periodic task while the pump lives — every 5 s, `tmux display-message -p -t <sid> '#{session_attached} #{window_width} #{window_height}'` through the same `inside` prefix and socket the scroll command uses (a helper in `tmux.py` beside `scroll_argv`) — and sends `{"clients": n, "window": [w, h]}` as a text frame when the reading changes from the last sent (the first reading always sent); a failed read sends nothing. Never pane output: the page's `onmessage` routes it with the `read_only` branch and resets no backoff. (3) **Tests**: the state machine under the node harness (grace, precedence, the clear on a byte, never silent on idle); the bridge's frame on a changed reading and silence on an unchanged one, with the tmux call stubbed; the argv helper. **Done when** the tests pass and each of the three marks is drawn on a scratch home (`scripts/look_home.py`) by forcing it — the UI process killed and restarted (*reconnecting…*), a `working` pane stalled under a `sleep` (*no output for Ns*), a second `tmux attach` of another size on the session (*resized by another client*) — with a screenshot of each under `docs/mockups/reviews/`.
 
 **Related:** TD-474 (the design), TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-096 (the read-only frame).
-
-## TD-481: PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1354)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/app.py` `heads` (`view(s, fleet, seats=seats, repos=repos, waits=waits)`), `person_states` (`view(..., repos=repos, waits=waits)`), `repo_page` (`view(..., repos=repos, waits=waits)`); `tests/test_ui_org.py` `test_an_idle_session_that_waits_on_someone_reads_waiting`
-
-**Why:** The PR's one test calls `view(...)` and `rollup(...)` directly with `repos=` and `waits=`; no test names `person_waits`, `person_states` or `review_wait` (`grep -rn` over `tests/`). Mutation probes on `origin/main` (9013f3ad), each over `tests/test_ui*.py` (536 passed at baseline): dropping `waits=waits` from the `heads` list comprehension — 536 passed; dropping `repos=repos, waits=waits` from `person_states`' `views = [...]` — 536 passed; dropping them from `repo_page`'s `vs = [...]` — `tests/test_ui_org.py tests/test_ui_repo_page.py tests/test_ui_team_summary.py` 83 passed (the same edit made the full-suite run hang past 4 minutes with no result, so it is no more reliable a catch). Each revert returns the old pill (*idle*) on the Org's group heads, the Agents pill's rows and the Repo page, while the Org card's own `view` still reads *waiting*: the very split the comment on `person_states` says the wiring prevents (*so a row's pill is the Org card's*).
-
-**Fix:** Add a test through the app (the fixtures `tests/test_ui_org.py` already uses to render `/org` and `/repo/<name>`) with an idle record holding a claim whose PR the stubbed repo reading holds open: the group's head counts, the Agents rollup and the Repo page each say *waiting*. Re-run the three mutations and see each fail.
-
-**Related:** PR #1354, TD-428.
 
 ## TD-482: PR #1354's `review_pr` assertion is vacuous: dropping `review_pr` from `review_wait` fails nothing
 
