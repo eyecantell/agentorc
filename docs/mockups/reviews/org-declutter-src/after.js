@@ -10,7 +10,7 @@
     .tgroup .ghead .foldmail { display: inline-block !important; }
     .lanechip { margin-left: 6px; flex: none; } .sc .r2 .cline { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .facet .kind { white-space: nowrap; } .frepo .fhead > .seg { margin-left: auto; }
     .lanecnt { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; border: 1px solid; font-weight: 700; color: var(--fg); } .lanecnt.k-pickable { background: color-mix(in srgb, var(--k-pickable) 25%, transparent); border-color: var(--k-pickable); } .lanecnt.k-design { background: color-mix(in srgb, var(--k-design) 25%, transparent); border-color: var(--k-design); } .lanecnt.solid.k-pickable { background: var(--k-pickable); color: var(--seg-fg); } .lanecnt.solid.k-design { background: var(--k-design); color: var(--seg-fg); }
-    .pill.s-waiting { background: color-mix(in srgb, #14b8a6 22%, transparent); color: #5eead4; } .bseg.k-live, .legend .k-live { background: #0f766e; } .bseg.k-blocked, .legend .k-blocked { background: repeating-linear-gradient(135deg, #475569 0 6px, #3b4656 6px 12px); }
+    .pill.s-waiting { background: color-mix(in srgb, #14b8a6 22%, transparent); color: #5eead4; } .bseg.k-live, .legend .k-live { background: #0f766e; } .bseg.k-eval, .legend .k-eval { background: #64748b; } .bseg.k-blocked, .legend .k-blocked { background: repeating-linear-gradient(135deg, #475569 0 6px, #3b4656 6px 12px); }
     .tsum { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); }
     .rollup.lone { grid-template-columns: 2fr 1fr; }
     .defblock { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
@@ -91,23 +91,26 @@
   $$('.card').forEach((c) => {
     const pill = $('.r1 .pill', c), cl = $('.cline', c); if (!pill || !cl || c.dataset.state !== 'idle') return;
     if (/out of work/.test(cl.textContent)) return; const pr = (cl.textContent.match(/TD-\d+ → (#\d+)/) || [])[1]; if (!pr) return;
-    pill.className = 'pill nog s-waiting'; pill.textContent = 'waiting'; pill.title = `waiting on review: ${pr} is open with the reader`;
+    pill.className = 'pill nog s-waiting'; pill.textContent = 'waiting'; pill.title = `waiting on review: ${pr} is open with the techlead`;
   });
   // round 4: the kind bar by who each entry waits on (computed from the same reading:
   // the 10 design-first all wait on their build, so blocked; 13 of the 20 other are live checks)
   const kb = $$('#tsum-ao-grind .frepo .bar')[1];
   if (kb) {
-    const segs = [['k-pickable', 15, 'pickable'], ['k-for-you', 8, 'for you'], ['k-live', 13, 'live check'], ['k-blocked', 10, 'blocked'], ['k-other', 7, 'other']];
+    const segs = [['k-pickable', 5, 'pickable'], ['k-for-you', 8, 'for you'], ['k-live', 13, 'live check'], ['k-blocked', 13, 'blocked'], ['k-eval', 13, 'evaluation'], ['k-other', 1, 'other']];
     const tot = segs.reduce((t, x) => t + x[1], 0);
     kb.innerHTML = segs.map(([k, n, w]) => `<a class="bseg ${k}" style="flex-basis:${(100 * n / tot).toFixed(1)}%" title="${n} ${w}">${n}</a>`).join('');
     const lg = kb.nextElementSibling;
-    if (lg && lg.classList.contains('legend')) lg.innerHTML = [['k-pickable', 'pickable'], ['k-design-first', 'design'], ['k-for-you', 'for you'], ['k-live', 'live check'], ['k-blocked', 'blocked'], ['k-other', 'other']].map(([k, w]) => `<span><i class="${k}"></i>${w}</span>`).join('');
+    if (lg && lg.classList.contains('legend')) lg.innerHTML = [['k-pickable', 'pickable'], ['k-design-first', 'design'], ['k-for-you', 'for you'], ['k-live', 'live check'], ['k-blocked', 'blocked'], ['k-eval', 'evaluation'], ['k-other', 'other']].map(([k, w]) => `<span><i class="${k}"></i>${w}</span>`).join('');
   }
 })();
 (() => {  // round 4: the rollup's Agents pills count WAITING apart from IDLE
   const w = document.querySelectorAll('.card .pill.s-waiting').length; if (!w) return;
-  const idle = [...document.querySelectorAll('.rollup button.pill')].find((b) => /^IDLE/.test(b.textContent.trim()));
+  const idle = [...document.querySelectorAll('.rollup button.pill')].find((b) => /^idle/i.test(b.textContent.trim()));
   if (!idle) return; const n = +(idle.textContent.match(/\((\d+)\)/) || [])[1];
-  idle.textContent = `IDLE (${n - w})`;
-  idle.insertAdjacentHTML('afterend', ` <button type="button" class="pill nog s-waiting">WAITING (${w})</button>`);
+  idle.textContent = `idle (${n - w})`;
+  idle.insertAdjacentHTML('afterend', ` <button type="button" class="pill nog s-waiting">waiting (${w})</button>`);
+})();
+(() => {  // round 5: Doing ages read 0m, never "just now"
+  document.querySelectorAll('.fv[data-fv="doing"] *').forEach((e) => { if (e.children.length === 0 && e.textContent.trim() === 'just now') e.textContent = '0m'; });
 })();
