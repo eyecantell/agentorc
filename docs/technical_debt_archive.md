@@ -7079,3 +7079,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** TD-423 (Clear filters held in place), TD-129 / TD-135 (the rail).
 
 **Resolved:** 2026-10-08 (PR #1308, grinder-ao-2) — `app.css` `.rail #findn { min-height: 1lh; }`: the count keeps its line while empty; pinned in `tests/test_ui_inbox.py`. The UI check (the PR's body) read the first toggle at 222 px empty, typed and cleared at 1440, and 226 px in the 400 px sheet; shot `docs/mockups/reviews/2026-10-08-td427-find-count-typed.png`.
+
+## TD-455: The Inbox rail's disabled Clear filters and held find-count line are pinned by source-text greps: a dead-coded line passes both
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1305–#1308)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_ui_inbox.py::test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked` (the last five lines, the `app.js` and `app.css` asserts); `src/agentorc/ui/static/app.js` (the recount's `$("#railclear").disabled = !c.filtered;`); `src/agentorc/ui/static/app.css` (`.rail #findn { min-height: 1lh; }`)
+
+**Why:** #1307 and #1308 pin the page's recount and the find count's held line with `assert '<the source line>' in js` / `in css`. Evidence, run in this audit's worktree against `origin/main`: prefixing the recount line with `if (false) ` (so the button never changes after the first render) leaves `pytest tests/test_ui_inbox.py` at 107 passed; wrapping the CSS rule in `/* … */` (so the find count holds no line) also leaves it at 107 passed. A plain revert of either line is caught, so the pins are not empty, but they pass for a page whose behaviour is gone. The test's name and docstring also say nothing of the find count, which #1308 added as a trailing assert to the *Clear filters* test, so a failure there reads as a Clear-filters failure. The file already runs the rail's JS in node (`RAIL_PROBE`, line 2796), which is where the recount's `disabled` belongs; for the CSS, the PR's own UI check is the only layout evidence.
+
+**Fix:** extend `RAIL_PROBE` to call the recount with `filtered` true and false and assert the stub button's `disabled` each time; move the find-count CSS assert to its own test named for TD-427 and match the rule as a parsed declaration outside comments, not a substring.
+
+**Done when** both mutations above fail the suite, and the find count has its own named test.
+
+**Resolved:** 2026-10-08 (PR #1310, grinder-ao-2) — `tests/test_ui_inbox.py`: `RECOUNT_PROBE` runs the page's `inboxFilter` in node (a hook appended inside the probe's copy of `app.js`) and `test_the_recount_disables_clear_filters_while_nothing_is_picked` reads `#railclear.disabled` across picks; `test_the_find_count_holds_its_line_while_empty` (TD-427) parses `app.css` with comments stripped. The dead-coded recount line and the commented-out CSS rule each fail the suite.
