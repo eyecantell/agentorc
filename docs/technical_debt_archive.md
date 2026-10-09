@@ -7549,3 +7549,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **The per-thread digest** (*Two more numbers*) is not needed on this showing: no re-ask could be found, and the seat reads its own sent mail first.
 
 **Resolved:** 2026-10-08 (this PR; the role designed in §4.9b and built in #361–#364, #370 and the TD-076 rename) — the done-when holds. Paul decided the shape on 2026-09-19 (its own role, `techlead`, started per batch). Four teams have run with it for more than a fortnight, and step 2's numbers are above. One thing left from it is TD-077's, not this entry's: TD-077 made option E (an OS boundary) the condition for putting a cheaper model beside the techlead. Since then Paul's own `profiles.yml` has run Sonnet (`grind-sonnet`: manager, auditors) and Opus (`grind`: grinders) beside the Fable techlead (`grind-fable`) on one account, `paul`. Whether E is still wanted is TD-077's question, and that entry is no longer blocked by this one.
+
+## TD-105: Mail carries more kinds and machinery than a night's traffic warrants
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session; the design review)
+**Owner:** anchor
+**Kind:** evaluation
+**Status:** Resolved — Open — for evaluation, not scheduled. The one measured night (TD-052 step 5) produced one `ask`, eight replies and nothing to the person. Built since: five kinds plus a `system` sender, eight `closed_reason`s, outcome debts with `OUTCOMES_OWED_MAX` and the `handed` mark, pass-up, answered-for-you, copies, per-thread and per-pair tallies, the wake budget, damping, nonces and six person-side controls (snooze, pause, resume, go-with-it, decline, dismiss). Three cuts cost little and remove design surface without removing a guarantee: **(a) fold `conflict` into an `ask` with several addressees** — §4.10 already says *a conflict is an ask for every rule in this section* and differs only in delivery shape, and the kind appears in briefs but nowhere in the code's own logic beyond a string; **(b) freeze the outcome-debt machinery at what is built** — no new `handed` cases beyond Log TD until a night shows a debt going unpaid; **(c) describe the thread and pair tallies as one exchange bound with two numbers**, one mechanism in the design and the code, rather than two paragraphs. None of these changes a number set in TD-052 step 6. **Next:** for evaluation, not scheduled.
+**Location:** design §4.10, `src/sessionorc/mail.py`, `src/sessionorc/agent.py` (`_msg`, 435 lines), `src/agentorc/briefs/`
+
+**Why:** every kind and closing is a case every brief, every row renderer and every fact-check has to know; the traffic does not yet justify the ones a person never meets.
+
+**Related:** TD-052 (mail), TD-079 (outcomes), TD-069 (the Inbox), TD-039 (the conflict).
+
+**Resolved:** 2026-10-08 (this PR; the anchor, read only, from the live home's mail and run logs) — the three cuts read against the traffic since:
+- **(a) `conflict`: no session has ever sent one.** None of the more than 650 run logs under `~/.agentorc/runs/` (from 2026-09-07) holds a `conflict →` send line. Their send lines are 58 notes, 15 asks, 8 replies and 2 steers. The roughly 300 entries still held in the mailboxes and the person inbox (from 2026-09-23; the count moves as mail arrives and ages out) are almost all notes and replies, with 13 asks, five or six steers and no conflict. A conflict needs a worker with two controllers, and every team today gives a member one, its manager. So the cut is filed as **TD-462** for the designer.
+- **(b) The outcome-debt machinery stays frozen at what is built.** It is used: three entries carry `handed`, and four outcomes were reported, three *done* and one *asker_gone*. Nothing has shown a debt going unpaid, so no new `handed` case is warranted. This is a restraint, not a change, and nothing is filed for it.
+- **(c) The thread and pair tallies stay two constants.** §4.10 *The numbers* already gives the reason: a thread is finite and a pair is not, and the pair's bound is the one a healthy team approaches. Folding them would describe two windows as one. Not taken.

@@ -29,7 +29,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` to a pane that was gone in `test_send_wait_three_outcomes` (diagnosed and refused in words, PR #286; watching until 2026-09-27) | Low | Partly done |
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
-| TD-105 | Mail carries more kinds and machinery than a night's traffic warrants: fold `conflict` into a multi-addressee `ask`, freeze the outcome debt at what is built, state the two tallies as one bound | Medium | Open |
 | TD-106 | Identity on one host (§4.8a) is finished as built: drop the unbuilt techlead alarm path and the `alarms` grant from the design, and decide the cgroup clause | Low | Open |
 | TD-109 | Docs housekeeping after the design pass: finished step briefs sit in `docs/briefs/`, the ledger is 1,000 lines with 50 open entries, and the history file needs a home in the map | Low | Partly done — (1) the step briefs archived |
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Medium | Open |
@@ -59,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Open |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
+| TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Open |
 
 ---
 
@@ -381,19 +381,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Claude Code session's card shows its context in use, and a compaction is visible on it within a tick.
 
 **Related:** TD-090 (a compaction's `SessionStart`), TD-087 (the usage windows, the other budget), design §4.3.
-
-## TD-105: Mail carries more kinds and machinery than a night's traffic warrants
-
-**Priority:** Medium
-**Added:** 2026-09-22 (the anchor session; the design review)
-**Owner:** anchor
-**Kind:** evaluation
-**Status:** Open — for evaluation, not scheduled. The one measured night (TD-052 step 5) produced one `ask`, eight replies and nothing to the person. Built since: five kinds plus a `system` sender, eight `closed_reason`s, outcome debts with `OUTCOMES_OWED_MAX` and the `handed` mark, pass-up, answered-for-you, copies, per-thread and per-pair tallies, the wake budget, damping, nonces and six person-side controls (snooze, pause, resume, go-with-it, decline, dismiss). Three cuts cost little and remove design surface without removing a guarantee: **(a) fold `conflict` into an `ask` with several addressees** — §4.10 already says *a conflict is an ask for every rule in this section* and differs only in delivery shape, and the kind appears in briefs but nowhere in the code's own logic beyond a string; **(b) freeze the outcome-debt machinery at what is built** — no new `handed` cases beyond Log TD until a night shows a debt going unpaid; **(c) describe the thread and pair tallies as one exchange bound with two numbers**, one mechanism in the design and the code, rather than two paragraphs. None of these changes a number set in TD-052 step 6. **Next:** for evaluation, not scheduled.
-**Location:** design §4.10, `src/sessionorc/mail.py`, `src/sessionorc/agent.py` (`_msg`, 435 lines), `src/agentorc/briefs/`
-
-**Why:** every kind and closing is a case every brief, every row renderer and every fact-check has to know; the traffic does not yet justify the ones a person never meets.
-
-**Related:** TD-052 (mail), TD-079 (outcomes), TD-069 (the Inbox), TD-039 (the conflict).
 
 ## TD-106: Identity on one host is finished as built
 
@@ -931,3 +918,22 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** one sentence in §4.5 screen 6 *The rail* and in §4.5a's rail row, in the present tense: the find count holds its line while empty, so typing moves no toggle. The dated fact (TD-427, 2026-10-08) goes to `docs/design-history.md` under §4.5. **Done when** both design files say it and the history line exists.
 
 **Related:** TD-427 (archived), TD-423 (the model for the wording), TD-455.
+
+## TD-462: Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, TD-105's evaluation)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — filed from TD-105's reading. The design round decides whether the kind goes, and files the build entry if it does.
+**Location:** design §4.10 (the kinds table, *A conflict is an `ask` for every rule in this section*, *A conflict, worked*), §4.5a (the conflict's rows), `src/sessionorc/mail.py`, `src/sessionorc/agent_mail.py`, `src/agentorc/briefs/` (each brief that names `--kind conflict`), `ao msg --kind conflict --cites`
+
+**Why:**
+- No session has sent a `conflict` since the kind was built (TD-039). Not one of the more than 650 run logs from 2026-09-07 holds a conflict send, and the roughly 300 retained entries hold none.
+- A conflict is an `ask` addressed to two or more controllers. Every team gives a member one controller, its manager, so the case cannot arise in today's shape.
+- §4.10 already says *a conflict is an ask for every rule in this section*. Yet every brief, every Inbox row renderer, every open-question count and every fact-check carries it as its own kind.
+
+**Fix:** design: fold `conflict` into an `ask` with several addressees and `--cites`. Keep what the kind uniquely carries: the cited `sends` and the rule that it never names the person. Alternatively, write down why the kind earns its place before a second controller exists. Then a build entry. **Done when** the design has one kind fewer, or says why it keeps it.
+
+**Related:** TD-105 (archived; the evaluation), TD-039 (the conflict), TD-052 (mail).
