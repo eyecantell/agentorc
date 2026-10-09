@@ -88,7 +88,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       does while the first is mid-prompt; where an orc-of-orcs' fan-out ceiling sits; whether a
       clean orchestrator exit and a crash propagate differently.
 - [x] **What happens when two controllers of one session disagree?** (raised 2026-09-13;
-      answered 2026-09-14 as §4.10): the conflict report is a `conflict` message to both
+      answered 2026-09-14 as §4.10): the conflict report is a `conflict` message (folded into an `ask` to both, TD-462) to both
       controllers, the exchange is `reply` traffic under one `about`, the escalation is §4.10's
       exchange bound, and a message about a session is copied to its other controllers. Built as
       TD-052; TD-039 is the conflict-specific half.
