@@ -1201,6 +1201,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the sentence in rule 6 says the pruned id's `dropped` mark leaves with it, and no other line of §6 or `docs/design-history.md` says it is kept; the doc-bound tests pass.
 
 **Related:** TD-407 (the design), TD-411 (the build), TD-247 (`dropped: {id: at}`).
+
 ## TD-415: Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words
 
 **Priority:** Low
