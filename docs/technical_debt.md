@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-416 | Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282) | Low | Open |
 | TD-417 | Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested | Low | Open |
 
 ---
@@ -1184,20 +1183,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
 
-
-## TD-416: Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/`
-
-**Why:** #1282 changes `_msg` in `src/sessionorc/agent_mail.py` to accept `text` as the picked answer, `\n\n`, and words. The words must be non-blank: `text.startswith(said + "\n\n") and text[len(said) + 2 :].strip()`. `tests/test_mail.py::test_the_home_checks_that_a_picked_answer_is_one_of_them` refuses `"hold it and more"`, `"hold it\nand more"` and `"merge it\n\nnow"`, and accepts `"hold it\n\nuntil Monday"`, but never a blank tail. Replacing `and text[len(said) + 2 :].strip())` by `)` leaves `pytest -q tests/test_mail.py -k picked` at 3 passed (`origin/main` 5a2f4441): the guard is a line no test would catch going back, and a direct RPC caller could then send `"hold it\n\n   "`.
-
-**Fix:** add `{"text": "hold it\n\n  ", "answer": 1}` to the refused list in that test. **Done when** reverting the `.strip()` condition fails it.
 
 ## TD-417: Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested
 

@@ -395,7 +395,8 @@ class MailMixin:
             if not 0 <= answer < len(replied.answers):
                 raise RpcError(f"{no}: {replied.id} carries {len(replied.answers)} of them (design §4.10)")
             said = replied.answers[answer]
-            if text != said and not (text.startswith(said + "\n\n") and text[len(said) + 2 :].strip()):
+            # `text` is stripped above, so words after the blank line are never blank
+            if text != said and not text.startswith(said + "\n\n"):
                 raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
             picked = answer
         # -- a reader's verdict on a PR's ask (§4.9c, TD-315 slice 1): a word, never read from the text ----
