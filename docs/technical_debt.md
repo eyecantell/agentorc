@@ -757,7 +757,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1341): §4.2a *A metered profile's prompt cache lives an hour* — the claude-code adapter's launch of a session on a `metered` profile carries `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` beside `CLAUDE_CONFIG_DIR`, the subagent key left to the tool, a subscription's launch setting nothing; the one way off is the key in the host agent's own environment, passed through for either billing, no `profiles.yml` field; the doorbell's `CACHE_LIFETIME` is the same hour for both billings because of it. The build is TD-470. Was: Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
+**Status:** Designed 2026-10-09 (the designer, PR #1341): §4.2a *A metered profile's prompt cache lives an hour* — the claude-code adapter's launch of a session on a `metered` profile carries `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` beside `CLAUDE_CONFIG_DIR`, the subagent key left to the tool, a subscription's launch setting nothing; the one way off is the key in the host agent's own environment, whose value the adapter passes into every launch for either billing (`new-session -e`), no `profiles.yml` field; the doorbell's `CACHE_LIFETIME` is the same hour for both billings because of it. The build is TD-470. Was: Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
 **Blocked by:** TD-470
 **Location:** design §4.2a (`billing: metered`, the profile's layer); `src/agentorc/profiles.py`; the claude-code adapter's launch environment
 
@@ -979,6 +979,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Why:** TD-458: on an API key Claude Code caches for five minutes, and 4% of a week's requests fell in the 5–60-minute gap that an hour's cache turns from a re-write into a hit; no team runs metered yet, so the cost is still to come.
 
-**Fix:** in `launch`, when `prof.metered` and `CLAUDE_CODE_PROMPT_CACHE_TTL` is not in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"] = "1h"`; nothing for a subscription profile; nothing for the subagent key. Tests: a metered profile's launch carries the key, a subscription's does not, a metered one with the key in the environment (monkeypatched) gets none of the adapter's. **Done when** a metered profile's session starts with the key and the tests pass.
+**Fix:** in `launch`: when `CLAUDE_CODE_PROMPT_CACHE_TTL` is in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"]` is that value for either billing (the tmux session does not inherit the host agent's environment: `new-session -e` carries each key, `tmux.py` L133); else when `prof.metered`, `"1h"`; else nothing; nothing for the subagent key. Tests: a metered profile's launch carries `1h`, a subscription's carries nothing, either with the key in the environment (monkeypatched) carries that value. **Done when** a metered profile's session starts with the key and the tests pass.
 
 **Related:** TD-458 (the design), TD-151 (metered profiles), TD-459 / TD-467 (the doorbell's `CACHE_LIFETIME`), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
