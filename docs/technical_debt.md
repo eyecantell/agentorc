@@ -68,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Open |
+| TD-414 | §6 rule 6 says a pruned `lane_seen` id keeps its `dropped` mark; `work.reread` and its test remove it | Low | Open |
 
 ---
 
@@ -1181,3 +1182,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane and its members' `controllers` name the manager's id; the manager is filled the first time one of its readings is due, a Start with a question kept in its mail filling on the first tick; a fill's prompt ends with the cause line; `docs/briefs/manager-ao-1.md` names no first reads of its own; the tests above pin each; `pdm run test` and `pdm run lint` pass. The live check, once this is live: a week's host-agent journal shows no *a seat with nothing due* close of a manager that was never filled for a cause, and `ao team start ao-grind`'s output names the manager *on call*. TD-410 is archived with this entry.
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
+
+## TD-414: §6 rule 6 says a pruned `lane_seen` id keeps its drop "under `dropped`"; `work.reread` removes the mark with the id
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1277–#1286: PR #1284 against design §6)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/6-policies.md` (rule 6, *`lane_seen` is the lane's memory, never the ledger's*), `src/sessionorc/work.py` (`reread`), `tests/test_lane_news.py::test_an_entry_that_leaves_the_lane_and_comes_back_is_told_again`
+
+**Why:** §6 rule 6 reads: *an id in it that the reading holds and the lane no longer matches is removed, with the drop kept for it under `dropped`*. The code does the opposite: `reread` rebuilds `seen["dropped"]` without every pruned id (`{i: at for i, at in dropped.items() if i not in left}`), its docstring says *its `dropped` mark with it*, and the test asserts `rec.lane_seen["dropped"] == {"TD-002": ...}` after TD-001 left. The code is the right half (a kept mark would make the returning entry's second drop look already told, against the *a later drop of the same id is told again* sentence two paragraphs down), so the fix is the design's wording: say the mark is removed with the id. Found by reading PR #1284's diff against the section it built; the PR changed the design's wording in no later commit.
+
+**Done when** the sentence in rule 6 says the pruned id's `dropped` mark leaves with it, and no other line of §6 or `docs/design-history.md` says it is kept; the doc-bound tests pass.
+
+**Related:** TD-407 (the design), TD-411 (the build), TD-247 (`dropped: {id: at}`).
