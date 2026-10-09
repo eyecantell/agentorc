@@ -28,7 +28,7 @@ question, TD-039).
      (**`one_for_one`**: a manager coming back finds its members where it left them, because
      membership lives on the target and survives the restart, §4.8). Never `ao new` it yourself,
      which would race the tick. Read its `restarts` and `restart_ceiling` (`ao status --json`)
-     rather than counting; one past the ceiling (*restarts exhausted*) reaches the person's Inbox
+     rather than counting; one at the ceiling (*restarts exhausted*) reaches the person's Inbox
      by itself, and is yours only to escalate once, below, if the board does not already carry it.
      OTP, systemd and Circus each arrived at that ceiling independently
      (`docs/decisions/2026-09-12-orchestrator-membership-prior-art.md`); without one, a member
