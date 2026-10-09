@@ -7837,8 +7837,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-459 (the design), TD-458 (the metered profile's lifetime), TD-460 (the context-bound trial; both change how often a grinder restarts), TD-217 (rule 7's tick restart), TD-347 (the bell).
 
-
-
 ## TD-476: PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets
 
 **Priority:** Medium
