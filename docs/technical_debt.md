@@ -1196,7 +1196,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** design §4.8 *A repo's brief is a supplement* (the rule), §4.3 *A kill the guard refuses*, §4.2's table row; `src/agentorc/skill.md` (the Never list), `src/agentorc/briefs/*.md` (every template's never-list: anchor, auditor, designer, grinder, hunter, manager, manager_on_call, techlead), `src/agentorc/adapters/claude_code/hook.py` (`PreToolUse`), a new `src/agentorc/adapters/claude_code/guard.py`; `docs/briefs/**` untouched (held; grinder-ao-1's own line stays)
+**Location:** design §4.8 *A repo's brief is a supplement* (the rule), §4.3 *A kill the guard refuses*, §4.2's table row; `src/agentorc/skill.md` (the Never list), `src/agentorc/briefs/*.md` (every template's never-list: anchor, auditor, designer, grinder, hunter, manager, manager_on_call, techlead; `entry.md` and the two `*.stage.md` supplements only where they carry one — the test over the directory says which), `src/agentorc/adapters/claude_code/hook.py` (`PreToolUse`), a new `src/agentorc/adapters/claude_code/guard.py`; `docs/briefs/**` untouched (held; grinder-ao-1's own line stays)
 
 **Why:** TD-489: a cleanup loop that killed each stray `sleep`'s parent killed `systemd --user` on 2026-10-09; no brief said never to signal a process the session did not start, and nothing refused it.
 
