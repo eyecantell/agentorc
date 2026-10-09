@@ -2786,11 +2786,76 @@ def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(m
         assert (" disabled" in button) is disabled, query
         assert html.index('id="railclear"') < html.index('id="ifilter"'), query  # the rail's head
     js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
-    assert '$("#railclear").disabled = !c.filtered;' in js
     assert 'railclear").classList.toggle("hidden"' not in js
-    # …and the find count under the box holds its line while empty, as the button holds its place (TD-427)
+
+
+# The page's own recount (`inboxFilter`, module-private) run in node against stub elements (TD-455):
+# a hook appended inside app.js's closure, in the probe's copy only, sets the picks and runs it.
+RECOUNT_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({ dataset: {}, style: {}, textContent: "", innerHTML: "", hidden: false,
+  addEventListener: noop, appendChild: noop, normalize: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false }, o);
+const els = { "#ifilter": el({ value: "" }), "#railclear": el({ disabled: "unset" }),
+  "#findn": el(), ".inboxpage": el() };
+const document = { documentElement: el(), body: el(), activeElement: null, getElementById: () => null,
+  querySelector: (s) => els[s] || null, querySelectorAll: () => [], addEventListener: noop,
+  createElement: () => el(), createTextNode: (t) => ({ textContent: t }) };
+global.window = {}; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/inbox", protocol: "http:", host: "x", search: "" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+const src = fs.readFileSync(process.argv[2], "utf8");
+const end = src.lastIndexOf("})();");
+eval(src.slice(0, end) + "window.__recount = (q) => { rail = AO.railPicks(q); inboxFilter(); }; " + src.slice(end));
+const out = [];
+for (const q of ["", "sec=needs", "find=517", ""]) {
+  window.__recount(q);
+  out.push({ q, disabled: els["#railclear"].disabled });
+}
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.unit
+def test_the_recount_disables_clear_filters_while_nothing_is_picked():
+    """TD-423, pinned by behaviour (TD-455): the page's recount, which runs on every press,
+    keystroke and poll, sets **Clear filters** disabled with nothing picked or typed and enabled
+    with a pick or a word, and disabled again once they are gone."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the recount is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "recount_probe.js"
+    probe.write_text(RECOUNT_PROBE)
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
+    out = subprocess.run([node, str(probe), str(app_js)], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert [(c["q"], c["disabled"]) for c in json.loads(out.stdout)] == [
+        ("", True),
+        ("sec=needs", False),
+        ("find=517", False),
+        ("", True),
+    ]
+
+
+@pytest.mark.unit
+def test_the_find_count_holds_its_line_while_empty():
+    """TD-427: `#findn`, the find box's *n of m*, keeps one line while it is empty, so the first
+    word typed moves no toggle. Read as a declaration of the stylesheet's rules, comments
+    stripped, so a rule commented out is no rule."""
     css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
-    assert ".rail #findn { min-height: 1lh; }" in css
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules = re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+    decls = [
+        dict((k.strip(), v.strip()) for k, _, v in (d.partition(":") for d in body.split(";")) if k.strip())
+        for sel, body in rules
+        if ".rail #findn" in [x.strip() for x in sel.split(",")]
+    ]
+    assert any(d.get("min-height") == "1lh" for d in decls), decls
 
 
 RAIL_PROBE = """
