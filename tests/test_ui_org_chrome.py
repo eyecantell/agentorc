@@ -38,6 +38,7 @@ filters.forEach((f) => {
   const w = AO.orgWords(f);
   out[f] = Object.keys(cards).filter((k) => AO.orgPasses(cards[k], w));
 });
+out.toggles = JSON.parse(process.argv[5]).map(([raw, word]) => AO.orgToggleWord(raw, word));
 console.log(JSON.stringify(out));
 """
 
@@ -52,16 +53,21 @@ CARDS = {
 }
 
 
-def _passes(*filters: str) -> dict:
+def _run(filters: list[str], toggles: list[list[str]]) -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the Org's filter is JavaScript, and nothing else runs it")
     probe = pathlib.Path(tempfile.mkdtemp()) / "org_filter_probe.js"
     probe.write_text(PROBE)
-    run = [node, str(probe), str(UI / "static" / "app.js"), json.dumps(CARDS), json.dumps(list(filters))]
+    run = [node, str(probe), str(UI / "static" / "app.js"), json.dumps(CARDS), json.dumps(filters), json.dumps(toggles)]
     out = subprocess.run(run, capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
-    return {k: set(v) for k, v in json.loads(out.stdout).items()}
+    return json.loads(out.stdout)
+
+
+def _passes(*filters: str) -> dict:
+    got = _run(list(filters), [])
+    return {f: set(got[f]) for f in filters}
 
 
 @pytest.mark.unit
@@ -109,6 +115,35 @@ def test_text_words_each_must_match_beside_the_others():
     assert got["agentorc td428"] == {"worker"}
     assert got["mine agentorc"] == {"me"}
     assert got["scratch kind:command"] == {"loose"}
+
+
+@pytest.mark.unit
+def test_a_badge_or_a_pill_presses_its_own_word_and_keeps_the_rest():
+    """The team badge types `team:<name>` and an Agents pill `state:<word>`: each replaces a word of its
+    own prefix or is added, and pressed again is taken out — `mine`, `kind:command` and text stay."""
+    got = _run(
+        [],
+        [
+            ["", "team:ao-grind"],
+            ["team:ao-grind", "team:ao-grind"],
+            ["mine kind:command", "state:working"],
+            ["mine state:working kind:command", "state:working"],
+            ["mine state:idle", "state:working"],
+            ["team:sam mine", "team:ao-grind"],
+            ["Team:AO-grind mine", "team:ao-grind"],
+            ["team:ao-grind agentorc", "state:idle"],
+        ],
+    )["toggles"]
+    assert got == [
+        "team:ao-grind",
+        "",
+        "mine kind:command state:working",
+        "mine kind:command",
+        "mine state:working",
+        "mine team:ao-grind",
+        "mine",
+        "team:ao-grind agentorc state:idle",
+    ]
 
 
 def test_the_top_bar_draws_one_new_button_whose_menu_is_session_and_shell(client):  # noqa: F811

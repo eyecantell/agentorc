@@ -948,6 +948,7 @@
     store.set("theme", cur === "dark" ? "light" : "dark"); applyTheme();
   });
   $("#shellbtn") && $("#shellbtn").addEventListener("click", () => {
+    const menu = $("#newmenu"); if (menu) menu.open = false;  // the + New ▾ menu folds on its choice
     const d = prompt("Shell in which directory?", store.get("lastdir", "~"));
     if (!d) return; store.set("lastdir", d);
     const f = $("#shellform"); f.querySelector("[name=dir]").value = d; f.submit();
@@ -1345,6 +1346,16 @@
       else w.text.push(low);
     });
     return w;
+  };
+  // A team badge or an Agents pill presses one word (`team:<name>`, `state:<word>`): it replaces a
+  // word of the same prefix, or is added, and pressed again it is taken out — the box's other words
+  // (`mine`, `kind:command`, text) stay as they were.
+  AO.orgToggleWord = function (raw, word) {
+    const prefix = word.slice(0, word.indexOf(":") + 1).toLowerCase(), low = word.toLowerCase();
+    const words = String(raw || "").trim().split(/\s+/).filter(Boolean);
+    const had = words.some((w) => w.toLowerCase() === low);
+    const rest = words.filter((w) => !w.toLowerCase().startsWith(prefix));
+    return (had ? rest : [...rest, word]).join(" ");
   };
   // `c` is what a card says of itself: its `data-*` (`kind`, `team`, `pill`, `mine`) and its text.
   AO.orgPasses = function (c, w) {
@@ -2514,12 +2525,12 @@
     $("#filter").addEventListener("input", layout);
     $("#retry").addEventListener("click", () => location.reload());
     const box = $("#groups");
-    // The card's team badge filters the page to that team; pressing it again clears the box.
+    // The card's team badge filters the page to that team; pressing it again takes the word out.
     box.addEventListener("click", (e) => {
       const b = e.target.closest(".badge.team"); if (!b) return;
       e.preventDefault();
-      const f = $("#filter"), q = "team:" + b.dataset.team;
-      f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
+      const f = $("#filter");
+      f.value = AO.orgToggleWord(f.value, "team:" + b.dataset.team);
       layout();
     });
     box.addEventListener("change", (e) => {
@@ -2549,14 +2560,14 @@
       if (p && !p.disabled) pickSummary(p);
     });
     // the rollup (TD-176 slice 4): its window picker is the page's one value, and an Agents pill
-    // types `state:<word>` into the filter box — pressed again, it clears it
+    // types `state:<word>` into the filter box — pressed again, it takes the word out
     const rollupBox = $("#rollup");
     if (rollupBox) rollupBox.addEventListener("click", (e) => {
       const p = e.target.closest(".seg[data-pick] button");
       if (p) return pickSummary(p);
       const pill = e.target.closest("[data-state-filter]"); if (!pill) return;
-      const f = $("#filter"), q = "state:" + pill.dataset.stateFilter;
-      f.value = f.value.trim().toLowerCase() === q ? "" : q;
+      const f = $("#filter");
+      f.value = AO.orgToggleWord(f.value, "state:" + pill.dataset.stateFilter);
       layout();
     });
     layout();
