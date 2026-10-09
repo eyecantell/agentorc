@@ -131,6 +131,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-09 (TD-419, the designer): **an attachment's life** — kept while the session is live, then deleted by the run-log sweep past `runs_keep_days`; not at Close, not at Forget. Built by TD-469.
 - 2026-10-07 (TD-384 slice 1, grinder-ao-1): work orders built in the repo reading — `sessionorc/workorders.py` runs the repo's own `nudge_user_attention.py --report --json --fetch` (a plain read when the fetch fails) and keys each open decided line, `fyi` left out, `board:<key>` by the reader's own `item_key`, loaded from that file; `_read_repo` reads them with the PRs every `REPOS_EVERY` as `work_orders`, a failed read keeping the last with the error; `ao repo` lists them first among the pickable rows and counts them.
 - 2026-10-07 (TD-380, the designer; asked by Paul the same day): a decided board line is a **work order** in the repo's lanes — the repo reading lists it as `board:<key>`, High, pickable; rule 8 counts it and a grinder picks it first; the Decide press writes nothing more, and the anchor seat (TD-381) is its other taker.
 - 2026-10-07 (TD-368 slice 1, grinder-ao-1): the reader built — `ledger.kind_of` reads *for you* as `Owner: paul` or `decision (paul)` (any case, `decided_by`), *design-first* as `Kind: design-first` or any entry on `decision (designer)`; the anchor's `Kind: decision` and a build on `decision (anchor)` read *other*.
@@ -534,6 +535,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-13 (amendment): the prediction came true — OpenAI's Agents API (public beta 2026-09-10), Anthropic's Managed Agents, AWS Bedrock AgentCore and Microsoft's Foundry Agent Service all sell a managed cloud agent runtime on token billing with no infrastructure fee. Conclusion recorded: the runtime is commodity; the relay sells the neutral view, not a runtime ([ADR](decisions/2026-09-13-openai-agents-api.md)). The spec now states this in the present tense.
 
 ## 4.6 Transport and terminal mechanics
+- 2026-10-09 (TD-419, the designer): the run-log sweep also prunes `attachments/<session>/`.
 - 2026-09-05: the section's decisions came from a review of the `sessionorc` layer before build.
 - 2026-09-05: the original rule was one long-lived ssh from the UI to *each* host; "phase 1 accepts this and tests it (it is what a hand-typed second `tmux attach` does today)" was the reasoning for the `window-size latest` decision.
 - 2026-09-09 (TD-022): scrollback moved to tmux's own history reached through tmux (`mouse on` per session, Shift+PageUp/PageDown via bridge message), replacing a local xterm.js buffer.
