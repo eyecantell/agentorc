@@ -861,7 +861,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 - A red run on main stops the promote policy (*not now: checks on main are failed*), and a red PR costs a re-run.
 - The anchor's read of 2026-10-08 covered every run from 09-27 to 10-09, including the first attempts of re-runs. It found these four failing after every earlier flake had its fix:
   - `tests/test_ui_board.py::test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it` — **four times**, on both Pythons: run 37111273858 (10-03, `td294-host-reads`), 37175483747 (10-04, `td292-look-shots`), 37253443447 (10-05, **main**), 37320649134 (10-05, `td099-live-check`). Each time `assert ['plain'] == ['plain', 'fetch']`: the fetching read had not started when the test looked.
-  - `tests/test_mail.py::test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wakes_its_manager` — once, run 37252493668 (10-05, main, 3.12): *ao-test-asks-waiting-counts-open-0-mgr never blocked in wait*.
+  - `tests/test_mail.py::test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wakes_its_manager` — once, run 37252493668 (10-05, main, 3.12): *ao-test-asks-waiting-counts-open-0-mgr never blocked in wait*. The same job also failed `test_link.py`'s supersession test, which was TD-326's, fixed by #1058 at 07:29Z that day.
   - `tests/test_agent_paths.py::test_a_screen_rules_state_goes_back_when_its_screen_is_gone` — once, run 37574592141 (10-07, main, 3.13): `assert False`.
   - `tests/test_agent_paths.py::test_forget_leaves_no_side_table_entry` — once, run 37748462010 (10-08, `td397-checkout-held-tests`, 3.12): the forgotten id was still in a side table.
 
