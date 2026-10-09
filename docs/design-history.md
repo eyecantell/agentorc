@@ -315,6 +315,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-08 (TD-424, grinder-ao-1): the Due strip / Inbox board row's **Done** row said TD-338's pending mark was *not built*; TD-340 built it (#1144), as the *a control's look* and *Inbox row: pending* rows already said, so the row now reads *built — TD-340*.
 - 2026-10-08 (TD-421, the designer): the row *a URL is a link — Ctrl+click / Cmd+click* on the Focus pane. TD-422 builds it.
 - 2026-10-08 (TD-408, the designer): the row *» put away / « (the rail)* on the Focus side panel, and the *keys* row names `s` for it on Focus. TD-412 builds it.
 - 2026-10-08 (TD-412, grinder-ao-2): *The help text* gains **» put away** (Focus side panel), the Help page's Focus paragraph, as the build entry worded it.
