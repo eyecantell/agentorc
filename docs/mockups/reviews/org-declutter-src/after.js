@@ -97,9 +97,9 @@
   // the 10 design-first all wait on their build, so blocked; 13 of the 20 other are live checks)
   const kb = $$('#tsum-ao-grind .frepo .bar')[1];
   if (kb) {
-    const segs = [['k-pickable', 5, 'pickable'], ['k-for-you', 8, 'for you'], ['k-live', 13, 'live check'], ['k-blocked', 13, 'blocked'], ['k-eval', 13, 'evaluation'], ['k-other', 1, 'other']];
+    const segs = [['k-pickable', 5, 'pickable'], ['k-for-you', 8, 'for you'], ['k-live', 12, 'live check'], ['k-blocked', 15, 'blocked'], ['k-eval', 13, 'evaluation'], ['k-other', 0, 'other']];
     const tot = segs.reduce((t, x) => t + x[1], 0);
-    kb.innerHTML = segs.map(([k, n, w]) => `<a class="bseg ${k}" style="flex-basis:${(100 * n / tot).toFixed(1)}%" title="${n} ${w}">${n}</a>`).join('');
+    kb.innerHTML = segs.filter((x) => x[1]).map(([k, n, w]) => `<a class="bseg ${k}" style="flex-basis:${(100 * n / tot).toFixed(1)}%" title="${n} ${w}">${n}</a>`).join('');
     const lg = kb.nextElementSibling;
     if (lg && lg.classList.contains('legend')) lg.innerHTML = [['k-pickable', 'pickable'], ['k-design-first', 'design'], ['k-for-you', 'for you'], ['k-live', 'live check'], ['k-blocked', 'blocked'], ['k-eval', 'evaluation'], ['k-other', 'other']].map(([k, w]) => `<span><i class="${k}"></i>${w}</span>`).join('');
   }
