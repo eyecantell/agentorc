@@ -499,8 +499,8 @@ code and needs no grant; a session doing the same work does.
      declare again* — the ids from the reading, five at most and *and n more*, nothing a session
      wrote — and adds them to `lane_seen`, so an entry is told once. **`lane_seen` is the lane's
      memory, never the ledger's** (TD-407; designed 2026-10-08; built — TD-411): on every reading,
-     an id in it that the reading holds and the lane no longer matches is removed, with the drop
-     kept for it under `dropped`, for a live member and a gone one alike, so an entry that leaves
+     an id in it that the reading holds and the lane no longer matches is removed, its drop mark
+     under `dropped` removed with it, for a live member and a gone one alike, so an entry that leaves
      the lane and comes back is news once more — a build that became a live check and then went
      live, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
      the reading does not hold is kept, since an entry absent from the checkout's file is archived
