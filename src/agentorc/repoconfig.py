@@ -188,7 +188,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "message": "the team's work: what it picks, its pace, a member that is stuck or should stop",
     },
     # The go-between (design §4.9b, TD-075): answers teammates' questions from the record, passes the
-    # rest up. No grants — it acts on no session; the design's `alarms` grant is not built.
+    # rest up. No grants — it acts on no session, and identity alarms go to the person (§4.8a).
     "techlead": {
         "kind": "seat",
         "brief": "techlead.md",
