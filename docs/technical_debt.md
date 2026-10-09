@@ -68,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
+| TD-421 | A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser | Medium | Open |
 
 ---
 
@@ -1181,3 +1182,23 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane and its members' `controllers` name the manager's id; the manager is filled the first time one of its readings is due, a Start with a question kept in its mail filling on the first tick; a fill's prompt ends with the cause line; `docs/briefs/manager-ao-1.md` names no first reads of its own; the tests above pin each; `pdm run test` and `pdm run lint` pass. The live check, once this is live: a week's host-agent journal shows no *a seat with nothing due* close of a manager that was never filled for a cause, and `ao team start ao-grind`'s output names the manager *on call*. TD-410 is archived with this entry.
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
+
+## TD-421: A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`: the `new Terminal(…)` and the two `loadAddon` calls — fit and WebGL — are the only addons the pane loads), `src/agentorc/ui/templates/focus.html` (the `/static/vendor/` script tags), `src/agentorc/ui/static/vendor/README.md` (the xterm.js family's version table: `@xterm/xterm` 5.5.0); design §4.6 *The mouse is the browser's*, §4.5a (the Focus rows: *Copy / Paste*, *copy on select*), §2 goal 12 (the terminal's face), §5 `person.terminal`
+
+**Why:** Paul's words (2026-10-08, the Add entry form): *Need to be able to go to a link by clicking it in the session terminal. Right now you have to copy it, and paste it in the (default) browser. It would be nice if it went automatically. The vscode terminal has this.* A session's pane is full of URLs a person wants to follow — the PR a worker just opened, a CI run, a design page — and today each is a drag, a Copy and a paste into the address bar (§4.5a *Copy / Paste*). VS Code's terminal underlines a URL on hover and opens it on Ctrl+click (Cmd+click on a Mac); xterm.js, which draws the pane, ships that as `@xterm/addon-web-links`, and the pane loads only the fit and WebGL addons. Nothing in the design says a URL in the pane is a link, and a control that is not in §4.5a's table does not exist — so this is designed before it is built. The one thing the design has to settle is Paul's own constraint (TD-071 item 8): *nothing on a page is a control that parses what an agent printed*. A link in the pane is built from text a session wrote, so the design says what makes it safe where a button from screen text would not be: it does one thing, open the URL as the browser's own address bar would (`noopener`, a new tab, no `javascript:` or `file:` schemes, as §5 `person.open_in`'s scheme rule already refuses), it opens nothing without a press, and the press is the terminal convention (a modifier+click, the URL shown first), never a bare click that a drag or a stray tap could land on a line that is being read.
+
+**Fix (to design, then build):**
+1. **Design** — one paragraph in §4.6 beside *The mouse is the browser's*: a URL in the pane is a link, how it is told from the text around it (xterm.js's web-links addon: `http://` and `https://` only, the addon's own regex), what the press is (Ctrl+click / Cmd+click as VS Code's terminal, with the underline on hover; or a plain click — decide, with the reading of TD-071's constraint above), where it opens (a new tab, `noopener`), and that it is inert on nothing: it reads, so a read-only Focus (TD-096) has it too. One row in §4.5a for the Focus pane's link. Say whether it is a person's choice (`person.terminal`, §5, beside copy on select) or has none — the lean is none: a link that opens only on a modifier+click takes nothing from anyone.
+2. **Build** — vendor `@xterm/addon-web-links` at the release paired with `@xterm/xterm` 5.5.0, with its licence file and its row in `vendor/README.md`; load it in `AO.focus` beside the fit addon, with a handler that opens the URL in a new tab through `window.open(url, "_blank", "noopener")`; the screenshot of the hover and the opened tab under `docs/mockups/reviews/` as a UI change's check asks (§4.9b *A UI change is verified by its builder*).
+
+**Done when** a URL printed in a session's Focus pane underlines on hover and opens in a new browser tab on the press the design names, a plain drag over it still selects, nothing opens without a press, §4.5a has the row and §4.6 the paragraph, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-071 (item 8, Paul's constraint: nothing on a page is a control that parses what an agent printed), TD-164 / TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the pane's renderer and face), §5 `person.open_in` (the editor presets' scheme rule, cited there for TD-095).
