@@ -7059,3 +7059,23 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** TD-129 (the rail's design), TD-135 (its build), TD-137 (the narrow sheet), TD-338 / TD-340 (a control's look, `.btn:disabled`), TD-368 (the ledger rows under the rail's picks).
 
 **Resolved:** 2026-10-08 (PR #1307, grinder-ao-2) — §4.5 screen 6 *The rail* and *Narrow*, and §4.5a's **Inbox page: the rail** row, say **Clear filters** is always in place and disabled while nothing is picked or typed; `inbox_rail.html` draws it with `disabled` in place of `hidden`, and the recount in `app.js` sets `disabled`; pinned by `tests/test_ui_inbox.py`. The UI check (the PR's body) read the button, the find box and the first toggle at the same heights unpicked, picked and cleared, at 1440 and in the 400 px sheet; shots `docs/mockups/reviews/2026-10-08-td423-*.png`. The find count's own shift is TD-427.
+
+## TD-427: The Inbox rail's find count appears under the find box with the first word typed, shoving the toggles down 18 px
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (grinder-ao-2, met building TD-423)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/templates/inbox_rail.html` (`.railfind`: `#findn` beside `#ifilter`), `src/agentorc/ui/static/app.js` (where `#findn` gets its *n of m* text, empty with no words), `src/agentorc/ui/static/app.css` (`.railfind`)
+
+**Why:** TD-423 held **Clear filters** in place because a rail head that changes height moves the toggle under the pointer (Paul, 2026-10-08). The find box's count does the same one step down: `#findn` is empty until a word is typed, then reads *n of m* on a line of its own, and every toggle under it moves down 18 px (read on a scratch home at 1440×900: the first toggle's top at 204 px with nothing typed, 222 px with `zz` typed, back to 204 px when cleared). Typing is not a press under the pointer, so it is milder than TD-423's, but the list jumps on the first keystroke and back on the last.
+
+**Fix:** reserve the count's line — `#findn` drawn always with a `min-height` of one line (or its text a non-breaking space when empty) — so the rail's height does not change with the find; or put the count inside the find box's right edge. A test pins the line drawn with nothing typed. Design §4.5 screen 6 *The rail* names the count; if its place changes, the design says so in the same PR.
+
+**Done when** typing the first word and clearing the last move no toggle on the rail (a scratch-home read of the first toggle's top, as above), and a test pins it.
+
+**Related:** TD-423 (Clear filters held in place), TD-129 / TD-135 (the rail).
+
+**Resolved:** 2026-10-08 (PR #1308, grinder-ao-2) — `app.css` `.rail #findn { min-height: 1lh; }`: the count keeps its line while empty; pinned in `tests/test_ui_inbox.py`. The UI check (the PR's body) read the first toggle at 222 px empty, typed and cleared at 1440, and 226 px in the 400 px sheet; shot `docs/mockups/reviews/2026-10-08-td427-find-count-typed.png`.

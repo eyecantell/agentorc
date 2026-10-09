@@ -2788,6 +2788,9 @@ def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(m
     js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
     assert '$("#railclear").disabled = !c.filtered;' in js
     assert 'railclear").classList.toggle("hidden"' not in js
+    # …and the find count under the box holds its line while empty, as the button holds its place (TD-427)
+    css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
+    assert ".rail #findn { min-height: 1lh; }" in css
 
 
 RAIL_PROBE = """
