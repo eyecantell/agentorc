@@ -60,7 +60,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Open |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Open |
-| TD-475 | PR #1340's `work.finished_alone` has four guards no test would catch going back: `superseded_by`, `sat_out`, `seat is None`, `r is not manager` | Medium | Open |
 | TD-476 | PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets | Medium | Open |
 | TD-477 | PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere | Medium | Open |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
@@ -932,22 +931,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first: a quiet mark in the Focus header beside the state pill, drawn after a grace as TD-372's banner is (no flicker on a navigation or a promote's restart): *reconnecting…* while the terminal socket is down, *no output for Ns* while it is open, the session reads `working` and no byte has come — never on an idle session, where silence is the normal case — and *resized by another client* when the pane's size changes under a Focus that did not ask for it (the count of attached clients is tmux's `#{session_attached}`). Hover says what each means and what to do. Record each kind of event with its time in the browser's console, so the next freeze names its cause. **Done when** the design says the marks and their graces, the build lands, and each of the three is drawn on a scratch home by forcing it (kill the socket, a silent `working` pane, a second `tmux attach` resizing).
 
 **Related:** TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-022 (scrollback through tmux).
-
-## TD-475: PR #1340's `work.finished_alone` has four guards no test would catch going back: `superseded_by`, `sat_out`, `seat is None`, `r is not manager`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1340)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/work.py` `finished_alone` L79–102; `tests/test_work_start.py` (the `_running` fixture and its four tests)
-
-**Why:** Mutation probe on `origin/main` (d31b6337+): deleting each of the lines `and not r.superseded_by`, `and not sat_out(r)`, `r.seat is None` (→ `True`) and `r is not manager` from `finished_alone` leaves `tests/test_work_waiting.py tests/test_work_start.py tests/test_person_only.py tests/test_workorders.py` at 37 passed, and `tests/test_work_start.py` alone at 14 passed. Only the `closer`/`pane` guards are pinned (deleting the `closer` line fails one test). The docstring promises all six exclusions (*not a seat, not the manager, … nor one its flow sat out, nor a record a successor took over*); a revert of any of the four would mark a seat, the manager, a sat-out member or a superseded record as a finished member and offer **Start** on it.
-
-**Fix:** Add to `tests/test_work_start.py` one case per guard: a record that is otherwise finished (closed, declared `out_of_work`) but is a seat, is the manager, has `closed_for: {why: sit_out}`, or has `superseded_by` set is absent from `finished_alone` and from the mark's `members`. Re-run each mutation above and see it fail.
-
-**Related:** PR #1340.
 
 ## TD-476: PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets
 

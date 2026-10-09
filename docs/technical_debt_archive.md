@@ -7802,3 +7802,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (the anchor) — `ao team list` shows each of the four teams on a flow it can follow (ao-grind `td`, samscrape-grind and cm-grind `build-review`, dc-grind `build`), and `ao org check` names no *same value* key (*ok: 4 teams, 1 warning*, the warning a change in dev-cadence's checkout). The moves landed by samscrape TD-454, contractmatch TD-054 (#164) and dev-cadence TD-086 (#216); each team's **Apply** (dc-grind and cm-grind offer one, samscrape's waits on its next start) is that repo's own entry and the person's press. The flows themselves: design §4.9c.
 
 **Related:** TD-307, TD-309.
+
+## TD-475: PR #1340's `work.finished_alone` has four guards no test would catch going back: `superseded_by`, `sat_out`, `seat is None`, `r is not manager`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1340)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/work.py` `finished_alone` L79–102; `tests/test_work_start.py` (the `_running` fixture and its four tests)
+
+**Why:** Mutation probe on `origin/main` (d31b6337+): deleting each of the lines `and not r.superseded_by`, `and not sat_out(r)`, `r.seat is None` (→ `True`) and `r is not manager` from `finished_alone` leaves `tests/test_work_waiting.py tests/test_work_start.py tests/test_person_only.py tests/test_workorders.py` at 37 passed, and `tests/test_work_start.py` alone at 14 passed. Only the `closer`/`pane` guards are pinned (deleting the `closer` line fails one test). The docstring promises all six exclusions (*not a seat, not the manager, … nor one its flow sat out, nor a record a successor took over*); a revert of any of the four would mark a seat, the manager, a sat-out member or a superseded record as a finished member and offer **Start** on it.
+
+**Fix:** Add to `tests/test_work_start.py` one case per guard: a record that is otherwise finished (closed, declared `out_of_work`) but is a seat, is the manager, has `closed_for: {why: sit_out}`, or has `superseded_by` set is absent from `finished_alone` and from the mark's `members`. Re-run each mutation above and see it fail.
+
+**Resolved:** 2026-10-09 (PR #1360) — `tests/test_work_start.py` `test_finished_alone_passes_over_each_record_that_is_not_a_finished_member`, one case per guard (a seat, the manager, a sat-out member, a superseded record); each of the four mutations fails it.
+
+**Related:** PR #1340.
