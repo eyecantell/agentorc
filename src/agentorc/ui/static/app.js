@@ -948,6 +948,7 @@
     store.set("theme", cur === "dark" ? "light" : "dark"); applyTheme();
   });
   $("#shellbtn") && $("#shellbtn").addEventListener("click", () => {
+    const menu = $("#newmenu"); if (menu) menu.open = false;  // the + New ▾ menu folds on its choice
     const d = prompt("Shell in which directory?", store.get("lastdir", "~"));
     if (!d) return; store.set("lastdir", d);
     const f = $("#shellform"); f.querySelector("[name=dir]").value = d; f.submit();
@@ -1326,24 +1327,52 @@
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
     syncTeams();
   }
+  // The Org's filter box (§4.5a **filter…**, TD-418, built by TD-428): words, each one a test, and a
+  // card is shown when it passes them all. `team:<name>` is the form the card's team badge writes: an
+  // exact match on the badge, not a substring of the card's text, so a team whose name also appears
+  // in a branch stays clean. `state:<word>` is the form the rollup's Agents pills write (TD-176): the
+  // card's pill word, hyphenated — `needs-you`, `working`, `on-call`. `mine`, the whole word alone,
+  // is the person's own — the interactive sessions — and `kind:command` shows the command runs,
+  // hidden without it (the two in place of the *mine* toggle and the *show command runs* box). Any
+  // other word is text the card must contain.
+  AO.orgWords = function (raw) {
+    const w = { team: null, state: null, mine: false, command: false, text: [] };
+    String(raw || "").trim().split(/\s+/).filter(Boolean).forEach((word) => {
+      const low = word.toLowerCase();
+      if (low.startsWith("team:")) w.team = low.slice(5);
+      else if (low.startsWith("state:")) w.state = low.slice(6);
+      else if (low === "mine") w.mine = true;
+      else if (low === "kind:command") w.command = true;
+      else w.text.push(low);
+    });
+    return w;
+  };
+  // A team badge or an Agents pill presses one word (`team:<name>`, `state:<word>`): it replaces a
+  // word of the same prefix, or is added, and pressed again it is taken out — the box's other words
+  // (`mine`, `kind:command`, text) stay as they were.
+  AO.orgToggleWord = function (raw, word) {
+    const prefix = word.slice(0, word.indexOf(":") + 1).toLowerCase(), low = word.toLowerCase();
+    const words = String(raw || "").trim().split(/\s+/).filter(Boolean);
+    const had = words.some((w) => w.toLowerCase() === low);
+    const rest = words.filter((w) => !w.toLowerCase().startsWith(prefix));
+    return (had ? rest : [...rest, word]).join(" ");
+  };
+  // `c` is what a card says of itself: its `data-*` (`kind`, `team`, `pill`, `mine`) and its text.
+  AO.orgPasses = function (c, w) {
+    if (c.kind === "command" && !w.command) return false;
+    if (w.team !== null && (c.team || "").toLowerCase() !== w.team) return false;
+    if (w.state !== null && (c.pill || "") !== w.state) return false;
+    if (w.mine && !c.mine) return false;
+    const text = (c.text || "").toLowerCase();
+    return w.text.every((t) => text.includes(t));
+  };
   function applyFilter() {
-    const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
-    const mine = !!$("#mine") && $("#mine").getAttribute("aria-pressed") === "true";
-    // `team:<name>` is the form the card's team badge writes: an exact match on the badge, not a
-    // substring of the card's text, so a team whose name also appears in a branch stays clean.
-    const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
-    // `state:<word>` is the form the rollup's Agents pills write (§4.5a **filter…**, TD-176): the
-    // card's pill word, hyphenated — `needs-you`, `working`, `on-call`
-    const state = /^state:/i.test(raw) ? raw.slice(6).trim().toLowerCase() : null;
-    const q = team === null && state === null ? raw.toLowerCase() : "";
-    const filtering = !!raw || mine;
+    const raw = ($("#filter") ? $("#filter").value : "").trim(), words = AO.orgWords(raw);
+    // `kind:command` alone shows more than the bare page, so it is no filter: the + card stays
+    const filtering = words.team !== null || words.state !== null || words.mine || words.text.length > 0;
     $$("#groups .sc").forEach((c) => {
       if (c.classList.contains("plus")) { c.hidden = filtering; return; }  // a filter hides the + card (§4.5a)
-      const hideKind = c.dataset.kind === "command" && !cmd;
-      const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team
-        : state !== null ? (c.dataset.pill || "") !== state
-        : !!q && !c.textContent.toLowerCase().includes(q);
-      c.hidden = hideKind || miss || (mine && !c.dataset.mine);  // *mine* composes with the box (§4.5a)
+      c.hidden = !AO.orgPasses({ ...c.dataset, text: c.textContent }, words);
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
     // A team's card stays while no filter is set, sessions or none: it is where Start lives.
@@ -2494,20 +2523,14 @@
     const wantTeam = new URLSearchParams(location.search).get("team");
     if (wantTeam) $("#filter").value = "team:" + wantTeam;
     $("#filter").addEventListener("input", layout);
-    // *mine* (§4.5a, TD-095): a toggle this browser remembers, as it remembers a team's fold
-    const mineBtn = $("#mine");
-    const setMine = (on) => { mineBtn.setAttribute("aria-pressed", on ? "true" : "false"); mineBtn.classList.toggle("on", on); };
-    setMine(!!store.get("mine", false));
-    mineBtn.addEventListener("click", () => { const on = mineBtn.getAttribute("aria-pressed") !== "true"; store.set("mine", on); setMine(on); layout(); });
-    $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
     const box = $("#groups");
-    // The card's team badge filters the page to that team; pressing it again clears the box.
+    // The card's team badge filters the page to that team; pressing it again takes the word out.
     box.addEventListener("click", (e) => {
       const b = e.target.closest(".badge.team"); if (!b) return;
       e.preventDefault();
-      const f = $("#filter"), q = "team:" + b.dataset.team;
-      f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
+      const f = $("#filter");
+      f.value = AO.orgToggleWord(f.value, "team:" + b.dataset.team);
       layout();
     });
     box.addEventListener("change", (e) => {
@@ -2537,14 +2560,14 @@
       if (p && !p.disabled) pickSummary(p);
     });
     // the rollup (TD-176 slice 4): its window picker is the page's one value, and an Agents pill
-    // types `state:<word>` into the filter box — pressed again, it clears it
+    // types `state:<word>` into the filter box — pressed again, it takes the word out
     const rollupBox = $("#rollup");
     if (rollupBox) rollupBox.addEventListener("click", (e) => {
       const p = e.target.closest(".seg[data-pick] button");
       if (p) return pickSummary(p);
       const pill = e.target.closest("[data-state-filter]"); if (!pill) return;
-      const f = $("#filter"), q = "state:" + pill.dataset.stateFilter;
-      f.value = f.value.trim().toLowerCase() === q ? "" : q;
+      const f = $("#filter");
+      f.value = AO.orgToggleWord(f.value, "state:" + pill.dataset.stateFilter);
       layout();
     });
     layout();
@@ -4194,7 +4217,7 @@
       dd.textContent = v === null ? "not set" : typeof v === "boolean" ? (v ? "on" : "off") : String(v);
     });
     $("#setreset").addEventListener("click", () => {
-      if (!confirm("Reset this browser? Every ao.* key this browser keeps — the theme, mine, the folds, the filters, the pop-out windows — is cleared, and the page reloads. Nothing anywhere else changes.")) return;
+      if (!confirm("Reset this browser? Every ao.* key this browser keeps — the theme, the folds, the filters, the pop-out windows — is cleared, and the page reloads. Nothing anywhere else changes.")) return;
       try { Object.keys(localStorage).filter((k) => k.startsWith("ao.")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
       location.reload();
     });

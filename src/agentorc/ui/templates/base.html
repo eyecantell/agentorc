@@ -42,11 +42,16 @@
   <button class="btn ghost light" id="theme" title="dark / light">◐</button>
   {# design §4.5a **?** overlay (TD-124): the same panel `?` opens, for the mouse and for a phone #}
   <button class="btn ghost light" id="keyhelpbtn" type="button" title="keys on this page (?)" aria-haspopup="dialog">?</button>
-  <form method="post" action="/shell" class="inline" id="shellform">
-    <input type="hidden" name="dir" value="">
-    <button class="btn light" type="button" id="shellbtn" title="a shell: host + directory, nothing else">⌘ Shell</button>
-  </form>
-  <a class="btn primary" href="/new">+ New session</a>
+  {# design §4.5a top bar **+ New ▾** (TD-418, built by TD-428): one button, a menu of two —
+     **Session** opens the New session form (`n` presses it), **Shell** starts a shell: host + directory #}
+  <form method="post" action="/shell" class="inline" id="shellform"><input type="hidden" name="dir" value=""></form>
+  <details class="more" id="newmenu">
+    <summary class="btn primary" title="start a session or a shell">+ New ▾</summary>
+    <div class="menu">
+      <a href="/new" id="newsession" title="the New session form (n)">Session</a>
+      <button type="button" id="shellbtn" title="a shell: host + directory, nothing else">Shell</button>
+    </div>
+  </details>
 </div>{% endif %}
 <div id="toasts"></div>
 {# design §4.5a **Message** and Focus Inbox **Reply** (§4.10): one mail composer for both. Mail

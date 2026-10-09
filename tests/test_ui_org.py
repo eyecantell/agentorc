@@ -1097,11 +1097,11 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
 
 
-def test_within_one_urgency_the_persons_own_sort_first_and_mine_shows_only_them(tmp_path, monkeypatch):
+def test_within_one_urgency_the_persons_own_sort_first_and_the_card_says_it_is_mine(tmp_path, monkeypatch):
     """Design §4.5 *One order, no control*, second pass (TD-095): the key is (rank, interactive
     first, name) — a worker that needs a person still outranks the person's own idle session, and a
-    manager's card is placed first before any of this. §4.5a ***mine***: one press shows only the
-    interactive sessions; the card says which it is, the page's script does the rest."""
+    manager's card is placed first before any of this. The filter's word `mine` (§4.5a, TD-428)
+    shows only the interactive sessions; the card says which it is, the page's script does the rest."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui.app import card_order, team_groups, templates, view
 
@@ -1118,13 +1118,13 @@ def test_within_one_urgency_the_persons_own_sort_first_and_mine_shows_only_them(
     assert 'data-mine="1"' in card.render(s=vs[1]) and "data-mine" not in card.render(s=vs[0])
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
     assert "(!!b.dataset.mine - !!a.dataset.mine)" in js  # the page's re-sort keeps the same key
-    assert "(mine && !c.dataset.mine)" in js  # …and *mine* composes with the box
     html = templates.get_template("org.html").render(
         sessions=vs, groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
         strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
-    assert 'id="mine" aria-pressed="false"' in html
+    assert 'id="mine"' not in html and 'id="showcmd"' not in html  # the words replaced them (TD-428)
+    assert 'placeholder="filter… team: state: mine kind:command"' in html
 
 
 def test_a_seats_last_came_is_its_fill_and_a_compact_flag_keeps_its_count(tmp_path, monkeypatch):
