@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Built (#1306); live check: an unattended session's env, then tell dev-cadence |
 | TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Open |
 | TD-456 | The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated | Low | Open |
+| TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Open |
 
 ---
 
@@ -950,3 +951,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** let the one reader fall back to the account's reading, by `_usage_key`, for a profile with no copy of its own (the chip's TD-073 rule unchanged: the copy is still what is shown); `ao gate` prints it, with its age and source. A test: two profiles on one account, a reading over the line held under the live one, and `_profile_gated` for the other reads it.
 
 **Done when** a profile with no live session reads its account's reading at the gate and in `ao gate`, and the test above passes.
+
+## TD-457: New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (ao-paul, Paul asked why the grinders did not pick up TD-428)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 rule 6 (*An exited or closed member is not written to*), rule 8 (*Work for a team that wound down*, the **wound down** reading), rule 9 (*Finished is the home's reading*); §5 `teams.<team>.on_work`; `src/sessionorc/agent_tick.py` (`on_work` default `"ask"`, the finished pass, the work pass), `src/sessionorc/agent_notify.py`, `src/sessionorc/work.py` (`wound_down`)
+
+**Why:** on 2026-10-08 at 03:32Z the tick closed grinder-ao-1, grinder-ao-2 and designer-ao-1 as *finished* (rule 9: each had declared out of work on an empty lane). Minutes later TD-428 merged, a pickable build in the grinders' lane. Nobody was told and nothing started: rule 6 never writes to a closed member, and rule 8 waits for the team to read *wound down*, which needs none of its unattended sessions live — and the anchor seat was working (TD-426, #1311), so ao-grind read *1 live*. §6 says so on purpose: *A finished member its manager closed while the team runs on is told by neither rule: its lane's new work waits for the team's next wind-down.* So a team with a long-running seat (the anchor, an auditor) can hold its members' new work indefinitely, and even when it does wind down the road back is a full Start of every member and seat (or Paul's Inbox row first, under `on_work: ask`) — clumsy where one member's lane gained one entry (Paul, 2026-10-08: *restarting a full team (and waiting for a stop) seems clumsy vs just telling a member when new work arrives*).
+
+**Decided by Paul, 2026-10-08:** the default of `on_work` becomes **`start`** (it is `ask` in §5, `agent_tick.py` and `agent_notify.py`); he switched ao-grind to `start` the same day.
+
+**Fix:** design, in §6, (1) **restart the one member**: when a finished member's lane gains work while its team runs on, the tick replays that member's record (rule 8's replay, `why: work`, under the team's `on_work` — `start` replays it, `ask` asks with a row naming the member, `off` does nothing), so the member that owns the lane comes back alone and is told what arrived; the sentence quoted above goes; weigh it against *a restart is not a start* (§6 — a replay under the person's standing word, as rule 8's is); (2) **seats do not hold a wind-down**: whether rule 8's *wound down* should read over members only, a live seat not counting — or whether (1) makes that unnecessary; (3) the `on_work: start` default in §5, its Settings picker's *(default)* label, and both code defaults. Then a build entry. **Done when** the design says what happens to a finished member's lane gaining work while a seat runs, and the build entry is open.
