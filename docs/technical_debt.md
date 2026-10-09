@@ -18,7 +18,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 |----|-------|----------|--------|
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
-| TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Partly done — the reset start (TD-133) and the start time (TD-152) designed; archives with them |
 | TD-035 | Adapters without a session-start hook still run dev-cadence's SessionStart set | Low | Open — designed; builds with the second adapter (TD-112) |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done — steps 1–8 done (5 was a measurement); the second-adapter step and the live check remain |
@@ -108,21 +107,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 **Fix:** either watch for the dialog in the pane as the fallback and answer it through the terminal channel, or find a supported way to pre-trust a directory (a `--trust`-style flag or a per-project settings key) and drop the file edit. Done when no agentorc code writes `.claude.json`.
 
 **Related:** TD-006.
-
-## TD-006: `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified
-
-**Priority:** Low
-**Added:** 2026-09-06
-**Owner:** anchor
-**Kind:** evaluation
-**Status:** Open **Next:** needs an attended `claude` run.
-**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`global_config_file`)
-
-**Why:** For a profile with `config_dir` set, the adapter reads/writes `<config_dir>/.claude.json`. The docs say every `~/.claude` path moves under `CLAUDE_CONFIG_DIR`, but `~/.claude.json` is not under `~/.claude`, and no second-account profile exists yet to test it. If wrong, pretrust silently writes a file Claude Code never reads and the trust dialog appears for that profile.
-
-**Fix:** create a throwaway `CLAUDE_CONFIG_DIR`, run `claude` once, see where `.claude.json` lands, pin it with a test. Done when the second profile (grind) launches without the dialog.
-
-**Related:** TD-005, design §4.2a.
 
 ## TD-026: Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI
 

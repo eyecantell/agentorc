@@ -21,6 +21,7 @@ from agentorc.adapters.claude_code import (
     _pid_alive,
     context_file,
     context_report,
+    global_config_file,
     hooks_settings,
     munge,
     parse_usage,
@@ -281,6 +282,16 @@ def test_pretrust_writes_once_and_keeps_other_state(tmp_path):
     assert d["projects"][str(tmp_path / "repo")]["hasTrustDialogAccepted"] is True
     assert pretrust(tmp_path / "repo", prof) is False  # already trusted: no write
     assert oct(cfg.stat().st_mode & 0o777) == "0o600"
+
+
+def test_claude_json_lives_in_the_config_dir(tmp_path, monkeypatch):
+    # Verified 2026-10-08 against Claude Code 2.1.295 (TD-006): with CLAUDE_CONFIG_DIR set, a first run
+    # writes `.claude.json` inside that directory, not beside it as `~/.claude.json` is beside `~/.claude`.
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    assert global_config_file(profiles.Profile(name="t", config_dir=tmp_path)) == tmp_path / ".claude.json"
+    assert global_config_file(profiles.Profile(name="t")) == Path("~/.claude.json").expanduser()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "env"))
+    assert global_config_file(profiles.Profile(name="t")) == tmp_path / "env" / ".claude.json"
 
 
 def test_profiles_default_when_missing(tmp_path):
