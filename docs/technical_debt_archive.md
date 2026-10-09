@@ -6899,3 +6899,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** extend that test: a reply entry with `answer` and `text` `"off develop\n\nrebase it first"` read by `ao inbox` as the sender prints `answered 2: "off develop"` and not the words; `--pick 2 "  "` sends the answer alone; `--pick 2` with an addressee word in front sends the same reply as without it, or is refused if that is the design. **Done when** reverting each of (a)–(b) fails a test.
 
 **Resolved:** 2026-10-08 (PR #1294, grinder-ao-2) — `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins (a) the sender's inbox reading a picked reply with words as `answered 2: "off develop"` alone, (b) `--pick 2 "   "` sending the answer alone, read from the `text` the CLI hands `call_sync` (the home strips a reply, so a round trip cannot see it), and (c) an addressee word in front sending the same reply to the same recipient. Reverting (a) or (b) fails the test; (c) is not observable by a revert, as the entry said.
+
+## TD-416: Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/`
+
+**Why:** #1282 changes `_msg` in `src/sessionorc/agent_mail.py` to accept `text` as the picked answer, `\n\n`, and words. The words must be non-blank: `text.startswith(said + "\n\n") and text[len(said) + 2 :].strip()`. `tests/test_mail.py::test_the_home_checks_that_a_picked_answer_is_one_of_them` refuses `"hold it and more"`, `"hold it\nand more"` and `"merge it\n\nnow"`, and accepts `"hold it\n\nuntil Monday"`, but never a blank tail. Replacing `and text[len(said) + 2 :].strip())` by `)` leaves `pytest -q tests/test_mail.py -k picked` at 3 passed (`origin/main` 5a2f4441): the guard is a line no test would catch going back, and a direct RPC caller could then send `"hold it\n\n   "`.
+
+**Resolved:** 2026-10-08 (PR #1293) — the clause cannot be caught: `_msg` strips `text` first, so a text that is the answer, a blank line and only whitespace arrives as the answer alone, a valid pick, and words after a blank line are never blank. The test now pins that (`"hold it\n\n  "` goes through as `"hold it"`; removing the strip fails it), and the unreachable clause is gone. The **Fix** below asked for a refusal the home never makes.
+
+**Fix:** add `{"text": "hold it\n\n  ", "answer": 1}` to the refused list in that test. **Done when** reverting the `.strip()` condition fails it.
