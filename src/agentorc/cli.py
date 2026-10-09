@@ -19,7 +19,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import orgcheck, repoconfig, service, teamrun, teams
-from agentorc.ending import closer_words, waiting_words
+from agentorc.ending import closer_words, restart_words, waiting_words
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import ledger as ledger_mod
@@ -237,6 +237,19 @@ def status_line(s: dict[str, Any], w: int = 0) -> str:
     return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
 
 
+def restarts_line(restarts: Any, shown: int = 3) -> str:
+    """`ao status -v`'s `restarts:` line (design §4.7, TD-467): the newest `shown` entries, newest first,
+    each in `ending.restart_words`' words and its age, *+n earlier* for the rest; "" for none."""
+    entries = [r for r in restarts if isinstance(r, dict)] if isinstance(restarts, list) else []
+    if not entries:
+        return ""
+    said = [
+        restart_words(r) + (f", {_age(str(r['at']))} ago" if r.get("at") else "") for r in reversed(entries[-shown:])
+    ]
+    rest = len(entries) - shown
+    return "; ".join(said) + (f"; +{rest} earlier" if rest > 0 else "")
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     sessions = call_sync("list")
     if hosts.is_node():
@@ -330,6 +343,9 @@ def cmd_status(args: argparse.Namespace) -> int:
                 wait = ""
             if wait:
                 print(f"{'':<{w}}      {wait}")
+            # the record's restarts, newest first (§4.7, TD-467): the doorbell's says *cache lapsed · idle 5h · 191k*
+            if line := restarts_line(s.get("restarts")):
+                print(f"{'':<{w}}      restarts: {line}")
             # rule 7's mark (§6, TD-217): a file the brief was made from reads otherwise, as merged
             if (bc := s.get("brief_changed")) and isinstance(bc, dict) and bc.get("at"):
                 names = ", ".join(pathlib.Path(str(p)).name for p in bc.get("paths") or [])

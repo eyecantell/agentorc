@@ -2280,6 +2280,44 @@ def test_status_v_says_who_closed_a_record_in_the_cards_words(monkeypatch, capsy
     assert len(re.findall(r"^\s+closed.* ago$", out, re.M)) == 4  # the idle record has no such line
 
 
+def test_status_v_says_a_records_restarts_and_the_caches_in_its_words(monkeypatch, capsys):
+    """design §4.7 and §4.10 *A lapsed cache is started again, not rung* (TD-467): `ao status -v` prints
+    the record's `restarts`, newest first — the doorbell's as *cache lapsed · idle 5h · 191k* — three of
+    them and *+n earlier*; and a record the cache restart closed reads *closed by the tick · cache lapsed*."""
+    now = datetime.datetime.now(datetime.UTC)
+    at = (now - datetime.timedelta(minutes=5)).isoformat()
+    older = (now - datetime.timedelta(hours=3)).isoformat()
+    base = {"confidence": "hook", "since": at, "adapter": "shell"}
+    restarts = [
+        {"at": older, "why": "start"},
+        {"at": older, "why": "brief"},
+        {"at": older, "why": "cache", "idle": 2.4, "context": 150_000, "error": "close: gone"},
+        {"at": older, "why": "person"},
+        {"at": at, "why": "cache", "idle": 5.4, "context": 191_000},
+    ]
+    records = [
+        {**base, "id": "ao-r-g", "name": "g", "state": "idle", "restarts": restarts},
+        {
+            **base,
+            "id": "ao-r-c",
+            "name": "c",
+            "state": "closed",
+            "closed_at": at,
+            "closer": {"by": "tick", "why": "cache", "at": at},
+        },
+        {**base, "id": "ao-r-n", "name": "n", "state": "idle", "restarts": []},
+    ]
+    monkeypatch.setattr(cli, "call_sync", lambda method, **_: records if method == "list" else {})
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    lines = [ln.strip() for ln in out.splitlines() if "restarts:" in ln]
+    assert lines == [
+        "restarts: cache lapsed · idle 5h · 191k, 5m ago; person, 3h ago; cache lapsed · idle 2h · 150k · failed, "
+        "3h ago; +2 earlier"
+    ]  # the record with none prints no line
+    assert "closed by the tick · cache lapsed 5m ago" in out
+
+
 def test_status_v_says_what_a_session_waits_on_on_its_declarations_line(monkeypatch, capsys):
     """§4.5a **waiting** mark (TD-274): `ao status -v` prints the wait on the declaration's line, or on
     a line of its own where the session declared nothing, from the home's `host` reading."""

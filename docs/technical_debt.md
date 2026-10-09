@@ -68,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
+| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Open |
 
 ---
 
@@ -1065,4 +1066,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
 
 **Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
+
+## TD-485: The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (grinder-ao-2, TD-467 slice 2)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 *The card's anatomy* (row 5), §4.5a (the card rows), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the row-5 slot), `src/agentorc/ending.py` (`restart_words`, which `ao status -v` already uses)
+
+**Why:** TD-459's design said *the card's restart note and `ao status -v` say cache lapsed · idle 5h · 191k*, but no card surface draws any restart (the `restarts` field is read only by the ceiling, rule 8's *work started* header note and, since TD-467 slice 2, `ao status -v`'s `restarts:` line). A page change follows a §4.5a row, so the grinder built the CLI half and left the card to a design: where the note sits (row 5's slot, the report line's hover, or a chip as *brief changed* is), which `restarts` entries it names (the newest only, inside `RESTART_WINDOW`, every `why` or the tick's and the doorbell's alone), and how long it stays.
+
+**Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
+
+**Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
 

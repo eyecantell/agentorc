@@ -9,6 +9,8 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
+from sessionorc.models import tokens_short
+
 # the tick's closes (§6): rule 9's, rule 2's, rule 7's two (its brief, its team's flow, §4.9c), rule 3's and a
 # sit-out's (§4.9c) — rule 8's start closes nothing
 TICK_WHY = {
@@ -18,6 +20,7 @@ TICK_WHY = {
     "flow": "flow changed",
     "sit_out": "flow sat it out",
     "seat": "seat done",
+    "cache": "cache lapsed",
 }
 
 
@@ -39,6 +42,22 @@ def closer_words(s: Mapping[str, Any], names: Mapping[str, str] | None = None) -
         why = TICK_WHY.get(str(c.get("why") or ""))
         return "closed by the tick" + (f" · {why}" if why else "")
     return f"closed by {(names or {}).get(by) or by}"
+
+
+def restart_words(entry: Mapping[str, Any]) -> str:
+    """One `restarts` entry as `ao status -v` says it (design §4.7, §4.10 *A lapsed cache is started
+    again, not rung*, TD-467): *cache lapsed · idle 5h · 191k* for the doorbell's restart — the hours
+    idle and the context's tokens the entry carries — and the `why` as written for the rest, *· failed*
+    where its close or replay did not take. Never raises: a malformed field is left out."""
+    why = str(entry.get("why") or "") or "restarted"
+    words = why
+    if why == "cache":
+        words = "cache lapsed"
+        if isinstance(idle := entry.get("idle"), int | float) and not isinstance(idle, bool):
+            words += f" · idle {round(idle)}h"
+        if isinstance(tokens := entry.get("context"), int) and not isinstance(tokens, bool):
+            words += f" · {tokens_short(tokens)}"
+    return words + (" · failed" if entry.get("error") else "")
 
 
 # why a close can read bare *closed* (§4.5 row 5 (b), design-history §4.4 2026-10-02): the hover says so,
