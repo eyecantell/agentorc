@@ -67,6 +67,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Built (#1306); live check: an unattended session's env, then tell dev-cadence |
+| TD-455 | The Inbox rail's disabled Clear filters and held find-count line are pinned by source-text greps: a dead-coded line passes both (#1307, #1308) | Low | Open |
 
 ---
 
@@ -1164,3 +1165,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** an unattended session's SessionStart scopes the nudge without calling `ao status` (the env reaches the runner), an interactive one reads `machine`, and the test passes.
 
 **Related:** TD-159 (the ADR), TD-118 (agentorc's scoping), dev-cadence TD-077 (the branch).
+
+## TD-455: The Inbox rail's disabled Clear filters and held find-count line are pinned by source-text greps: a dead-coded line passes both
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1305–#1308)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_inbox.py::test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked` (the last five lines, the `app.js` and `app.css` asserts); `src/agentorc/ui/static/app.js` (the recount's `$("#railclear").disabled = !c.filtered;`); `src/agentorc/ui/static/app.css` (`.rail #findn { min-height: 1lh; }`)
+
+**Why:** #1307 and #1308 pin the page's recount and the find count's held line with `assert '<the source line>' in js` / `in css`. Evidence, run in this audit's worktree against `origin/main`: prefixing the recount line with `if (false) ` (so the button never changes after the first render) leaves `pytest tests/test_ui_inbox.py` at 107 passed; wrapping the CSS rule in `/* … */` (so the find count holds no line) also leaves it at 107 passed. A plain revert of either line is caught, so the pins are not empty, but they pass for a page whose behaviour is gone. The test's name and docstring also say nothing of the find count, which #1308 added as a trailing assert to the *Clear filters* test, so a failure there reads as a Clear-filters failure. The file already runs the rail's JS in node (`RAIL_PROBE`, line 2796), which is where the recount's `disabled` belongs; for the CSS, the PR's own UI check is the only layout evidence.
+
+**Fix:** extend `RAIL_PROBE` to call the recount with `filtered` true and false and assert the stub button's `disabled` each time; move the find-count CSS assert to its own test named for TD-427 and match the rule as a parsed declaration outside comments, not a substring.
+
+**Done when** both mutations above fail the suite, and the find count has its own named test.
