@@ -8057,3 +8057,36 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-496 (#1395), TD-489 (the guard's design).
 
 **Resolved:** 2026-10-09 (PR #1408): twelve `REFUSED` rows — `kill -- -1`, `kill $(sudo pgrep x)`, each of `WRAPPERS`' eight beyond sudo/timeout/nice (`env`, `nohup`, `exec`, `command`, `builtin`, `setsid`, `time`, `xargs`), and the value options `env -u X` and `xargs -I {}`. Each mutation in the Why, re-run: `--` → `[]` 1 failed, the substitution's `sudo` removed 1 failed, `WRAPPERS` cut to three 10 failed, `xargs`' values emptied 1 failed, `env`'s emptied 1 failed.
+
+## TD-419: A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget
+
+**Priority:** Low
+**Added:** 2026-10-08 (ao-paul, Paul asked when a pasted screenshot is deleted)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`_write_attachment`, the `attach` RPC); `src/sessionorc/paths.py` (`attachments_dir`); design §4.4 *Attachment drop*
+
+**Why:** the `attach` RPC (TD-002) writes each file under `attachments/<session>/` and nothing removes it: not Close, not Forget, not the tick. 524K on 2026-10-08, one session's pastes, so nothing is pressing, but it grows without bound and §4.4 says nothing of its life.
+
+**Fix:** design the attachment's life in §4.4: the folder goes with the record's Forget, and the tick removes a file older than a bound (14 days suggested; a sent prompt may still name a file, so not at Close). Then a build entry.
+
+**Resolved:** 2026-10-09 (grinder-ao-1) — designed in #1339 (§4.4 *An attachment's life*), built by TD-469 (#1375): the run-log sweep prunes an ended session's attachments past `runs_keep_days`.
+
+## TD-469: Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (the designer, TD-419's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *An attachment's life*, §4.6 *Run-log retention*; `src/sessionorc/agent_tick.py` (the run-log retention sweep, ~L2729: `runs_keep_days`, the `live` set, `PRUNE_EVERY`), `src/sessionorc/paths.py` (`attachments_dir`), `src/sessionorc/agent.py` (`_write_attachment`, `rpc_attach`)
+
+**Why:** TD-419: nothing removes a Focus attachment today — not Close, not Forget, not the tick — so `~/.agentorc/attachments/` grows without bound (524K on 2026-10-08).
+
+**Fix:** in the run-log sweep, after the logs: for each folder under `attachments_dir()` whose session id names no live record (the same `live` reading the logs use: any record of the session not exited or closed — a record forgotten counts as not live), unlink each file whose mtime is older than `runs_keep_days` and remove the folder when it is empty; `0` keeps everything, as for logs; a folder whose session is live is left whole whatever its files' age; an `OSError` on one file is logged and skipped. Runs in the thread the sweep runs in; touches files, never `self.sessions`. Tests: a closed session's old file goes and the folder with it, a young file stays, a live session's old file stays, `runs_keep_days: 0` deletes nothing. **Done when** the sweep prunes attachments by the rule and the tests pass.
+
+**Related:** TD-419 (the design), TD-002 (the attach), TD-096.
+
+**Resolved:** 2026-10-09 (PR #1375) — `_prune_runs` takes the tick's `live_ids` (records neither exited nor closed) and, after the logs, unlinks each file older than `runs_keep_days` in every `attachments/<session>/` not among them, removing the folder once empty; `0` keeps all. `tests/test_attachment_life.py`.

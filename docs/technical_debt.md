@@ -38,7 +38,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Designed 2026-10-09 — TD-469 builds it |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
 | TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Designed 2026-10-09 — TD-470 builds it |
@@ -49,7 +48,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Built — live check of #1403 |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
-| TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 | TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
@@ -567,20 +565,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
 
-## TD-419: A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget
-
-**Priority:** Low
-**Added:** 2026-10-08 (ao-paul, Paul asked when a pasted screenshot is deleted)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1339): §4.4 *An attachment's life* — a file lives as the run log does: kept while any record of the session is live, and once it has exited or closed deleted by the run-log sweep (§4.6, `runs_keep_days`, 30 by default, `0` keeps all) when older than that, the folder removed once empty; never at Close (a sent prompt names it, a Resume reads it back), not at Forget (the run log is left to the same sweep); one rule, one knob. The 14-day bound and the delete-at-Forget the Fix suggested were weighed and not taken: a second retention beside `runs_keep_days` is a second thing to explain and set, and a Forget that deletes what a Resume with the old record's conversation might read is a surprise; steered to the techlead. The build is TD-469.
-**Blocked by:** TD-469
-**Location:** `src/sessionorc/agent.py` (`_write_attachment`, the `attach` RPC); `src/sessionorc/paths.py` (`attachments_dir`); design §4.4 *Attachment drop*
-
-**Why:** the `attach` RPC (TD-002) writes each file under `attachments/<session>/` and nothing removes it: not Close, not Forget, not the tick. 524K on 2026-10-08, one session's pastes, so nothing is pressing, but it grows without bound and §4.4 says nothing of its life.
-
-**Fix:** design the attachment's life in §4.4: the folder goes with the record's Forget, and the tick removes a file older than a bound (14 days suggested; a sent prompt may still name a file, so not at Close). Then a build entry.
-
 ## TD-420: The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums
 
 **Priority:** Low
@@ -761,22 +745,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §6 rule 8 says, in slices: (1) the reading — `_work_mark` also watches a crew member that is `closed` or `exited` with `out_of_work` while its team is not wound down (not one a person killed or closed; not one sat out), its `lane_seen` kept as rule 6 keeps it, the same mark and settle, `members` naming it; the mark removed when every named member is live again, when no id is new, or under `off`; (2) the start — `_work_start` reads at the start whether the team is wound down: whole as today, else only the named members, each replayed alone with `why: work`, its `ids`, `start`, `of` = the members replayed, under the five bounds (usage read for the member's profile, one such start counting in `work_started`), a named member at its ceiling, suspended, sat out or without a launch record left and a mark naming only such members held as `nothing`; (3) `work_start {team}`, a person's own RPC in `HOME_EDITS`, the same replay under the same bounds, refused in the row's words when one holds; the row (`inbox.py`) reads *`<team>` · `<member>` finished <t> · its lane gained …* for a running team and its **Start** calls `work_start` instead of the team's start; (4) the default: `start` when absent in `agent_tick.py`, `agent_notify.py`, `settings_page.py`, `ON_WORK`'s comment, the picker's *(default)* on *start the team*; (5) the help text: §4.5a's **when work appears** paragraph loses *It does nothing while the team is live* and says a finished member of a running team is started alone, and **Start** (Inbox row: team start) says it starts the named members when the team is running — word for word in `help.py` and §4.5a's list together (`tests/test_help.py`); (6) tests: a finished member closed while a seat runs, the mark, the one-member replay under `start`, the row under `ask`, `work_start` refused by a bound, the default with no key. **Done when** a crew member closed after declaring, its team running on, is replayed alone within `WORK_SETTLE` of its lane gaining an entry under `on_work: start` (and the default), the row names it under `ask` and its Start replays it, and the help text and tests agree.
 
 **Related:** TD-457 (the design), TD-214 / TD-227 (rule 8), TD-240 / TD-241 (rule 9), TD-407 (no hold for an untold entry), TD-271 (a question's end is work: unchanged).
-
-## TD-469: Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (the designer, TD-419's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *An attachment's life*, §4.6 *Run-log retention*; `src/sessionorc/agent_tick.py` (the run-log retention sweep, ~L2729: `runs_keep_days`, the `live` set, `PRUNE_EVERY`), `src/sessionorc/paths.py` (`attachments_dir`), `src/sessionorc/agent.py` (`_write_attachment`, `rpc_attach`)
-
-**Why:** TD-419: nothing removes a Focus attachment today — not Close, not Forget, not the tick — so `~/.agentorc/attachments/` grows without bound (524K on 2026-10-08).
-
-**Fix:** in the run-log sweep, after the logs: for each folder under `attachments_dir()` whose session id names no live record (the same `live` reading the logs use: any record of the session not exited or closed — a record forgotten counts as not live), unlink each file whose mtime is older than `runs_keep_days` and remove the folder when it is empty; `0` keeps everything, as for logs; a folder whose session is live is left whole whatever its files' age; an `OSError` on one file is logged and skipped. Runs in the thread the sweep runs in; touches files, never `self.sessions`. Tests: a closed session's old file goes and the folder with it, a young file stays, a live session's old file stays, `runs_keep_days: 0` deletes nothing. **Done when** the sweep prunes attachments by the rule and the tests pass.
-
-**Related:** TD-419 (the design), TD-002 (the attach), TD-096.
 
 ## TD-470: Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it
 
