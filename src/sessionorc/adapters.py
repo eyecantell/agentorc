@@ -108,6 +108,12 @@ class Adapter(Protocol):
     #                                                      kinds, never folded; `cost` None where the tool does
     #                                                      not price its own turns. A cursor past its
     #                                                      transcript's end is a rewrite, read from 0 again
+    #   doctor_profiles() -> list[dict]                   each profile this adapter runs, as `ao doctor` reads it
+    #                                                      (design §4.7, TD-465): {profile, account, config_dir,
+    #                                                      metered, credentials: True | False | None, key (metered
+    #                                                      only), layers: [{path, commands: [{command, resolves}]}
+    #                                                      | {path, error}]}; or one {error} when the profiles
+    #                                                      file does not parse
     #   billing_for(profile: str) -> dict | None           {"billing": "subscription" | "metered", "prices":
     #                                                      {kind: per million}} as the profile declares it
     #                                                      (§4.2a, TD-151): the home reads it before the cap

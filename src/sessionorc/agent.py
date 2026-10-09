@@ -177,6 +177,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     stat_dir,  # noqa: F401
     tick_ready,  # noqa: F401
 )
+from sessionorc.agent_doctor import DoctorMixin
 from sessionorc.agent_hook import HookMixin
 from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_inbox import InboxMixin
@@ -328,6 +329,7 @@ class HostAgent(
     InboxMixin,
     MailMixin,
     IdentityMixin,
+    DoctorMixin,
     RemoteMixin,
     LinkMixin,
 ):
@@ -365,6 +367,8 @@ class HostAgent(
         self._id_list_lock = asyncio.Lock()
         self._id_detached: str | None = None
         self._id_tmux: tuple[int, int] | None = None  # (pid, start time): the server the answer is about
+        # the first server read, kept: `ao doctor` reads a server replaced under the agent against it (§4.7, TD-465)
+        self._id_tmux_first: tuple[int, int] | None = None
         self._id_rechecked = 0.0  # monotonic; the check is re-read on a cadence, not per connection
         # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
         # from outside every pane — is evidence, and evidence that dies with the process is a page

@@ -121,6 +121,7 @@ class IdentityMixin:
         there is no server, which is *not yet known* rather than *off*: the next connection asks
         again."""
         self._id_tmux, self._id_rechecked = self._id_server(tmux_pid), time.monotonic()
+        self._id_tmux_first = self._id_tmux_first or self._id_tmux
         if not tmux_pid:
             self._id_detached = None
             return
