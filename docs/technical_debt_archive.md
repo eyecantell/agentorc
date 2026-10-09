@@ -6883,3 +6883,70 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the sentence in rule 6 says the pruned id's `dropped` mark leaves with it, and no other line of §6 or `docs/design-history.md` says it is kept; the doc-bound tests pass.
 
 **Related:** TD-407 (the design), TD-411 (the build), TD-247 (`dropped: {id: at}`).
+
+## TD-415: Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/`
+
+**Why:** #1282 (TD-070) lets `ao msg --reply-to <id> --pick <n> "text"` send the picked answer, a blank line and the replier's words. `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins only the one case `--pick 2 "rebase it first"`. Three changed lines survive being reverted, each with the whole of `tests/test_cli.py` and `tests/test_mail.py` passing (153 passed, run on `origin/main` 5a2f4441): (a) `_picked_text` in `src/agentorc/cli.py` — `return text.split("\n", 1)[0] if isinstance(idx, int) else text` replaced by `return text` (the line that makes `ao inbox` show a picked reply as the answer alone and not the words after it: the test reads `answered 2:` only from the closed *question*, which takes the `answers[idx]` branch above it, never from the reply entry); (b) `if more.strip():` replaced by `if more:` (a whitespace-only word then sends `"off develop\n\n "`, which the home accepts only because of TD-416); (c) `*to, more = words or [""]` replaced by `to, more = [], (words or [""])[-1]` (the `to` addressees an `ao msg a b --pick` leaves in front of the words are dropped by the reply either way, and no test sends one). Revert each line in a worktree and run `pdm run pytest -q tests/test_cli.py tests/test_mail.py` to see it.
+
+**Fix:** extend that test: a reply entry with `answer` and `text` `"off develop\n\nrebase it first"` read by `ao inbox` as the sender prints `answered 2: "off develop"` and not the words; `--pick 2 "  "` sends the answer alone; `--pick 2` with an addressee word in front sends the same reply as without it, or is refused if that is the design. **Done when** reverting each of (a)–(b) fails a test.
+
+**Resolved:** 2026-10-08 (PR #1294, grinder-ao-2) — `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins (a) the sender's inbox reading a picked reply with words as `answered 2: "off develop"` alone, (b) `--pick 2 "   "` sending the answer alone, read from the `text` the CLI hands `call_sync` (the home strips a reply, so a round trip cannot see it), and (c) an addressee word in front sending the same reply to the same recipient. Reverting (a) or (b) fails the test; (c) is not observable by a revert, as the entry said.
+
+## TD-416: Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/`
+
+**Why:** #1282 changes `_msg` in `src/sessionorc/agent_mail.py` to accept `text` as the picked answer, `\n\n`, and words. The words must be non-blank: `text.startswith(said + "\n\n") and text[len(said) + 2 :].strip()`. `tests/test_mail.py::test_the_home_checks_that_a_picked_answer_is_one_of_them` refuses `"hold it and more"`, `"hold it\nand more"` and `"merge it\n\nnow"`, and accepts `"hold it\n\nuntil Monday"`, but never a blank tail. Replacing `and text[len(said) + 2 :].strip())` by `)` leaves `pytest -q tests/test_mail.py -k picked` at 3 passed (`origin/main` 5a2f4441): the guard is a line no test would catch going back, and a direct RPC caller could then send `"hold it\n\n   "`.
+
+**Resolved:** 2026-10-08 (PR #1293) — the clause cannot be caught: `_msg` strips `text` first, so a text that is the answer, a blank line and only whitespace arrives as the answer alone, a valid pick, and words after a blank line are never blank. The test now pins that (`"hold it\n\n  "` goes through as `"hold it"`; removing the strip fails it), and the unreachable clause is gone. The **Fix** below asked for a refusal the home never makes.
+
+**Fix:** add `{"text": "hold it\n\n  ", "answer": 1}` to the refused list in that test. **Done when** reverting the `.strip()` condition fails it.
+
+## TD-417: Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/`
+
+**Why:** `tests/test_ui_focus_rail.py` (#1286, TD-412) opens with a docstring that says *«* and every glyph bring the panel back, *a glyph opening its card*, and *the choice is this browser's (`focus.side`)*. Its four tests call `AO.railGlyphs` (the pure glyph list), assert strings in `app.css` (`.focus .side.rail { width: 28px; }`) and in the rendered template, and `AO.keyEntry("focus","s")`. None runs `putAway`, the `#sideaway`, `#sideback` and `#railglyphs` click handlers, `renderRail` or the `store.set("focus.side", …)` write, so deleting the handler body, the `store.set` call, or `d.open = true` in `src/agentorc/ui/static/app.js` keeps every test green (read from the diff; the handlers live inside `AO.focus`, which the node probe never calls). (This one is read from the diff, not shown by a revert.) The inline script in `focus.html` reads `ao.focus.side` and `store.set("focus.side")` writes it (`store` prefixes `ao.`); no test pins that the two agree.
+
+**Fix:** a Playwright run (the repo's `~/ao-shots/pwlib`, headless-screenshots memory) or a probe of `AO.focus` against a stubbed DOM: press `#sideaway` (`#side` gains `rail`, localStorage `ao.focus.side` is `"away"`), reload (the class is there before the first paint), press a glyph (`rail` leaves, its `details.side[data-side]` is `open`), press `#sideback`. Skip like the existing probe where the tool is absent. **Done when** removing each handler in `app.js` fails a test.
+
+**Resolved:** 2026-10-08 (PR #1296, grinder-ao-2) — the rail's wiring moved from inside `AO.focus` to `AO.wireRail` in `app.js`, unchanged in behaviour; `tests/test_ui_focus_rail.py` presses it in a node probe (put away, bring back, a glyph opening its card, needs-you's glyph, a press between glyphs) and runs `focus.html`'s inline script against what the presses stored. Removing any handler, the `store.set` or `d.open = true` fails a test. UI check on a scratch home in the PR body.
+
+## TD-004: Host identity: `hosts.yml`, host name and VS Code alias are env vars for now
+
+**Priority:** Medium
+**Added:** 2026-09-06
+**Owner:** anchor
+**Kind:** build
+**Status:** Resolved — was: Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 after the first real session hit the unresolvable hostname. 2026-09-10 (PR #55): the parser moved to `sessionorc.hosts` so the agent can read it too; `volatile` (Team banner wording), `repos_registry` (registered repos head the New session directory list) and `runs_keep_days` (run-log retention on the tick, design §4.6) landed; the three `AGENTORC_*_HOST` env overrides are gone. Remaining: the ssh transport entries (phase 2) — and with them the `unreachable` card state and the volatile sort slot, which phase 1's single local host cannot produce. **Next:** what is left is the ssh transport, phase 2.
+**Location:** `src/sessionorc/hosts.py`, `src/sessionorc/agent.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`, `new_form`)
+
+**Note (2026-09-10, session tdgrind-ao-1):** the run-1 question "where do per-host agent settings live" was answered by moving the parser into `sessionorc`: the agent reads its own machine's `hosts.yml` `local` entry, which on a phase 2 session host is that host's own file (design §5).
+
+**Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
+
+**Fix:** `hosts.yml` loader; the local host is an entry like any other; drop the env vars. Done when the top bar shows `kmaster` from the file and the VS Code link uses the ssh alias from it.
+
+**Related:** design §4.5 browser mechanics (VS Code links), §5, phase 2.
+
+**Resolved:** 2026-10-08 (PR #1292, the anchor) — what was left was the ssh transport's host entries and, with them, the `unreachable` card state and the volatile sort slot. The entries are not coming: the home and node split replaced the hub-and-spoke ssh transport (§7 phase 2), and §5 now says so. A machine node in use is TD-057's. `unreachable` was already built (`agent_serve.py`'s overlay for a node whose link is down). The volatile slot is `cards.host_volatile`: an unreachable card on a host whose `nodes:` flags, or own `local` entry, say `volatile` takes the `idle` rank (§4.5's order), pinned by `tests/test_card_volatile.py`. The *Done when* (the top bar's name and the VS Code alias from the file) has held since 2026-09-10 (PR #55).

@@ -17,7 +17,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
-| TD-004 | Host identity: `hosts.yml` `local` entry complete; ssh entries pending (phase 2, now the node→home link of TD-057) | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Partly done — the reset start (TD-133) and the start time (TD-152) designed; archives with them |
@@ -68,12 +67,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-415 | Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words | Low | Open |
-| TD-416 | Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282) | Low | Open |
-| TD-417 | Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested | Low | Open |
-| TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Open — mockup reviewed with Paul 2026-10-08, three rounds; his last look before the design PR |
+| TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Open — mockup reviewed with Paul 2026-10-08, four rounds; his last look before the design PR |
 | TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Open |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
+| TD-421 | A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser | Medium | Designed — TD-422 builds it |
+| TD-422 | Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab | Medium | Open |
+| TD-424 | §4.5a's *Done* row still ends *TD-338 — designed 2026-10-05, not built*; TD-340 built it (#1144) and the *pending* row (line 14) says so | Low | Open |
+| TD-425 | 13 live checks wait on the anchor, some since #343, and 10 designed entries wait on them as *design-first*: the bar counted them as the designer's work while its lane held nothing | Medium | Open |
 
 ---
 
@@ -109,23 +109,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 **Fix:** soft-key row that sends keys through the terminal websocket (not `send-keys`, invariant 6), collapsed side panel, 44 px tap targets on Allow / Deny; test on a phone over WireGuard or the Cloudflare tunnel (design §4.5) once phase 2 lands it.
 
 **Related:** design §10 "Phone answers for questions" (open).
-
-## TD-004: Host identity: `hosts.yml`, host name and VS Code alias are env vars for now
-
-**Priority:** Medium
-**Added:** 2026-09-06
-**Owner:** anchor
-**Kind:** build
-**Status:** Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 after the first real session hit the unresolvable hostname. 2026-09-10 (PR #55): the parser moved to `sessionorc.hosts` so the agent can read it too; `volatile` (Team banner wording), `repos_registry` (registered repos head the New session directory list) and `runs_keep_days` (run-log retention on the tick, design §4.6) landed; the three `AGENTORC_*_HOST` env overrides are gone. Remaining: the ssh transport entries (phase 2) — and with them the `unreachable` card state and the volatile sort slot, which phase 1's single local host cannot produce. **Next:** what is left is the ssh transport, phase 2.
-**Location:** `src/sessionorc/hosts.py`, `src/sessionorc/agent.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`, `new_form`)
-
-**Note (2026-09-10, session tdgrind-ao-1):** the run-1 question "where do per-host agent settings live" was answered by moving the parser into `sessionorc`: the agent reads its own machine's `hosts.yml` `local` entry, which on a phase 2 session host is that host's own file (design §5).
-
-**Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
-
-**Fix:** `hosts.yml` loader; the local host is an entry like any other; drop the env vars. Done when the top bar shows `kmaster` from the file and the VS Code link uses the ssh alias from it.
-
-**Related:** design §4.5 browser mechanics (VS Code links), §5, phase 2.
 
 ## TD-005: `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json`
 
@@ -1070,7 +1053,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-07 (the anchor, from Paul)
 **Owner:** anchor
 **Kind:** evaluation
-**Status:** Open — asked by Paul 2026-10-07: research it (a Sonnet agent can do the reading), then see what agentorc could change.
+**Status:** **Researched and measured 2026-10-08 (the anchor):** [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md), proposed. On the Oct 1–8 transcripts (Opus 5.5, 19,534 requests), cache reads are 58% of the weighted cost, one-hour writes 26% and output 16%. Re-writes after a lapsed cache are 6.0%, and cold starts 3%. Requests over 200k of context carry 35%. Claude Code already gives a subscription's main conversation the one-hour lifetime, and that saved a full re-write at each of 813 gaps of 5–60 minutes. Proposed: pin `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` on a metered profile; restart, rather than ring by the doorbell, a member idle past the hour with a context over ~100k; a one-week trial of a 200k bound on ao-grind's grinders. **Left:** Paul's decision on the board, then the build entries for the levers taken, and the ADR's Status.
+**Blocked by:** decision (Paul) — the board's *Which prompt-cache levers should agentorc take?* (2026-10-08)
 **Location:** design §4.2a (profiles and `prices:`, which already carry `cache_read` and `cache_write`), §6 (the tick: rule 3's idle close, restarts, wakes and rings), §4.9b (a techlead started per batch); `src/sessionorc/agent_tick.py`, `src/sessionorc/agent_wake.py`
 
 **Why:**
@@ -1172,9 +1156,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Priority:** Medium
 **Type:** debt
 **Added:** 2026-10-08 (the designer, from TD-410's design)
-**Owner:** grinder
+**Owner:** anchor
 **Kind:** live-check #1287
-**Status:** Built 2026-10-08 (grinder-ao-1, PR #1287), all three slices: `teamrun.start` and `apply` write a manager on call `held` (`on_call_gate`), the line *on call — comes when a member needs a reading*; the held create moves kept mail; a fill's prompt ends with *[agentorc] you are filled for: <by> — <member or question>* (`agent_tick.filled_for`, `restarts` `for: seat_due`); `docs/briefs/manager-ao-1.md`'s first reads under the readings. Tests in `test_anchor_seat.py`, `test_manager_on_call.py`. **The live check:** once #1287 is live (`ao promote status`), read with no press of yours: the next `ao team start` of an on-call team (its output, or `ao status -v`) shows the manager `closed` with `closer: {by: start, why: held}` and no pane; and from the promote on, a week of `journalctl --user -u agentorc-agent` (read only) holds no *a seat with nothing due* close of a manager that was never filled for a cause. TD-410 is archived with this entry.
+**Status:** Built 2026-10-08 (grinder-ao-1, PR #1287), all three slices: `teamrun.start` and `apply` write a manager on call `held` (`on_call_gate`), the line *on call — comes when a member needs a reading*; the held create moves kept mail; a fill's prompt ends with *[agentorc] you are filled for: <by> — <member or question>* (`agent_tick.filled_for`, `restarts` `for: seat_due`); `docs/briefs/manager-ao-1.md`'s first reads under the readings. Tests in `test_anchor_seat.py`, `test_manager_on_call.py`. **The live check:** once #1287 is live (`ao promote status`), read with no press of yours: the next `ao team start` of an on-call team (its output, or `ao status -v`) shows the manager `closed` with `closer: {by: start, why: held}` and no pane; and from the promote on, a week of `journalctl --user -u agentorc-agent` (read only) holds no *a seat with nothing due* close of a manager that was never filled for a cause. TD-410 is archived with this entry. **Read 2026-10-08 19:39 local (grinder-ao-2):** #1287 went live with `aebeea3` at 19:33 (the host agent's journal: *promoted `agentorc` `aebeea3` — 9 commits*); no `ao team start` has run since, so the held create is not yet seen — `ao status --json` shows `ao-agentorc-manager-ao-1` `closed` by `{by: tick, why: seat}` at 21:15Z, a close from before the promote. The journal since the promote holds no *a seat with nothing due* line. **Waits for** the next `ao team start` of an on-call team, and a week of journal from 2026-10-08 19:33 (to 2026-10-15): read both then, and archive or file what is wrong.
 **Location:** `src/agentorc/teamrun.py` (`start`: `plan.lead`'s create; `apply`: the manager the run lacks; the Start's row words), `src/sessionorc/agent.py` (`rpc_create`'s `held` for a `team` seat, `_schedule(state="closed")`), `src/sessionorc/agent_tick.py` (`_fill` → `_replay`: the closing line on the prompt), `src/agentorc/briefs/manager_on_call.md` (the first paragraph reads the line), `docs/briefs/manager-ao-1.md` (first reads moved under the readings — a held path), `tests/test_teamrun*.py`, `tests/test_seats*.py` / `tests/test_manager_on_call*.py`
 
 **Why:** TD-410: `start` creates the manager live before every other record, so every Start fills a manager on call into nothing — fourteen fills since 2026-10-03, each closed as *a seat with nothing due*. Design §6 rule 3 *A Start writes the seat and never fills it*, §6 *What is left is judgement* (first reads), §4.9 `on_call`, §4.9c (Apply).
@@ -1188,61 +1172,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
 
-## TD-415: Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/`
-
-**Why:** #1282 (TD-070) lets `ao msg --reply-to <id> --pick <n> "text"` send the picked answer, a blank line and the replier's words. `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins only the one case `--pick 2 "rebase it first"`. Three changed lines survive being reverted, each with the whole of `tests/test_cli.py` and `tests/test_mail.py` passing (153 passed, run on `origin/main` 5a2f4441): (a) `_picked_text` in `src/agentorc/cli.py` — `return text.split("\n", 1)[0] if isinstance(idx, int) else text` replaced by `return text` (the line that makes `ao inbox` show a picked reply as the answer alone and not the words after it: the test reads `answered 2:` only from the closed *question*, which takes the `answers[idx]` branch above it, never from the reply entry); (b) `if more.strip():` replaced by `if more:` (a whitespace-only word then sends `"off develop\n\n "`, which the home accepts only because of TD-416); (c) `*to, more = words or [""]` replaced by `to, more = [], (words or [""])[-1]` (the `to` addressees an `ao msg a b --pick` leaves in front of the words are dropped by the reply either way, and no test sends one). Revert each line in a worktree and run `pdm run pytest -q tests/test_cli.py tests/test_mail.py` to see it.
-
-**Fix:** extend that test: a reply entry with `answer` and `text` `"off develop\n\nrebase it first"` read by `ao inbox` as the sender prints `answered 2: "off develop"` and not the words; `--pick 2 "  "` sends the answer alone; `--pick 2` with an addressee word in front sends the same reply as without it, or is refused if that is the design. **Done when** reverting each of (a)–(b) fails a test.
-
-## TD-416: Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/`
-
-**Why:** #1282 changes `_msg` in `src/sessionorc/agent_mail.py` to accept `text` as the picked answer, `\n\n`, and words. The words must be non-blank: `text.startswith(said + "\n\n") and text[len(said) + 2 :].strip()`. `tests/test_mail.py::test_the_home_checks_that_a_picked_answer_is_one_of_them` refuses `"hold it and more"`, `"hold it\nand more"` and `"merge it\n\nnow"`, and accepts `"hold it\n\nuntil Monday"`, but never a blank tail. Replacing `and text[len(said) + 2 :].strip())` by `)` leaves `pytest -q tests/test_mail.py -k picked` at 3 passed (`origin/main` 5a2f4441): the guard is a line no test would catch going back, and a direct RPC caller could then send `"hold it\n\n   "`.
-
-**Fix:** add `{"text": "hold it\n\n  ", "answer": 1}` to the refused list in that test. **Done when** reverting the `.strip()` condition fails it.
-
-## TD-417: Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/`
-
-**Why:** `tests/test_ui_focus_rail.py` (#1286, TD-412) opens with a docstring that says *«* and every glyph bring the panel back, *a glyph opening its card*, and *the choice is this browser's (`focus.side`)*. Its four tests call `AO.railGlyphs` (the pure glyph list), assert strings in `app.css` (`.focus .side.rail { width: 28px; }`) and in the rendered template, and `AO.keyEntry("focus","s")`. None runs `putAway`, the `#sideaway`, `#sideback` and `#railglyphs` click handlers, `renderRail` or the `store.set("focus.side", …)` write, so deleting the handler body, the `store.set` call, or `d.open = true` in `src/agentorc/ui/static/app.js` keeps every test green (read from the diff; the handlers live inside `AO.focus`, which the node probe never calls). (This one is read from the diff, not shown by a revert.) The inline script in `focus.html` reads `ao.focus.side` and `store.set("focus.side")` writes it (`store` prefixes `ao.`); no test pins that the two agree.
-
-**Fix:** a Playwright run (the repo's `~/ao-shots/pwlib`, headless-screenshots memory) or a probe of `AO.focus` against a stubbed DOM: press `#sideaway` (`#side` gains `rail`, localStorage `ao.focus.side` is `"away"`), reload (the class is there before the first paint), press a glyph (`rail` leaves, its `details.side[data-side]` is `open`), press `#sideback`. Skip like the existing probe where the tool is absent. **Done when** removing each handler in `app.js` fails a test.
-
 ## TD-418: The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet
 
 **Priority:** Medium
 **Added:** 2026-10-08 (ao-paul, a UI/UX review with Paul)
 **Owner:** paul
 **Kind:** decision
-**Status:** Open — the mockup is up (`docs/mockups/reviews/2026-10-08-org-declutter.html`, published at https://claude.ai/artifact/B8ybKFKeu3n1n4PUzYgktP), two rounds with Paul on 2026-10-08: the seven changes below as recommended, then his round 2 (the lane chip in the kind's colour, the + card's words, the debt label on one line, Doing's gloss gone, and three of the observations taken in), then round 3 (the count on the state pill, and the kind bar's design-first split). Next, after his last look: a design PR for §4.5 / §4.5a (and the history), then a build entry.
-**Blocked by:** decision (paul) — the last look at round 3 on the mockup page
+**Status:** Open — the mockup is up (`docs/mockups/reviews/2026-10-08-org-declutter.html`, published at https://claude.ai/artifact/B8ybKFKeu3n1n4PUzYgktP), two rounds with Paul on 2026-10-08: the seven changes below as recommended, then his round 2 (the lane chip in the kind's colour, the + card's words, the debt label on one line, Doing's gloss gone, and three of the observations taken in), then round 3 (the count on the state pill, and the kind bar's design-first split), then round 4 (WAITING, each card's own lane, the kind bar by who an entry waits on; the shots re-captured from the live page that evening). Next, after his last look: a design PR for §4.5 / §4.5a (and the history), then a build entry.
+**Blocked by:** decision (paul) — the last look at round 4 on the mockup page
 **Location:** `src/agentorc/ui/templates/org.html`, `group_head.html`, `rollup.html`, `lanes_line.html`, `team_summary.html`, `card.html`, `base.html`; `static/app.css`, `app.js`; design §4.5, §4.5a
 
 **Why:** Paul's screenshot of the live Org page, 2026-10-08, and his list: the *mine* toggle and *show command runs* box sit in the title row though rarely used; the rollup's TDs-in-motion bar and PRs-in-motion blocks sit at different heights (the PR facet's header holds the window picker, and `.blk` is 30px against `.bar`'s 22px); the Agents facet's *in urgency order…* line is help text on the page; Shell and + New session are two top-bar buttons though a team's sessions start from its + card; the team header says *9 sessions* twice (meta and fold), the flow twice (strip and dropdown, and Settings has the same picker per team), and spends a line on a disabled Members…, its reason and Open file, and another on *not concluded:*; the team's ✉ n shows only while folded (TD-071), which reads as a bug; the lanes line (TD-361) sits mid repo facet though its counts are members' lanes.
 
-**Fix:** the seven changes on the mockup page — (1) `mine` and `kind:command` become filter words, both controls go; (2) every rollup and repo-facet header reserves the picker's height and bars and blocks share one height; (3) the Agents line becomes an i, and Needs you hides *answer needed* at 0; (4) Shell and + New session merge into **+ New ▾** (Session, Shell); (5) the team header is one row — name, place, a `flow: <name>` chip linked to Settings (to the flow's own page once flows have pages, Paul 2026-10-08), the marks, Wind down, Stop now, fold, i — with Members…, the definition's source, Open file and *not concluded:* in the i panel, and *flow changed · Apply* kept on the header; (6) ✉ n drawn folded or not; (7) the lanes line becomes an i on TECHNICAL DEBT, each grinder and designer card carrying its lane's count attached to its state pill (*WORKING [18]*, so it never reads as the ✉ chip; Paul, round 3) in the repo bar's colour for its kind (pickable blue, design-first purple), a soft tint, solid only when the member has declared out of work with entries waiting (idle with a PR in review stays soft), none at 0. (14) the kind bar's design-first segment counts only the entries the designer can take; the designed ones waiting on a build get their own muted segment, so the bar and the designer's count agree (on 2026-10-08 all 9 purple were waiting on builds and the designer's lane held 0). Round 2: (8) the + card reads *New session*; (9) a facet's label never wraps — the window picker drops to its own line first; (10) Doing loses *the team's ao doing calls*; (11) while one team is live the rollup keeps Agents and Needs you only; (12) a team with nothing live draws no summary; (13) the summary's columns 1.15 : 0.85 : 1.2. The PR counts that disagree are TD-420. The capture and transform that made the shots are in `docs/mockups/reviews/org-declutter-src/`. **Done when** the design says the new shape and the build entry it names is open.
+**Fix:** the seven changes on the mockup page — (1) `mine` and `kind:command` become filter words, both controls go; (2) every rollup and repo-facet header reserves the picker's height and bars and blocks share one height; (3) the Agents line becomes an i, and Needs you hides *answer needed* at 0; (4) Shell and + New session merge into **+ New ▾** (Session, Shell); (5) the team header is one row — name, place, a `flow: <name>` chip linked to Settings (to the flow's own page once flows have pages, Paul 2026-10-08), the marks, Wind down, Stop now, fold, i — with Members…, the definition's source, Open file and *not concluded:* in the i panel, and *flow changed · Apply* kept on the header; (6) ✉ n drawn folded or not; (7) the lanes line becomes an i on TECHNICAL DEBT, each grinder and designer card carrying its lane's count attached to its state pill (*WORKING [18]*, so it never reads as the ✉ chip; Paul, round 3) in the repo bar's colour for its kind (pickable blue, design-first purple), a soft tint, solid only when the member has declared out of work with entries waiting (idle with a PR in review stays soft), none at 0. (14) the kind bar's design-first segment counts only the entries the designer can take; the designed ones waiting on a build get their own muted segment, so the bar and the designer's count agree (on 2026-10-08 all 9 purple were waiting on builds and the designer's lane held 0). Round 2: (8) the + card reads *New session*; (9) a facet's label never wraps — the window picker drops to its own line first; (10) Doing loses *the team's ao doing calls*; (11) while one team is live the rollup keeps Agents and Needs you only; (12) a team with nothing live draws no summary; (13) the summary's columns 1.15 : 0.85 : 1.2. Round 4: (15) a **WAITING** pill — an idle session that holds a claim whose PR is open (*waiting · review #1302*), has an open ask to the person (*waiting · you*), or sits in `ao wait` on another session (*waiting · <session>*) reads WAITING, its own colour and its own place in the urgency sort and the Agents pills, so IDLE means it holds nothing and IDLE with a solid count is the case to act on; a session never waits on a build; (16) a card's count is what its **own** lane takes that nobody holds, written `n/k` where `k` > 1 sessions share the lane (two grinders on `[free-pick, owner:grinder]`: `14/2`; Paul's rule, the same for two designers) — the team's sum misled: the 18 of the first capture were mostly the anchor seat's lane (evaluations), the grinders' own lane holding TD-422 alone; (17) the kind bar counts by who an entry waits on — pickable · design (the designer can take it) · for you · live check · blocked (waits on another open entry) · other — so a designed entry whose build entry exists counts *blocked*, and the live checks the grey *other* hid get a segment (on the evening capture: 15 · 0 · 8 · 13 · 10 · 7 of 53). The PR counts that disagree are TD-420; the live checks themselves are TD-425. The capture and transform that made the shots are in `docs/mockups/reviews/org-declutter-src/`. **Done when** the design says the new shape and the build entry it names is open.
 
 ## TD-419: A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget
 
@@ -1269,3 +1211,76 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** Paul's screenshot of 2026-10-08: the rollup's PRs in motion read 93 opened / 92 closed for the day while ao-grind's repo facet, the only live team's, read 85 / 85. A later capture the same evening read 84 / 83 in both. §4.5a says the rollup sums over every live team; with one live team the two should agree, or the page should say what else is counted (another repo, a stopped team's, a different window edge).
 
 **Fix:** find what the rollup sums that the facet does not (read both builders against §4.5a), then either make them agree or label the rollup's scope on the page. **Done when** the two numbers agree with one live team, or the difference is named where it is shown.
+
+## TD-421: A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-08 (the designer, PR #1300): design §4.6 *A URL in the pane is a link* and §4.5a's row *a URL is a link — Ctrl+click / Cmd+click* — xterm.js's web-links addon (`@xterm/addon-web-links`, the release paired with the vendored xterm 5.5.0), `http://` and `https://` only by the addon's own regex, underlined on hover, **Ctrl+click / Cmd+click** opens a new tab with `noopener` (the press decided: VS Code's convention, the one Paul named; a plain click is a drag's start and a drag over a link still selects, a plain tap does nothing and the phone's press is TD-003's to name); TD-071's constraint read: not a control from the text — one act on what is written, nothing without a press, the press a modifier, the URL read under the pointer first; `javascript:`, `data:` and `file:` are not links, as §5's scheme rule has it for the editor button; a read-only Focus and a pop-out have it; **no person setting** — a modifier+click takes nothing from anyone, and copy on select is untouched. Mockup: `Focus.dc.html` gains a hovered URL line (`docs/mockups/reviews/2026-10-08-td421-pane-link.png`). TD-422 builds it. Before: Open.
+**Blocked by:** TD-422
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`: the `new Terminal(…)` and the two `loadAddon` calls — fit and WebGL — are the only addons the pane loads), `src/agentorc/ui/templates/focus.html` (the `/static/vendor/` script tags), `src/agentorc/ui/static/vendor/README.md` (the xterm.js family's version table: `@xterm/xterm` 5.5.0); design §4.6 *The mouse is the browser's*, §4.5a (the Focus rows: *Copy / Paste*, *copy on select*), §2 goal 12 (the terminal's face), §5 `person.terminal`
+
+**Why:** Paul's words (2026-10-08, the Add entry form): *Need to be able to go to a link by clicking it in the session terminal. Right now you have to copy it, and paste it in the (default) browser. It would be nice if it went automatically. The vscode terminal has this.* A session's pane is full of URLs a person wants to follow — the PR a worker just opened, a CI run, a design page — and today each is a drag, a Copy and a paste into the address bar (§4.5a *Copy / Paste*). VS Code's terminal underlines a URL on hover and opens it on Ctrl+click (Cmd+click on a Mac); xterm.js, which draws the pane, ships that as `@xterm/addon-web-links`, and the pane loads only the fit and WebGL addons. Nothing in the design says a URL in the pane is a link, and a control that is not in §4.5a's table does not exist — so this is designed before it is built. The one thing the design has to settle is Paul's own constraint (TD-071 item 8): *nothing on a page is a control that parses what an agent printed*. A link in the pane is built from text a session wrote, so the design says what makes it safe where a button from screen text would not be: it does one thing, open the URL as the browser's own address bar would (`noopener`, a new tab, no `javascript:` or `file:` schemes, as §5 `person.open_in`'s scheme rule already refuses), it opens nothing without a press, and the press is the terminal convention (a modifier+click, the URL shown first), never a bare click that a drag or a stray tap could land on a line that is being read.
+
+**Fix (to design, then build):**
+1. **Design** — one paragraph in §4.6 beside *The mouse is the browser's*: a URL in the pane is a link, how it is told from the text around it (xterm.js's web-links addon: `http://` and `https://` only, the addon's own regex), what the press is (Ctrl+click / Cmd+click as VS Code's terminal, with the underline on hover; or a plain click — decide, with the reading of TD-071's constraint above), where it opens (a new tab, `noopener`), and that it is inert on nothing: it reads, so a read-only Focus (TD-096) has it too. One row in §4.5a for the Focus pane's link. Say whether it is a person's choice (`person.terminal`, §5, beside copy on select) or has none — the lean is none: a link that opens only on a modifier+click takes nothing from anyone.
+2. **Build** — vendor `@xterm/addon-web-links` at the release paired with `@xterm/xterm` 5.5.0, with its licence file and its row in `vendor/README.md`; load it in `AO.focus` beside the fit addon, with a handler that opens the URL in a new tab through `window.open(url, "_blank", "noopener")`; the screenshot of the hover and the opened tab under `docs/mockups/reviews/` as a UI change's check asks (§4.9b *A UI change is verified by its builder*).
+
+**Done when** a URL printed in a session's Focus pane underlines on hover and opens in a new browser tab on the press the design names, a plain drag over it still selects, nothing opens without a press, §4.5a has the row and §4.6 the paragraph, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-071 (item 8, Paul's constraint: nothing on a page is a control that parses what an agent printed), TD-164 / TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the pane's renderer and face), §5 `person.open_in` (the editor presets' scheme rule, cited there for TD-095).
+
+## TD-422: Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-08 (the designer, from TD-421's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/vendor/` (`addon-web-links.js`, `LICENSE-addon-web-links.txt`, the row in `README.md`), `src/agentorc/ui/templates/focus.html` (the script tag beside `addon-fit.js`), `src/agentorc/ui/static/app.js` (`AO.focus`: the third `loadAddon`, with its handler), `src/agentorc/ui/help.py` (the paragraph), `tests/test_ui_focus*.py`
+
+**Why:** TD-421: a URL in the pane is copied by hand and pasted into the browser. Design §4.6 *A URL in the pane is a link*, §4.5a *a URL is a link — Ctrl+click / Cmd+click*.
+
+**Fix:** as designed —
+- **Vendor** `@xterm/addon-web-links` at the release paired with `@xterm/xterm` 5.5.0 (0.11.0 on the published pairing; match the file's SHA-256 to the package's as `vendor/README.md`'s rows were matched, and record the version there with its licence file). A newer line of the addon needs a newer xterm, which is its own change.
+- **Load** it in `AO.focus` beside the fit addon: `term.loadAddon(new WebLinksAddon.WebLinksAddon(handler))`, the addon's default regex (http and https) and its hover underline; **the modifier gate is the handler's, not the addon's** — the addon calls its handler on any click of a link, so the handler opens only when `event.ctrlKey || event.metaKey` holds (`(event, uri) => { if (!(event.ctrlKey || event.metaKey)) return; … window.open(uri, "_blank", "noopener"); }`) and a plain click falls through to the selection as before; pin that in a test, since it is what makes the design's *a plain click does nothing* true. The handler opens nothing for a scheme other than `http:` or `https:` (a guard, since the regex is the addon's: `new URL(uri).protocol` in the two).
+- **Read-only Focus and the pop-out**: no condition — the addon is loaded on every Focus; the press sends nothing to the bridge.
+- **Help**: a paragraph in `ui/help.py` under the Focus heading, key `pane-link`, in the §4.5a row's words.
+- **The shot**: the hover's underline and the opened tab, in headless Chromium under Playwright on a scratch home (`scripts/look_home.py`, §4.9b *A UI change is verified by its builder*), committed as `docs/mockups/reviews/<date>-td422-*.png` and named in the PR.
+
+**Done when** a `https://` URL printed in a Focus pane underlines on hover and Ctrl+click (Cmd+click on a Mac) opens it in a new tab with `noopener`; a plain click and a drag over it select as before and open nothing; the same on a read-only Focus; `vendor/README.md` has the row and the licence file is in place; the help paragraph is there; tests pin the script tag, the `loadAddon` call with the handler and the scheme guard, and the help key; `pdm run test` and `pdm run lint` pass; TD-421 is archived with this entry.
+
+**Related:** TD-421 (the design), TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the WebGL addon's vendoring), TD-071 (the constraint).
+
+## TD-424: §4.5a's *Done* row says the pending mark is *not built*; TD-340 built it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (docs-audit-ao-1, auditing the last ten merged PRs against §4.5a; found beside #1296's rail row)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.5a-controls.md` (the *Due strip / Inbox board row* · **Done** row)
+
+**Why:** The row reads *the row leaves on the press and the toast waits for the landing (**pending**, TD-338 — designed 2026-10-05, not built)*. The rows for the same work say the opposite: *a control's look* (*designed 2026-10-05 (TD-338; built — TD-340 …)*) and *Inbox row: pending* (*built — TD-340*), and the archived TD-340 and TD-338 entries both record PR #1144 as the build, with *checking off…* in the pending table for Done. §4.5a is the table a control is read from, and this row still says *designed* for what was built.
+
+**Done when** the row reads *built — TD-340* where it now reads *not built*, in the form the neighbouring rows use, and no other line of `docs/design/4.5a-controls.md` says TD-338's pending mark is unbuilt; the doc-bound tests pass.
+
+**Related:** TD-338 (the design), TD-340 (the build, #1144).
+
+## TD-425: 13 live checks wait on the anchor, some since #343, and 10 designed entries wait on them as *design-first*: the bar counted them as the designer's work while its lane held nothing
+
+**Priority:** Medium
+**Added:** 2026-10-08 (ao-paul, found in TD-418's UI/UX review with Paul)
+**Owner:** anchor
+**Kind:** evaluation
+**Status:** Open
+**Location:** `docs/technical_debt.md` (the entries below); design §4.9b (live checks in a `free-pick` lane), cadence §2.4
+
+**Why:** the Org page's kind bar read *10 design-first* on 2026-10-08 while the designer was out of work with an empty lane. Each of the ten is a designed entry whose **Blocked by** names its build entry, and every one of those builds is merged and waits on a live check, not a build: TD-230 and TD-231 on TD-233 (#791), TD-380 on TD-384 (#1243), TD-223 and TD-198 on TD-228 (#904), TD-247 on TD-259 (#884), TD-410 on TD-413 (#1287), TD-290 on TD-292 (#1007), TD-307 on TD-310 (the anchor's pickable move). Behind them sit 13 `live-check` entries, most owned by the anchor: TD-052 (#343), TD-064 (#431), TD-151, TD-228, TD-233, TD-259, TD-292, TD-297, TD-300, TD-302, TD-358, TD-384, TD-413 — counted in the bar's grey *other*, so the page never showed them. Paul's read (2026-10-08): most are artifacts of the change that handed a UI change's live look to the grinder that made it (TD-290/TD-292), so one-offs rather than a standing flow problem.
+
+**Fix:** walk the 13: do the live look where it still means something (`ao promote status` says the build is live), or archive the entry with **Resolved:** saying the look was folded into a later one or is moot; archive each designed parent with its build. Then say whether the design entry should archive when its design merges, its build entry carrying the rest, so no parent waits as *design-first* again (cadence §2.4, `scripts/ledger.py`'s derived kinds). TD-418 change 17 shows the live checks on the bar so a pile is visible. **Done when** no live check is older than its build's promote by more than a week, and no designed entry counts as the designer's work.

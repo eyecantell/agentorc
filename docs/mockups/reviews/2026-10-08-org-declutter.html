@@ -32,7 +32,7 @@ h1 { font-size: 26px; margin: 0; text-wrap: balance; } h2 { font-size: 18px; mar
 .chg .t { grid-column: 2; }
 .chips { grid-column: 2; display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0 2px; padding: 10px 12px; background: #151b24; border-radius: 6px; }
 .cs { display: inline-flex; align-items: center; gap: 8px; color: #c9d1db; font-size: 13px; }
-.pl { font: 600 11px var(--mono); letter-spacing: .04em; padding: 3px 6px; border-radius: 3px; display: inline-flex; align-items: center; gap: 6px; } .pl.wk { background: #12391f; color: #5fd38a; } .pl.id { background: #1b2a4a; color: #8fb3ff; }
+.pl { font: 600 11px var(--mono); letter-spacing: .04em; padding: 3px 6px; border-radius: 3px; display: inline-flex; align-items: center; gap: 6px; } .pl.wk { background: #12391f; color: #5fd38a; } .pl.id { background: #1b2a4a; color: #8fb3ff; } .pl.wt { background: #0f3532; color: #5eead4; }
 .lc { font: 600 11px var(--mono); padding: 1px 6px; border-radius: 3px; border: 1px solid; color: #e3e8ef; }
 .lc.soft.pk { background: rgba(59,130,246,.22); border-color: rgba(59,130,246,.7); } .lc.solid.pk { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 .lc.soft.df { background: rgba(99,102,241,.22); border-color: rgba(99,102,241,.7); } .lc.solid.df { background: #6366f1; border-color: #6366f1; color: #fff; }
@@ -44,19 +44,19 @@ ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { m
 <div class="wrap">
   <header>
     <h1>Org page: declutter round</h1>
-    <p class="sub">The live Org page from 2026-10-08 18:50, captured read-only. Both shots show the same data: the "after" applies the proposed changes to that captured page, so only the design differs.</p>
+    <p class="sub">The live Org page re-captured read-only on the evening of 2026-10-08 for round 4, so the numbers are that moment's. Both shots show the same data: the "after" applies the proposed changes to that captured page, so only the design differs.</p>
   </header>
 
   <section>
     <div class="tabs" role="tablist">
-      <button role="tab" id="t-after" aria-selected="true" data-img="2026-10-08-org-declutter-after.png" data-cap="After: one header row per team, aligned bars, lane counts on the member cards, the rollup trimmed to Agents and Needs you while one team is live.">After</button>
+      <button role="tab" id="t-after" aria-selected="true" data-img="2026-10-08-org-declutter-after.png" data-cap="After: one header row per team, aligned bars, own-lane counts on the state pills, WAITING, the kind bar by who an entry waits on.">After</button>
       <button role="tab" id="t-before" aria-selected="false" data-img="2026-10-08-org-declutter-before.png" data-cap="Before: the live page as it stands.">Before</button>
       <button role="tab" id="t-open" aria-selected="false" data-img="2026-10-08-org-declutter-after-open.png" data-cap="After, with the team's i panel and the + New menu open: the definition (Members…, where it is defined, Open file, the flow link) and not concluded now live in the panel.">After, menus open</button>
       <button role="tab" id="t-afull" aria-selected="false" data-img="2026-10-08-org-declutter-after-full.png" data-cap="After, the whole page, the stopped teams included.">After, full page</button>
       <button role="tab" id="t-bfull" aria-selected="false" data-img="2026-10-08-org-declutter-before-full.png" data-cap="Before, the whole page.">Before, full page</button>
     </div>
     <div class="shot" style="margin-top:12px"><img id="shot" src="2026-10-08-org-declutter-after.png" alt="The Org page after the proposed changes"></div>
-    <div class="cap" id="cap">After: one header row per team, aligned bars, lane counts on the member cards, the rollup trimmed to Agents and Needs you while one team is live.</div>
+    <div class="cap" id="cap">After: one header row per team, aligned bars, own-lane counts on the state pills, WAITING, the kind bar by who an entry waits on.</div>
   </section>
 
   <section>
@@ -68,16 +68,16 @@ ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { m
       <div class="chg"><span class="t"><b>Shell and + New session merge into + New ▾</b></span><p>One button with two choices, Session and Shell. A team's own sessions still start from its + card.</p></div>
       <div class="chg"><span class="t"><b>The team header fits on one row</b></span><p>The header keeps the name, host / repo, a <code>flow: td</code> chip (its stages in the tooltip, linked to Settings), the marks, Wind down, Stop now, the fold and the i. Dropped from the header: the second "9 sessions", the flow strip, and the flow dropdown (Settings already has the same picker per team). Members…, "defined in … changed by PR", Open file and <em>not concluded:</em> move into the i panel under a Definition line. <em>flow changed · Apply</em> stays on the header because it asks you to act.</p></div>
       <div class="chg"><span class="t"><b>✉ n shows folded or not</b></span><p>The team's unread total sits beside the flow chip in both states. TD-071 drew it only while folded; that rule is reversed.</p></div>
-      <div class="chg"><span class="t"><b>The lanes line leaves the repo facet</b></span><p>Its full text becomes an i on TECHNICAL DEBT. Each grinder and designer card shows how many entries its lane holds, attached to its state pill, in the repo bar's colour for that kind: blue for pickable, purple for design-first. Inside the pill it can't be mistaken for the ✉ mail chip. A soft tint means the member is busy or holds something. It turns solid when the member has said it is out of work while entries wait in its lane, which is the case to act on. No count at 0.</p>
+      <div class="chg"><span class="t"><b>The lanes line leaves the repo facet</b></span><p>Its full text becomes an i on TECHNICAL DEBT. Each card counts the entries its <b>own</b> lane takes that nobody holds, attached to its state pill in the bar's colour for that kind. When several sessions share one lane the count reads <code>n/k</code>: two grinders on the shared grinder lane show <code>14/2</code> on both cards. The same goes for two designers. Soft while the member works or waits; solid when it has said it is out of work with entries in its lane. No count at 0.</p>
         <div class="chips" aria-label="count states">
-          <span class="cs"><span class="pl wk">WORKING <span class="lc soft pk">18</span></span> grinder busy, 18 to come</span>
-          <span class="cs"><span class="pl id">IDLE <span class="lc soft pk">18</span></span> idle while its PR is reviewed</span>
-          <span class="cs"><span class="pl wk">WORKING <span class="lc soft df">9</span></span> designer with 9 to design</span>
+          <span class="cs"><span class="pl wk">WORKING <span class="lc soft pk">14</span></span> its own lane, alone</span>
+          <span class="cs"><span class="pl wk">WORKING <span class="lc soft pk">14/2</span></span> a lane shared by 2 grinders</span>
+          <span class="cs"><span class="pl wt">WAITING <span class="lc soft df">9</span></span> designer waiting, 9 to design</span>
           <span class="cs"><span class="pl id">IDLE <span class="lc solid df">9</span></span> out of work, 9 waiting: look</span>
         </div>
-        <p>In the shot, grinder-ao-1 is IDLE with 18 but stays soft: it holds TD-414, whose PR is in review. Being idle alone isn't a problem; being out of work with entries waiting is.</p>
-        <p><b>Why the designer shows no count here:</b> the repo bar's purple 9 aren't designer work. All 9 are design-first entries that are already designed and wait on their build (TD-230 on TD-233, TD-380 on TD-384, TD-247 on TD-259…); the bar's tooltip says <em>9 design-first · 0 in ao-grind's lanes · 9 wait on a build</em>. So the card is right, and the bar is the misleading part: see the next change.</div>
-      <div class="chg"><span class="t"><b>The kind bar splits design-first into "to design" and "waits on a build"</b></span><p>Today the purple segment counts both. The segment keeps purple for entries the designer can take, which is the same number as the designer card's count. The designed entries waiting on a build get their own muted segment and legend entry. Then the bar and the cards agree, and a purple 9 on the bar means 9 for the designer.</p></div>
+        <p>In the shot only the anchor seat carries a count (<code>WORKING 14</code>): its lane takes 14 unheld entries. The grinders' shared lane holds TD-422 alone, which grinder-ao-2 is working, so neither grinder card has a count. The first capture's "18 pickable" was the team's sum, mostly the anchor's evaluations.</p></div>
+      <div class="chg"><span class="t"><b>The kind bar counts by who an entry waits on</b></span><p>pickable · design (the designer can take it) · for you · <b>live check</b> · <b>blocked</b> (waits on another open entry) · other. The 10 "design-first" of tonight's reading were designed entries waiting on their builds, so they count as blocked, and design is 0, matching the designer card. The 13 live checks that grey "other" hid get a teal segment: 15 · 0 · 8 · 13 · 10 · 7 of 53. Why those 13 exist is TD-425.</p></div>
+      <div class="chg"><span class="t"><b>A WAITING state</b></span><p>An idle session reads <b>WAITING</b> when it holds a claim whose PR is open (<em>waiting · review #1302</em>, docs-audit-ao-1 in the shot), has an open ask to you (<em>waiting · you</em>), or sits in <code>ao wait</code> on another session. It has its own colour, its own place in the sort, and its own Agents pill. IDLE then means it holds nothing. A session never waits on a build; an entry can, which is what the bar's <em>blocked</em> says.</p></div>
       <div class="chg"><span class="t"><b>The + card reads New session</b></span><p>"your session in ao-grind" becomes "New session". The team card is the context.</p></div>
       <div class="chg"><span class="t"><b>TECHNICAL DEBT (56 OPEN) stays on one line</b></span><p>Section labels never wrap. Where the header runs out of room, the window picker drops to its own line on the right, not the label.</p></div>
       <div class="chg"><span class="t"><b>Doing loses "the team's ao doing calls"</b></span><p>The label and the rows say it.</p></div>
@@ -90,6 +90,7 @@ ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { m
   <section>
     <h2>Split out</h2>
     <ul class="obs">
+      <li><b>The live-check pile</b> is TD-425: 13 live checks, some from #343, and the 10 designed entries waiting on them. Likely one-offs from when grinders took over live looks; the entry walks them.</li>
       <li><b>Two PR counts that disagree</b> is its own entry, TD-420: the rollup read 93 / 92 in your screenshot while the repo facet read 85 / 85, and the page does not say what the rollup sums.</li>
       <li><b>The footnote under the page</b> ("Inside a team: the manager, then…") is left for the look-and-feel round.</li>
     </ul>

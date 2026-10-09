@@ -10,6 +10,7 @@
     .tgroup .ghead .foldmail { display: inline-block !important; }
     .lanechip { margin-left: 6px; flex: none; } .sc .r2 .cline { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .facet .kind { white-space: nowrap; } .frepo .fhead > .seg { margin-left: auto; }
     .lanecnt { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; border: 1px solid; font-weight: 700; color: var(--fg); } .lanecnt.k-pickable { background: color-mix(in srgb, var(--k-pickable) 25%, transparent); border-color: var(--k-pickable); } .lanecnt.k-design { background: color-mix(in srgb, var(--k-design) 25%, transparent); border-color: var(--k-design); } .lanecnt.solid.k-pickable { background: var(--k-pickable); color: var(--seg-fg); } .lanecnt.solid.k-design { background: var(--k-design); color: var(--seg-fg); }
+    .pill.s-waiting { background: color-mix(in srgb, #14b8a6 22%, transparent); color: #5eead4; } .bseg.k-live, .legend .k-live { background: #0f766e; } .bseg.k-blocked, .legend .k-blocked { background: repeating-linear-gradient(135deg, #475569 0 6px, #3b4656 6px 12px); }
     .tsum { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); }
     .rollup.lone { grid-template-columns: 2fr 1fr; }
     .defblock { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
@@ -66,13 +67,6 @@
     const pk = (txt.match(/(\d+) pickable/) || [])[1], df = (txt.match(/(\d+) design-first/) || [])[1];
     if (head) { const k = $('.kind', head); k.insertAdjacentHTML('afterend', imark(txt)); }
     ln.remove();
-    $$(`.tgroup[data-team="${team}"] .card`).forEach((c) => {
-      const role = $('.cline', c)?.textContent || ''; const pill = $('.r1 .pill', c); if (!pill) return;
-      const n = /^Grinder/.test(role) ? +pk : /^Designer/.test(role) ? +df : 0; if (!n) return;
-      const k = /^Grinder/.test(role) ? 'k-pickable' : 'k-design';
-      const busy = !/out of work/.test(role);  // solid only when it says it has nothing, with entries waiting
-      pill.insertAdjacentHTML('beforeend', `<span class="lanecnt ${k}${busy ? '' : ' solid'}" title="${n} ${k === 'k-design' ? 'design-first' : 'pickable'} entries in its lane">${n}</span>`);
-    });
   });
   // round 2: the + card says New session; Doing loses its gloss
   $$('.plusgo .meta').forEach((m) => { m.textContent = 'New session'; });
@@ -82,4 +76,38 @@
   // the rollup drops the TD and PR facets while one team is live: that team's own facets say it
   const live = $$('.tgroup').filter((g) => +g.dataset.live > 0);
   if (live.length === 1) { const fs = $$('.rollup > .facet'); fs[1]?.remove(); fs[2]?.remove(); $('.rollup')?.classList.add('lone'); }
+  // round 4 (TD-418): each card counts what its OWN lane takes that nobody holds, "n/k" where k > 1
+  // sessions share the lane. Read from the ledger on main at the capture: the anchor's lane takes 14
+  // unheld (its evaluations and builds; it holds TD-159); the grinders' shared lane takes TD-422 alone,
+  // held by grinder-ao-2, so 0; the designer's lane 0.
+  const OWN = { 'ao-grind-anchor': { n: 14, k: 'k-pickable', shared: 1, what: 'pickable' } };
+  $$('.tgroup[data-team="ao-grind"] .card').forEach((c) => {
+    const o = OWN[c.dataset.name]; const pill = $('.r1 .pill', c); if (!o || !pill) return;
+    const role = $('.cline', c)?.textContent || '';
+    const solid = /out of work/.test(role);
+    pill.insertAdjacentHTML('beforeend', `<span class="lanecnt ${o.k}${solid ? ' solid' : ''}" title="${o.n} ${o.what} entries in its own lane, held by nobody${o.shared > 1 ? `, shared by ${o.shared} sessions` : ''}">${o.n}${o.shared > 1 ? '/' + o.shared : ''}</span>`);
+  });
+  // round 4: WAITING — idle while holding a claim whose PR is open (waits on review)
+  $$('.card').forEach((c) => {
+    const pill = $('.r1 .pill', c), cl = $('.cline', c); if (!pill || !cl || c.dataset.state !== 'idle') return;
+    if (/out of work/.test(cl.textContent)) return; const pr = (cl.textContent.match(/TD-\d+ → (#\d+)/) || [])[1]; if (!pr) return;
+    pill.className = 'pill nog s-waiting'; pill.textContent = 'waiting'; pill.title = `waiting on review: ${pr} is open with the reader`;
+  });
+  // round 4: the kind bar by who each entry waits on (computed from the same reading:
+  // the 10 design-first all wait on their build, so blocked; 13 of the 20 other are live checks)
+  const kb = $$('#tsum-ao-grind .frepo .bar')[1];
+  if (kb) {
+    const segs = [['k-pickable', 15, 'pickable'], ['k-for-you', 8, 'for you'], ['k-live', 13, 'live check'], ['k-blocked', 10, 'blocked'], ['k-other', 7, 'other']];
+    const tot = segs.reduce((t, x) => t + x[1], 0);
+    kb.innerHTML = segs.map(([k, n, w]) => `<a class="bseg ${k}" style="flex-basis:${(100 * n / tot).toFixed(1)}%" title="${n} ${w}">${n}</a>`).join('');
+    const lg = kb.nextElementSibling;
+    if (lg && lg.classList.contains('legend')) lg.innerHTML = [['k-pickable', 'pickable'], ['k-design-first', 'design'], ['k-for-you', 'for you'], ['k-live', 'live check'], ['k-blocked', 'blocked'], ['k-other', 'other']].map(([k, w]) => `<span><i class="${k}"></i>${w}</span>`).join('');
+  }
+})();
+(() => {  // round 4: the rollup's Agents pills count WAITING apart from IDLE
+  const w = document.querySelectorAll('.card .pill.s-waiting').length; if (!w) return;
+  const idle = [...document.querySelectorAll('.rollup button.pill')].find((b) => /^IDLE/.test(b.textContent.trim()));
+  if (!idle) return; const n = +(idle.textContent.match(/\((\d+)\)/) || [])[1];
+  idle.textContent = `IDLE (${n - w})`;
+  idle.insertAdjacentHTML('afterend', ` <button type="button" class="pill nog s-waiting">WAITING (${w})</button>`);
 })();

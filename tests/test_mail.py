@@ -2004,6 +2004,10 @@ async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_pa
         # …and that answer, a blank line, then the replier's own words (`--pick <n> "text"`, TD-070)
         more = await person.call("msg", kind="reply", reply_to=asked, text="hold it\n\nuntil Monday", answer=1)
         assert more["entry"]["answer"] == 1 and more["entry"]["text"] == "hold it\n\nuntil Monday"
+        # a blank line and nothing after it is the answer alone: the home strips the text first, so the words
+        # after a picked answer are never blank (TD-416)
+        bare = await person.call("msg", kind="reply", reply_to=asked, text="hold it\n\n  ", answer=1)
+        assert bare["entry"]["answer"] == 1 and bare["entry"]["text"] == "hold it"
         await person.call("kill", id=loner)
 
 
