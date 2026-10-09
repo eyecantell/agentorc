@@ -2762,10 +2762,33 @@ def test_the_page_draws_the_rail_pressed_from_the_url(monkeypatch, tmp_path):
     )  # fmt: skip
     assert 'data-group="team" data-value="grind" aria-pressed="true"' in html
     assert 'data-group="team" data-value="cm" aria-pressed="false"' in html
-    assert 'id="railclear"' in html and 'class="btn sm railclear hidden"' not in html
+    assert '<button type="button" class="btn sm railclear" id="railclear" title=' in html  # enabled
     assert 'value="517"' in html and 'id="needspill"' not in html and "team:name" not in html
     assert '<span id="n-needs">1 of 3</span>' in html.replace('class="meta" ', "")
 
+
+
+def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(monkeypatch, tmp_path):
+    """TD-423 (§4.5 screen 6 *The rail*, Paul 2026-10-08): **Clear filters** is drawn at the rail's
+    head whatever is picked, so the toggles under it never move; with nothing picked or typed it is
+    disabled (`.btn:disabled`'s look), and the page's recount sets `disabled`, never `hidden`."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import rail_counts, rail_picks, rail_rows, templates
+
+    sections = _rail_fixture()
+    for query, disabled in (({}, True), ({"find": "517"}, False), ({"kind": "questions"}, False)):
+        picks = rail_picks(query)
+        html = templates.get_template("inbox.html").render(
+            sections=sections, picks=picks, rail=rail_counts(rail_rows(sections), picks), host="kmaster",
+            active="Inbox", agent_down=False, volatile=False, usage={},
+        )  # fmt: skip
+        button = re.search(r'<button[^>]*id="railclear"[^>]*>', html).group(0)
+        assert "hidden" not in button, query
+        assert (" disabled" in button) is disabled, query
+        assert html.index('id="railclear"') < html.index('id="ifilter"'), query  # the rail's head
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert '$("#railclear").disabled = !c.filtered;' in js
+    assert 'railclear").classList.toggle("hidden"' not in js
 
 RAIL_PROBE = """
 const fs = require("fs");

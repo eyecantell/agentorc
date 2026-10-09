@@ -68,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-423 | The Inbox rail's **Clear filters** appears and vanishes with the first pick, shoving the filter list down and up | Medium | Open |
 | TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Open |
+| TD-427 | The Inbox rail's find count appears under the find box with the first word typed, shoving the toggles down 18 px | Low | Open |
 
 ---
 
@@ -1186,3 +1187,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** an unattended session's SessionStart scopes the nudge without calling `ao status` (the env reaches the runner), an interactive one reads `machine`, and the test passes.
 
 **Related:** TD-159 (the ADR), TD-118 (agentorc's scoping), dev-cadence TD-077 (the branch).
+
+## TD-427: The Inbox rail's find count appears under the find box with the first word typed, shoving the toggles down 18 px
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (grinder-ao-2, met building TD-423)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/inbox_rail.html` (`.railfind`: `#findn` beside `#ifilter`), `src/agentorc/ui/static/app.js` (where `#findn` gets its *n of m* text, empty with no words), `src/agentorc/ui/static/app.css` (`.railfind`)
+
+**Why:** TD-423 held **Clear filters** in place because a rail head that changes height moves the toggle under the pointer (Paul, 2026-10-08). The find box's count does the same one step down: `#findn` is empty until a word is typed, then reads *n of m* on a line of its own, and every toggle under it moves down 18 px (read on a scratch home at 1440×900: the first toggle's top at 204 px with nothing typed, 222 px with `zz` typed, back to 204 px when cleared). Typing is not a press under the pointer, so it is milder than TD-423's, but the list jumps on the first keystroke and back on the last.
+
+**Fix:** reserve the count's line — `#findn` drawn always with a `min-height` of one line (or its text a non-breaking space when empty) — so the rail's height does not change with the find; or put the count inside the find box's right edge. A test pins the line drawn with nothing typed. Design §4.5 screen 6 *The rail* names the count; if its place changes, the design says so in the same PR.
+
+**Done when** typing the first word and clearing the last move no toggle on the rail (a scratch-home read of the first toggle's top, as above), and a test pins it.
+
+**Related:** TD-423 (Clear filters held in place), TD-129 / TD-135 (the rail).
