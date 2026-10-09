@@ -301,6 +301,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     compact_line,  # noqa: F401
     doing_rows,  # noqa: F401
     drawn_facets,  # noqa: F401
+    lane_count,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
     repo_facet,  # noqa: F401
@@ -3283,7 +3284,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         repos=repos,
                         waits=await h.person_waits(),
                     )
-                    compact_in(v, known.values())
+                    compact_in(v, known.values(), repos)
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
                     # `controllers` change on one record can move a card, change a lead, or turn
                     # grouping on or off for the whole page, and only the server sees the fleet.
@@ -3337,7 +3338,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     repos=repos,
                                     waits=await h.person_waits(),
                                 )
-                                compact_in(ov, known.values())
+                                compact_in(ov, known.values(), repos)
                                 await ws.send_text(
                                     json.dumps(
                                         {

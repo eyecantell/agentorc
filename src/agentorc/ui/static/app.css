@@ -566,7 +566,12 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 /* the lanes line under the legend (§4.5a *team card: Repo facet*, TD-361): its counts are links, a member out of work tinted */
 .laneline { font-size: var(--t-small); line-height: 1.5; white-space: normal; }
 .laneline a { color: inherit; font-weight: 600; }
-.lanewarn { color: var(--warn-fg); background: var(--warn-bg); border-radius: 3px; padding: 0 5px; }
+/* the lane's count inside a compact card's pill (§4.5a *card: compact*, TD-428): the kind bar's colour for
+   its lane, a soft tint; solid while the member said it is out of work and reads *idle* — the case to act on */
+.lanecount { margin-left: 5px; padding: 0 4px; border-radius: 3px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  color: var(--lc); background: color-mix(in srgb, var(--lc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--lc) 45%, transparent); }
+.lanecount.k-pickable { --lc: var(--k-pickable); } .lanecount.k-design { --lc: var(--k-design); }
+.lanecount.solid { color: #fff; background: var(--lc); }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
 /* TDs in motion in columns (§4.5a **Columns**, TD-252): one grid per row with the same tracks, so
    each column starts at one x down the facet — the phase in the width of its longest word, the

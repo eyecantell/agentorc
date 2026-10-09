@@ -23,7 +23,7 @@ from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
 from .common import _age, host_name
 from .inbox import work_note, work_started
-from .org import compact_line, drawn_facets, team_summary
+from .org import compact_line, drawn_facets, lane_count, team_lanes, team_repo, team_summary
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
 
@@ -162,12 +162,19 @@ def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def compact_in(v: dict[str, Any], fleet: Collection[dict[str, Any]]) -> dict[str, Any]:
+def compact_in(
+    v: dict[str, Any], fleet: Collection[dict[str, Any]], repos: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     """Mark `v` compact when it is a member of a team (§4.5a *card: compact*): a `team` badge, live
     or not — a team with nothing live draws its summary and compact cards too, once unfolded
-    (TD-192). The full card stays on *No team*. `fleet` is kept for the callers' shape."""
+    (TD-192). The full card stays on *No team*. With `repos`, the home's repo facts, it carries **the
+    lane's count** (TD-428) as `team_groups` gives it, read from the same lanes reading over `fleet`."""
     if v.get("team"):
         v["compact"], v["compact_line"] = True, compact_line(v)
+        if repos is not None and v.get("lane"):
+            fleet = list(fleet)
+            r = team_repo([s for s in fleet if s.get("team") == v["team"]], repos)
+            v["lane_count"] = lane_count(v, team_lanes(str(v["team"]), fleet, r))
     return v
 
 
@@ -329,8 +336,10 @@ def team_groups(
             team_summary(team, members, repos, doing, waiting, needs=needs, fleet=views) if team != NO_TEAM else None
         )
         if summary:
+            lanes = ((summary.get("repo") or {}).get("ledger") or {}).get("lanes")
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m)
+                m["lane_count"] = lane_count(m, lanes)  # the member's own count, in its pill (TD-428)
             if not live:  # a team with nothing live draws only the facets that hold something (TD-418)
                 summary["drawn"] = drawn_facets(summary)
         groups.append(

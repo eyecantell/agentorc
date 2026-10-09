@@ -64,6 +64,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
+| TD-484 | A member's lane count goes stale on its siblings' cards until each gets a delta of its own | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
@@ -605,7 +606,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (ao-paul, the design of TD-418)
 **Owner:** grinder
 **Kind:** build
-**Status:** In progress — slice 1 (page chrome) merged in #1333, slice 2 (rollup and summary) in #1342, slice 3 (the team header and its *i* panel) in #1348, slice 4 (the waiting pill) in its PR (grinder-ao-2, 2026-10-09); slices 5–7 open
+**Status:** In progress — slice 1 (page chrome) merged in #1333, slice 2 (rollup and summary) in #1342, slice 3 (the team header and its *i* panel) in #1348, slice 4 (the waiting pill) in #1354, slice 5 (each member's own lane count) in its PR (grinder-ao-2, 2026-10-09); slices 6–7 open
 **Location:** `src/agentorc/ui/templates/` (`base.html`, `org.html`, `rollup.html`, `group_head.html`, `team_summary.html`, `lanes_line.html`, `card.html`, `plus_card.html`, `help_mark.html`, `settings.html`, `repo.html`, `repo_part.html`), `static/app.css`, `static/app.js`, `ui/org.py` (`lanes_line`'s *wait on a build*), `ui/cards.py`, `ui/repo.py` (`LEDGER_LISTS`), `ui/app.py`, `ui/help.py`; `sessionorc/ledger.py` (`kind_of`, `KINDS`, `in_lanes`, `design_first_rest`), `agentorc/teamrun.py` (`lane_kinds`, `repo_lanes`), `agentorc/cli.py` (`ao repo`, the `design-first` key near line 1454)
 
 **Why:** TD-418 is designed (§4.1, §4.2 *Waiting*, §4.4 *Repo facts*, §4.5 screen 1 and *The card's anatomy*, §4.5a, §4.7, §4.9c *What is shown*, each marked *built by TD-428*). The mockup and the scripts that made it are in `docs/mockups/reviews/2026-10-08-org-declutter*` and `org-declutter-src/` — `after.js` is the change list applied to a captured page, a guide to the DOM, not code to copy.
@@ -999,6 +1000,23 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
 
+## TD-484: A member's lane count goes stale on its siblings' cards until each gets a delta of its own
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, review of PR #1358)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (the events stream: the `session` delta's `compact_in`, the `gone` redraw, the `repos` event), `src/agentorc/ui/static/app.js` (`syncGroups`), `src/agentorc/ui/repo.py` (`compact_in`)
+
+**Why:** TD-428 slice 5 (#1358) draws each member's own lane count in its pill (§4.5a *card: compact*). The count is recomputed for the one card whose `session` delta arrives: when g2 claims an entry its own card reads *13/2*, while g1's still reads *14/2* until g1 has an event. A `repos` event (the ledger changed) and a member's `gone` (which changes `k`) redraw no member card. The page load and every poll redraw it correctly.
+
+**Fix:** carry each member's `lane_count` on the `groups` payload every delta already sends (`heads()` reads the same lanes), keyed by id, and have `syncGroups` patch each card's `.lanecount` from it, adding or removing the span.
+
+**Done when:** a test drives two members sharing a lane, one claiming, and the other's card reads the new count from the groups payload alone.
+
+**Related:** TD-428 (slice 5), TD-418 (the design).
 ## TD-485: The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one
 
 **Priority:** Low

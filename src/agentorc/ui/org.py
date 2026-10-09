@@ -71,10 +71,12 @@ def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
 
 
 def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str, Any]) -> dict[str, Any] | None:
-    """The **lanes line** under the kind bar's legend (§4.5a *team card: Repo facet*, §4.4 *In a team's
-    lanes*, TD-361), from `ledger.in_lanes`' reading: what the team's lanes take, the rest of the
-    pickable by owner, each member out of work with unheld work in its lane, and the two segments'
-    hovers. None for a team none of whose records carries a lane: the bars stand alone."""
+    """The **lanes line** (§4.5a *team card: Repo facet*, §4.4 *In a team's lanes*, TD-361), from
+    `ledger.in_lanes`' reading: what the team's lanes take, the rest of the pickable by owner, each
+    member out of work with unheld work in its lane, and the two segments' hovers; `text`, the line as
+    words, which the team card carries as the *i* beside *Technical debt* (TD-418) where the Repo page
+    draws it whole; `members`, each record's own count by id (`lane_count`). None for a team none of
+    whose records carries a lane: the bars stand alone."""
     if not lanes or not team:
         return None
     rest = list(lanes.get("rest") or [])
@@ -87,6 +89,13 @@ def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str,
     design = (
         f"{int(by_kind.get('design-first') or 0)} design-first · {n_design} in {team}'s lanes · {waits} wait on a build"
     )
+    # the line as words: the team card's *i* carries it as its tooltip, for want of room (TD-418)
+    text = f"in {team}'s lanes: {n_pick} pickable, {n_design} design-first" + (
+        f" · the other {sum(int(o['n']) for o in rest)} pickable: {owners}" if rest else ""
+    )
+    text += "".join(
+        f" · {m['name']} out of work with {len(m['ids'])} in its lane" for m in lanes.get("out_of_work") or []
+    )
     return {
         "team": team,
         "pickable": n_pick,
@@ -98,8 +107,32 @@ def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str,
             for m in lanes.get("out_of_work") or []
         ],
         "titles": {"pickable": pick, "design-first": design},
+        "text": text,
+        # each record's own count (§4.5a *card: compact*, TD-428), by id: what its card draws in its pill
+        "members": {str(m["id"]): {"n": len(m["ids"]), "k": int(m.get("k") or 0)} for m in lanes.get("members") or []},
         # a count links to its list only when the Repo page draws that list (it draws no empty one)
         "listed": {k: int(by_kind.get(k) or 0) > 0 for k in ("pickable", "design-first")},
+    }
+
+
+def lane_count(v: Mapping[str, Any], lanes: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """**The lane's count** in a compact card's pill (§4.5a *card: compact*, §4.4 *In a team's lanes*,
+    TD-418, built by TD-428): from `lanes_line`'s `members`, how many entries the member's own lane
+    takes that no live record holds, `n` or `n/k` where `k` > 1 live records of the team carry the same
+    lane; purple (`design`) for a `design-first` lane, the pickable blue otherwise; soft, and **solid**
+    while the record carries `out_of_work` and its pill reads *idle*. None at 0, on a record with no
+    lane, and on one that has ended."""
+    got = ((lanes or {}).get("members") or {}).get(str(v.get("id") or ""))
+    if not got or not got.get("n") or not v.get("lane") or v.get("state") in DEAD:
+        return None
+    n, k = int(got["n"]), int(got.get("k") or 0)
+    shared = k > 1
+    return {
+        "text": f"{n}/{k}" if shared else str(n),
+        "title": f"{n} {'entry' if n == 1 else 'entries'} in its lane"
+        + (f", shared by {k} sessions" if shared else ""),
+        "kind": "design" if "design-first" in (v.get("lane") or ()) else "pickable",
+        "solid": bool(v.get("out_of_work")) and v.get("pill_word") == "idle",
     }
 
 

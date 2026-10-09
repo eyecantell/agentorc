@@ -18,7 +18,9 @@
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>{% if not s.unattended %}<span class="mine" title="yours: an interactive session — no policy acts on it">{{ role_svg('person') }}</span>{% endif %}
       <span class="grow"></span>
       <span class="pill nog s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
-            title="{{ s.host_note or (s.wait_reason ~ ' — idle in every payload, on someone else’s move' if s.state_class == 'waiting' else 'a seat on call: read from its record, not from a screen' if s.seat else 'guessed from the screen' if s.scraped else 'reported by the tool') }}">{{ s.state_label }}</span>
+            title="{{ s.host_note or (s.wait_reason ~ ' — idle in every payload, on someone else’s move' if s.state_class == 'waiting' else 'a seat on call: read from its record, not from a screen' if s.seat else 'guessed from the screen' if s.scraped else 'reported by the tool') }}">{{ s.state_label }}{% if s.lane_count %}{% set lc = s.lane_count %}
+        {#- the lane's count (§4.5a *card: compact*, TD-428): soft, solid while out of work and idle -#}
+        <span class="lanecount k-{{ lc.kind }}{% if lc.solid %} solid{% endif %}" title="{{ lc.title }}">{{ lc.text }}</span>{% endif %}</span>
     </div>
     <div class="row r2"><span class="meta cline" title="{{ s.slot.full or s.slot.text }}">{{ s.compact_line }}</span><span class="grow"></span>{% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}{% if s.flag %}<span class="flag" title="{{ s.flag }}">⚠ {{ s.flag_short or s.flag }}</span>{% endif %}</div>
   </div>
