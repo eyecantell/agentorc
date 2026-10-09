@@ -68,6 +68,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 | TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
+| TD-488 | Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09) | High | Open |
+| TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Open |
+| TD-490 | An `exited` pill says *guessed from the screen*, never why the session ended | Medium | Open |
+| TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Open |
 
 ---
 
@@ -1063,3 +1067,67 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
 
 **Related:** TD-464 (the pass), PR #1376 (archived it).
+
+## TD-488: Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09)
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul asked why the ao grinders had exited)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.4 (the host agent and its tmux server), §4.6, §9 (sessions outlive the host agent); `ao service install` (the systemd units); the journal of 2026-10-09 12:30:53–16:50:26
+
+**Why:** at 12:30:53 the user manager (`systemd --user`, pid 1920) was sent SIGTERM (TD-489 says by whom) and ran `exit.target`: it stopped `agentorc-agent` and `agentorc-ui` and then SIGKILLed what was left in `user@1000.service`, the `tmux: server` among them, so every Claude Code session on kmaster ended at once. Linger was on, but linger only starts the manager at boot. Nothing restarted it until Paul's ssh login at 16:50:26 started a new one, so kmaster ran no session, no host agent and no UI for 4h20m. The design promises that sessions outlive the host agent, and they do across a restart of `agentorc-agent`, but they are no safer than the user manager they run under.
+
+**Fix:** design first: where the session tmux server lives so that it outlives both the host agent and the user manager. Candidates are its own user unit, which survives an agent restart but not a manager stop, or a system unit with `User=kmaster` (`KillMode=process`, the socket where the host agent expects it), which survives both. Also decide whether the host agent's units move with it. Weigh what `ao service install` may write as a non-root user, and say what a person runs once as root. **Done when** the design says where the server runs and why, the build lands, and on a scratch home a `systemctl --user exit` leaves the scratch tmux sessions alive and the host agent finds them again when it comes back.
+
+**Related:** TD-489 (the kill and the missing alarm), TD-490 (what the card says afterwards), TD-062 (the promote's restart).
+
+## TD-489: A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, the cause of the 2026-10-09 outage, found from designer-ao-1's transcript)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/briefs/` (the role briefs) and `docs/briefs/` (held paths); design §6 (supervision, alarms), §4.4a (the home); designer-ao-1's transcript `2acd2a63-…` at 18:30:53Z
+
+**Why:** to stop its own `sleep 90` polling loops, designer-ao-1 ran `for p in $(ps … grep '[s]leep 90' …); do pp=$(ps -o ppid= -p $p); kill $pp $p; done`. One of those `sleep`s had been orphaned, so its parent was `/usr/lib/systemd/systemd --user`. The loop killed it, which is TD-488's outage. Two gaps: (1) nothing tells a session never to signal a process it did not start, and "kill the parent" is how a cleanup reaches pid 1 or the user manager; (2) no alarm fired. The host agent, the UI and every session were gone for 4h20m, and the person found out only by logging in.
+
+**Fix:** design first, two parts. (1) A rule in every role brief and in `ao --skill`: signal only a pid this session started itself and still holds (a `$!`, a background task id), never a parent, and never by matching a name across the machine. Look at whether a guard fits too, such as a `PreToolUse` hook that refuses a `kill` of pid 1, the user manager, the tmux server or the host agent; a guard is wiring, so it goes in the adapter. (2) An alarm that does not need the host agent alive: something outside `user@1000` that sees the agent socket silent past a bound and reaches the person through the board's push or Telegram (TD-092). **Done when** the briefs and the skill carry the rule, the guard is built or written down as not built, and stopping the host agent on a scratch home raises the alarm within the bound.
+
+**Related:** TD-488, TD-092 (Telegram), TD-111 (`ao doctor`).
+
+## TD-490: An `exited` pill says *guessed from the screen*, never why the session ended
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul: the grinders exited, were they out of work? the reason should show on hovering *exited*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/card.html` (the pill's `title`, ~L21 and L34), `inbox_row.html` ~L457, design §4.5a (the state pill), §4.2 (states); the record's exit fields
+
+**Why:** after TD-488's outage, three ao-grind members read `exited`, and the hover said *guessed from the screen*: `scraped` is true on any state not reported by a hook, so the hover talks about where the state came from and never about why the session ended. To learn that they had not run out of work took a journal and a transcript.
+
+**Fix:** design first: the `exited` (and `closed`) pill's hover says the cause the record can prove, and the record keeps that cause when it can: the tool's exit code; *closed by <who>*; *wound down: out of work*; *wrap-up*; *pane gone, found at <time> by a host agent that was down since <time>*; *killed*. The dashed *guessed* style and its hover stay only where the state really was read from a screen. Say whether the cause also goes on the Focus exited banner. **Done when** the design names the causes and their words, the build lands, and each cause is drawn on a scratch home.
+
+**Related:** TD-488, TD-485 (the restart note), TD-096.
+
+## TD-491: The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul's review of the Focus composer; shape 2 and 3 of the mockups chosen over the side panel)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/focus.html` (`#composer`), `static/app.css` (`.termbox` 60vh, `.composer`), `static/app.js` (composer, `fit`); design §4.5 (Focus anatomy), §4.5a (*Focus composer* rows); mockups `docs/mockups/reviews/2026-10-09-focus-composer-{current,collapsed,collapsed-open,sidebar,sidebar-folded}.png`, their source `docs/mockups/reviews/focus-composer-src/`
+
+**Why:** the composer is useful (Attach, Send's confirmation, Steer, the prompt chips, typing while the terminal reconnects, the phone layout), but it holds about 130px under a terminal fixed at 60vh even when unused. The side panel was weighed and not taken: it is about 300px wide, the hint wraps to seven lines, and with Inbox open it is off the screen.
+
+**Fix:** design first, starting from the chosen mockups: the composer folds to one bar (*✎ Compose a prompt… · Attach · Send*) and the terminal takes the height down to it. A click on the bar, `c`, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal (a resize makes Claude Code repaint, one of TD-474's causes). It folds again on Send, or on Esc when empty, and a draft survives a fold. A Settings → You choice decides whether it starts folded or always open. The terminal also takes the height an unattended Focus leaves empty under it today. This is the anchor of a wider Focus-screen round: other changes Paul names join this entry before its design. **Done when** the design says the fold, the overlay and the setting, the build lands, and the shapes are drawn again from the built page.
+
+**Related:** TD-472 (paste on the terminal), TD-474 (the struggling-terminal mark, which takes the header room), TD-003 (the phone).
