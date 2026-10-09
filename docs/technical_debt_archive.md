@@ -7036,3 +7036,46 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** TD-421 (the design), TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the WebGL addon's vendoring), TD-071 (the constraint).
 
 **Resolved:** 2026-10-08 (PR #1305, grinder-ao-2) — `@xterm/addon-web-links` 0.11.0 vendored (SHA-256 matched to the npm release, `LICENSE-addon-web-links.txt`, the `vendor/README.md` row), loaded in `AO.focus` on every Focus with `AO.paneLink` as its handler (Ctrl or Cmd held, `http:`/`https:` only, `noopener`), the `pane-link` help paragraph in `ui/help.py` and §4.5a *The help text*; pinned by `tests/test_ui_focus_links.py`. The UI check (the PR's body) read the hover's underline, Ctrl+click opening one `noopener` tab, a plain click and a drag opening nothing, on an attended and a read-only Focus; shots `docs/mockups/reviews/2026-10-08-td422-*.png`.
+
+## TD-423: The Inbox rail's **Clear filters** appears and vanishes with the first pick, shoving the filter list down and up
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/templates/inbox_rail.html` (`rail_html`: the `#railclear` button, `hidden` while `rail.filtered` is false), `src/agentorc/ui/static/app.js` (`AO.railCounts`' `classList.toggle("hidden", !c.filtered)` on every press, keystroke and poll; `landOn`, which presses `#railclear` to reveal a row a filter hides; the button's click handler), `src/agentorc/ui/static/app.css` (`.rail .railclear`, `.btn:disabled`), `tests/test_ui_inbox.py` (the first-paint assertion that the button is drawn without `hidden`); design §4.5 screen 6 *The rail* ("drawn only while anything is picked or typed") and *Narrow* (the sheet's copy of the button), §4.5a **Inbox page: the rail**, mockups `Inbox.dc.html`, `InboxRail.dc.html`
+
+**Why:** Paul's words (2026-10-08, the Add entry form): *Right now in the inbox, if you choose a filter the "clear filters" button appears and pushes the filter list down, then if filters are removed it disappears, raising the filter list. This is a little jarring. Lets instead keep the "Clear filters" button in place and disable it when no filters are selected. Open to better ideas as well.* The rail is a sticky column whose head is **Clear filters**, then the find box, then the three groups (§4.5 screen 6 *The rail*, TD-129/TD-135); the design says the button is *drawn only while anything is picked or typed*, and the build does that with `display: none`, so the first pick inserts 26 px plus the column's gap above the find box and every toggle moves down, and the last un-pick moves them back up. The toggle a person is about to press next is the one that moves, under the pointer, on the very press that filters. The fix is Paul's: the button holds its place always and is **disabled** while nothing is picked or typed — the look `.btn:disabled` already gives every button (dimmed, no hover, §4.5a *a control's look*, TD-338/TD-340) — so the rail's head never changes height and a cleared rail reads as *nothing to clear* rather than as a button that was never there. The one caller that presses the button from script, `landOn`, does so only while a row is hidden by a filter, when the button is enabled, so nothing else changes.
+
+**Fix:**
+1. **Design** — in the same PR, §4.5 screen 6 *The rail*: *drawn only while anything is picked or typed* becomes *always in place at the rail's head, disabled while nothing is picked or typed*, with the reason (a rail whose head changes height moves the toggle under the pointer); the same words in §4.5a's **Inbox page: the rail** row and in the *Narrow* sheet's sentence, since the sheet is the rail moved in (one set of toggles, TD-137) and holds the same button.
+2. **Build** — `inbox_rail.html`: `disabled` in place of `hidden` on the first paint; `AO.railCounts`: `$("#railclear").disabled = !c.filtered` in place of the `hidden` toggle; the template comment and the row of `tests/test_ui_inbox.py` that pins the first paint follow (the filtered page's button is enabled and drawn, an unfiltered page's is drawn and disabled). Check `landOn` still clears a filter that hides the landed-on row.
+3. **The check** (§4.9b *A UI change is verified by its builder*): screenshots of the rail before and after a pick under `docs/mockups/reviews/`, showing the find box and the groups at the same height in both.
+
+**Done when** the Inbox rail's **Clear filters** occupies the same place whether or not anything is picked or typed, is disabled and dimmed while nothing is, clears every pick and the find box with one press while something is, the narrow sheet's copy behaves the same, §4.5 screen 6 and §4.5a say so, the test pins both states, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-129 (the rail's design), TD-135 (its build), TD-137 (the narrow sheet), TD-338 / TD-340 (a control's look, `.btn:disabled`), TD-368 (the ledger rows under the rail's picks).
+
+**Resolved:** 2026-10-08 (PR #1307, grinder-ao-2) — §4.5 screen 6 *The rail* and *Narrow*, and §4.5a's **Inbox page: the rail** row, say **Clear filters** is always in place and disabled while nothing is picked or typed; `inbox_rail.html` draws it with `disabled` in place of `hidden`, and the recount in `app.js` sets `disabled`; pinned by `tests/test_ui_inbox.py`. The UI check (the PR's body) read the button, the find box and the first toggle at the same heights unpicked, picked and cleared, at 1440 and in the 400 px sheet; shots `docs/mockups/reviews/2026-10-08-td423-*.png`. The find count's own shift is TD-427.
+
+## TD-427: The Inbox rail's find count appears under the find box with the first word typed, shoving the toggles down 18 px
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (grinder-ao-2, met building TD-423)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/agentorc/ui/templates/inbox_rail.html` (`.railfind`: `#findn` beside `#ifilter`), `src/agentorc/ui/static/app.js` (where `#findn` gets its *n of m* text, empty with no words), `src/agentorc/ui/static/app.css` (`.railfind`)
+
+**Why:** TD-423 held **Clear filters** in place because a rail head that changes height moves the toggle under the pointer (Paul, 2026-10-08). The find box's count does the same one step down: `#findn` is empty until a word is typed, then reads *n of m* on a line of its own, and every toggle under it moves down 18 px (read on a scratch home at 1440×900: the first toggle's top at 204 px with nothing typed, 222 px with `zz` typed, back to 204 px when cleared). Typing is not a press under the pointer, so it is milder than TD-423's, but the list jumps on the first keystroke and back on the last.
+
+**Fix:** reserve the count's line — `#findn` drawn always with a `min-height` of one line (or its text a non-breaking space when empty) — so the rail's height does not change with the find; or put the count inside the find box's right edge. A test pins the line drawn with nothing typed. Design §4.5 screen 6 *The rail* names the count; if its place changes, the design says so in the same PR.
+
+**Done when** typing the first word and clearing the last move no toggle on the rail (a scratch-home read of the first toggle's top, as above), and a test pins it.
+
+**Related:** TD-423 (Clear filters held in place), TD-129 / TD-135 (the rail).
+
+**Resolved:** 2026-10-08 (PR #1308, grinder-ao-2) — `app.css` `.rail #findn { min-height: 1lh; }`: the count keeps its line while empty; pinned in `tests/test_ui_inbox.py`. The UI check (the PR's body) read the first toggle at 222 px empty, typed and cleared at 1440, and 226 px in the 400 px sheet; shot `docs/mockups/reviews/2026-10-08-td427-find-count-typed.png`.

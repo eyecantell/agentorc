@@ -189,6 +189,8 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .rail .railclear { width: 100%; justify-content: center; }
 .rail .railfind { display: flex; flex-direction: column; gap: 3px; }
 .rail .railfind .input { width: 100%; height: 30px; }
+/* the find count keeps its line while empty, so the first word typed moves no toggle (TD-427) */
+.rail #findn { min-height: 1lh; }
 .rail .railgroup { display: flex; flex-direction: column; gap: 1px; }
 .rail .railh { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 0 6px 3px; }
 .rail .railline { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
