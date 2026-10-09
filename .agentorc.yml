@@ -46,3 +46,8 @@ teams:
 roles:
   designer:
     brief: docs/briefs/designer-ao-1.md
+  # a one-week trial of a 200k bound on the grinders, from 2026-10-08 (Paul's decision on TD-378's ADR,
+  # docs/decisions/2026-10-08-prompt-cache.md option 4): the anchor reads usage per merged PR against the
+  # week before, and the line stays or goes (TD-460)
+  grinder:
+    context: {bound: 200k}

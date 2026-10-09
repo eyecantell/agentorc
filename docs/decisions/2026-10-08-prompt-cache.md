@@ -1,6 +1,6 @@
 # ADR 2026-10-08: Keep the one-hour prompt cache, restart a lapsed member rather than ring it, and trial a 200k context bound
 
-**Status:** proposed
+**Status:** accepted 2026-10-08 (Paul: *Pin 1h, restart lapsed, trial 200k*)
 **Date:** 2026-10-08
 **Related:** TD-378 (this research), TD-151 (metered profiles), design §6 rule 5 (the context bound), §6 rule 6 (lane news), §4.2a (`prices:`)
 
@@ -102,16 +102,19 @@ which rule 5 does not bound.
 
 ## Decision
 
-Proposed, for Paul. Take options 2 and 3, and run option 4 as a one-week trial on ao-grind's
-grinders, compared against the week before by usage-window percentage per merged PR. Option 1 is
-the stance for everything else. On a subscription, the cached reads' weight against the weekly
-window is not published. The trial's reading of the window itself is therefore the measure that
-counts, and these API-price shares only rank the levers.
+Accepted by Paul on 2026-10-08, the recommended answer on the board. Take options 2 and 3, and run
+option 4 as a one-week trial on ao-grind's grinders, compared against the week before by
+usage-window percentage per merged PR. Option 1 is the stance for everything else. On a
+subscription, the cached reads' weight against the weekly window is not published. The trial's
+reading of the window itself is therefore the measure that counts, and these API-price shares only
+rank the levers.
 
 ## Consequences
 
-- Option 2 is a build entry: the metered profile's layer sets the main conversation's lifetime,
-  and design §4.2a says so.
+- The entries: option 2 is TD-458 and option 3 is TD-459, both design-first. The trial of option 4 is set in
+  `.agentorc.yml` (`roles.grinder.context: {bound: 200k}`), and TD-460 reads it back after a week.
+- Option 2 is a design line, then its build: the metered profile's layer sets the main
+  conversation's lifetime, and design §4.2a says so.
 - Option 3 is a design-first entry: §4.10's doorbell gains a branch that restarts a lapsed
   member, with the precondition above, and the restart's `why` names the cause.
 - Option 4 changes `.agentorc.yml`'s bound for the trial. The anchor reads the windows after a

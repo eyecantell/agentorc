@@ -604,6 +604,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-08 (TD-378, the anchor; Paul's decision on the board, *Pin 1h, restart lapsed, trial 200k*): this repo's `.agentorc.yml` sets `roles.grinder.context: {bound: 200k}` as a one-week trial. Until this date the repo set no number and its grinders took the package's 300k. On 2026-10-01–08, requests over 200k carried 35% of the weighted cost ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)), and TD-460 reads the trial back.
 - 2026-10-07 (TD-381, the designer): the `anchor` preset row — a seat on call in the main checkout, lane `anchor`, no grants.
 - 2026-10-07 (TD-002, grinder-ao-2): `attach`, the Focus composer's **Attach**, joins the person-only list: a file put where a session will read it is the person's, and no session uploads through the page.
 - 2026-10-06 (TD-310, the designer): *Role names*' clause on a designer's whole brief in a team with no flow deleted with the carve-out — a repo's designer brief is its supplement, as every role's is.
