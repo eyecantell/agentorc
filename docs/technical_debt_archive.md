@@ -7587,3 +7587,20 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** TD-090 (a compaction's `SessionStart`), TD-087 (the usage windows, the other budget), design §4.3.
 
 **Resolved:** 2026-10-08 (this PR; the context half built as TD-190) — **the context in use is shown.** The claude-code adapter's `context()` reads `{tokens, at, window}` from the last top-level turn's `usage`. The record carries it. The card and Focus draw `context_reading` (`*231k of 1M*`), and `ao status -v` prints it with the bound. §6 rule 5 acts on it, which answers Paul's 2026-09-21 question (*should grinders compact after each TD?*): a supervised member restarts between entries at its context bound and does not compact. **The compaction half is not built, and is not worth a field.** The anchor read Claude Code's transcripts written since 2026-10-01 (more than 800 under `~/.claude/projects/`). Four hold a `compact_boundary` (three manual, one automatic), all in agentorc sessions. Rule 5's bound ends runs long before automatic compaction would, so *just compacted* is a moment that rarely happens to a supervised session. A person who compacts their own session knows they did. Reopen as a new entry if a role without a bound starts compacting automatically.
+
+## TD-006: `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Owner:** anchor
+**Kind:** evaluation
+**Status:** Resolved — was: Open **Next:** needs an attended `claude` run.
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`global_config_file`)
+
+**Why:** For a profile with `config_dir` set, the adapter reads/writes `<config_dir>/.claude.json`. The docs say every `~/.claude` path moves under `CLAUDE_CONFIG_DIR`, but `~/.claude.json` is not under `~/.claude`, and no second-account profile exists yet to test it. If wrong, pretrust silently writes a file Claude Code never reads and the trust dialog appears for that profile.
+
+**Fix:** create a throwaway `CLAUDE_CONFIG_DIR`, run `claude` once, see where `.claude.json` lands, pin it with a test. Done when the second profile (grind) launches without the dialog.
+
+**Related:** TD-005, design §4.2a.
+
+**Resolved:** 2026-10-08 (this PR) — verified, and the assumption holds. The anchor ran Claude Code 2.1.295 once (`claude -p`) with `CLAUDE_CONFIG_DIR` pointed at an empty scratch directory. It wrote `.claude.json` inside that directory, beside `projects/`, `sessions/` and `backups/`, and left `~/.claude.json` alone. No login was needed: the run stopped at *Not logged in* after the file was written. `global_config_file` already resolves a profile's `config_dir`, or the environment's `CLAUDE_CONFIG_DIR`, to `<dir>/.claude.json`. `tests/test_claude_adapter.py::test_claude_json_lives_in_the_config_dir` now pins all three cases. The done-when's *second profile* is moot on kmaster, where no local profile sets a `config_dir`. A container node's profiles run under `CLAUDE_CONFIG_DIR=/agentorc/profiles/<profile>` (TD-299), which is the case verified here. TD-005, the read-modify-write race, is unchanged.
