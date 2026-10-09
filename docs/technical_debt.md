@@ -790,7 +790,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from TD-109 step (6))
 **Owner:** designer
 **Kind:** design-first
-**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,226 words. Before the pass the design was 192,692 words across `docs/design/`. The rest of the sections, largest first (§6, §4.10, §4.5, §4.9c, §4.4a), each its own PR. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
+**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,494 words. Before the pass the design was 192,692 words across `docs/design/`. The rest of the sections, largest first (§6, §4.10, §4.5, §4.9c, §4.4a), each its own PR. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
 **Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
 
 **Why:**
