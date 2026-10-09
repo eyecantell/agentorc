@@ -62,7 +62,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Open |
 | TD-475 | PR #1340's `work.finished_alone` has four guards no test would catch going back: `superseded_by`, `sat_out`, `seat is None`, `r is not manager` | Medium | Open |
 | TD-476 | PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets | Medium | Open |
-| TD-477 | PR #1348's `ready` mark and the folded-only `counts` of a team header are asserted nowhere | Medium | Open |
+| TD-477 | PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere | Medium | Open |
 
 ---
 
@@ -939,7 +939,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/sessionorc/work.py` `finished_alone` L79–101; `tests/test_work_start.py` (the `_running` fixture and its four tests)
+**Location:** `src/sessionorc/work.py` `finished_alone` L79–102; `tests/test_work_start.py` (the `_running` fixture and its four tests)
 
 **Why:** Mutation probe on `origin/main` (d31b6337+): deleting each of the lines `and not r.superseded_by`, `and not sat_out(r)`, `r.seat is None` (→ `True`) and `r is not manager` from `finished_alone` leaves `tests/test_work_waiting.py tests/test_work_start.py tests/test_person_only.py tests/test_workorders.py` at 37 passed, and `tests/test_work_start.py` alone at 14 passed. Only the `closer`/`pane` guards are pinned (deleting the `closer` line fails one test). The docstring promises all six exclusions (*not a seat, not the manager, … nor one its flow sat out, nor a record a successor took over*); a revert of any of the four would mark a seat, the manager, a sat-out member or a superseded record as a finished member and offer **Start** on it.
 
@@ -963,7 +963,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** PR #1342.
 
-## TD-477: PR #1348's `ready` mark and the folded-only `counts` of a team header are asserted nowhere
+## TD-477: PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere
 
 **Priority:** Medium
 **Type:** debt
@@ -973,9 +973,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Status:** Open
 **Location:** `src/agentorc/ui/repo.py` (the team header's `"ready": ready` and `"counts": state_counts(members)`); `tests/test_ui_teams.py`, `tests/test_ui.py`, `tests/test_ui_org.py`
 
-**Why:** Mutation probes over the five UI test modules of PR #1342's probe (195 pass at baseline): `"ready": ready` → `"ready": 0` still 195 passed; restoring the old `"counts": state_counts(members) + ([f"{ready} ready to close"] if ready else [])` still 195 passed. The PR's comments say the count is "drawn only while folded" and the ready-to-close figure is "a mark, folded or not"; no test would notice either going back.
+**Why:** Mutation probes over the five UI test modules of PR #1342's probe (195 pass at baseline): `"ready": ready` → `"ready": 0` still 195 passed; restoring the old `"counts": state_counts(members) + ([f"{ready} ready to close"] if ready else [])` still 195 passed. The PR's comments say the count is "drawn only while folded" and the ready-to-close figure is, "on any team, folded or not, how many wait for a person's Close — a mark"; no test would notice either going back. The template half exists (`tests/test_ui_org.py::test_a_folded_live_teams_header_carries_its_counts_by_state` renders `group_head.html` with a hand-set `ready: 2`); what nothing asserts is the producer in `repo.py`.
 
-**Fix:** Add a `test_ui_teams.py` case for a team with a card Ready to close: the header context carries `ready == 1`, its `counts` does not contain `ready to close`, and the rendered header shows the mark folded and unfolded. Re-run both mutations and see them fail.
+**Fix:** Add a `test_ui_teams.py` case (the template half is already covered) for a team with a card Ready to close: the header context built by `repo.py` carries `ready == 1`, its `counts` does not contain `ready to close`, and the rendered header shows the mark folded and unfolded. Re-run both mutations and see them fail.
 
 **Related:** PR #1348.
 
