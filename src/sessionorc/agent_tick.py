@@ -1960,8 +1960,79 @@ class TickMixin:
             why = (r.out_of_work or {}).get("why") if isinstance(r.out_of_work, dict) else None
             if why:
                 lines.append(f"{r.name}: {why}")
+        if more := self._finished_more(team, mine, members, start):
+            lines += ["", *more]
         self._system_note(PERSON, "\n".join(lines), team=team)
         log.info("rule 9: %s wound down by the tick — the person told", team)
+
+    def _finished_more(self, team: str, mine: list[Session], members: list[Session], start: str) -> list[str]:
+        """What rule 9's note adds under its first lines (§4.9a *The home's note says more*, TD-468),
+        each line only when it has something to say: the members' claims left standing and their
+        drops since `start`, with each one's why; their restarts since `start` by `why`, and any at
+        the restart ceiling; the identity alarms standing on the team's records; each open `ask` or
+        `steer` a member put to the person about a reference, with its bound; and each profile the
+        records name, its window readings now beside `teams.<team>.usage_at_start`."""
+        out: list[str] = []
+        for r in sorted(members, key=lambda r: (r.name, r.id)):
+            left = [f"{e.ref} left claimed" for e in r.progress if e.status == "claimed"]
+            left += [
+                f"{e.ref} dropped" + (f" — {e.why}" if e.why else "")
+                for e in r.progress
+                if e.status == "dropped" and (not start or str(e.at) >= start)
+            ]
+            if left:
+                out.append(f"Claims left — {r.name}: {'; '.join(left)}")
+        whys: dict[str, int] = {}
+        for r in members:
+            for e in r.restarts:
+                if isinstance(e, dict) and (not start or str(e.get("at") or "") >= start):
+                    word = str(e.get("why") or "restarted")
+                    word = "cache lapsed" if word == "cache" else word
+                    whys[word] = whys.get(word, 0) + 1
+        ceiling = sorted(r.name for r in members if r.restart_ceiling)
+        if whys or ceiling:
+            n = sum(whys.values())
+            said = f"{n} restart{'' if n == 1 else 's'}: " + ", ".join(
+                f"{c} {w}" for w, c in sorted(whys.items(), key=lambda x: (-x[1], x[0]))
+            )
+            if ceiling:
+                said = (said + "; " if whys else "") + "at the restart ceiling: " + ", ".join(ceiling)
+            out.append(f"Restarts — {said}")
+        alarms = [r for r in mine if r.identity_alarms]
+        if alarms:
+            n = sum(len(r.identity_alarms) for r in alarms)
+            names = ", ".join(sorted(r.name for r in alarms))
+            out.append(f"Alarms — {n} identity alarm{'' if n == 1 else 's'} standing on {names} (§4.8a)")
+        asked = work_mod.waiting_of(self.person_inbox)
+        for r in sorted(members, key=lambda r: (r.name, r.id)):
+            qs = asked.get(self._address(r)) or []
+            if qs:
+                each = [
+                    f"{q['ref']} ({q['id']}"
+                    + (
+                        f", until {work_mod.bound_words(q.get('bound'))})"
+                        if work_mod.bound_words(q.get("bound"))
+                        else ")"
+                    )
+                    for q in qs
+                ]
+                out.append(f"Open to you — {r.name}: {'; '.join(each)}")
+        at_start = ((self._host_rec.get("teams") or {}).get(team) or {}).get("usage_at_start") or {}
+        for prof in sorted({r.profile for r in mine if r.profile}):
+            now = [
+                w for w in (self._usage.get(prof) or {}).get("windows") or [] if isinstance(w, dict) and w.get("label")
+            ]
+            was = at_start.get(prof) if isinstance(at_start.get(prof), dict) else {}
+            each = []
+            for w in now:
+                if not isinstance(w.get("pct"), int | float):
+                    continue
+                then = was.get(str(w["label"]))
+                from_ = f", from {round(then)}%" if isinstance(then, int | float) else ""
+                each.append(f"{w['label']} {round(w['pct'])}%{from_}")
+            if each:
+                out.append(f"Usage — {prof}: {'; '.join(each)}")
+        return out
 
     @staticmethod
     def _owed_part(ids: list[str]) -> str | None:
@@ -2026,6 +2097,43 @@ class TickMixin:
                 return False
         return True
 
+    def _mark_team_start(self, team: str, but: Session | None = None) -> None:
+        """A start of `team` (§4.9a *The home's note says more*, TD-468): `ao team start`'s creates, a
+        schedule's start and rule 8's — each counts only when no unattended record of the team runs
+        but `but`, the one being started. The home's usage readings now (the `usage` RPC's windows)
+        are kept as `teams.<team>.usage_at_start: {profile: {window: pct}}` on the host record,
+        replacing the last start's; with no reading the key goes. At the home only."""
+        if self.mode != "home" or not team:
+            return
+        for r in self._graph().values():
+            if r is but or r.team != team or not r.unattended or r.superseded_by:
+                continue
+            if r.state not in ("exited", "closed", "scheduled"):
+                return
+        readings: dict[str, dict[str, float]] = {}
+        for prof, reading in self._usage.items():
+            windows = {
+                str(w["label"]): w["pct"]
+                for w in (reading or {}).get("windows") or []
+                if isinstance(w, dict) and w.get("label") and isinstance(w.get("pct"), int | float)
+            }
+            if windows:
+                readings[prof] = windows
+        teams = self._host_rec.setdefault("teams", {})
+        rec = teams.get(team) if isinstance(teams.get(team), dict) else {}
+        if readings:
+            rec["usage_at_start"] = readings
+        else:
+            rec.pop("usage_at_start", None)
+        if rec:
+            teams[team] = rec
+        else:
+            teams.pop(team, None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+
     async def _replay(
         self, s: Session, why: str, *, mark: dict[str, Any] | None = None, closing: str | None = None, **extra: Any
     ) -> None:
@@ -2039,6 +2147,8 @@ class TickMixin:
         the closed run's mail is the new record's, so a reply to its `ask` still has a thread (TD-352).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
         (`agent_common._reported`) — since the new record keeps none of the old one's `progress` (§4.9a, TD-245)."""
+        if why in ("start", "work"):  # a schedule's start and rule 8's: the team's, if none of it runs
+            self._mark_team_start(s.team, but=s)
         now = datetime.now(UTC)
         entry: dict[str, Any] = {
             "at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
