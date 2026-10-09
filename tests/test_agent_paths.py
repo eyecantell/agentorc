@@ -57,17 +57,18 @@ async def test_a_forget_during_the_git_read_leaves_no_git_key(agent, tmp_path, m
     `_git_checked` key when it comes back (the CI flake of 2026-10-08 in the test above)."""
     from sessionorc import agent_tick
 
+    forget = {}
+
+    def forgotten_meanwhile(d):
+        if forget:
+            agent.sessions.pop(forget["id"], None)
+
+    monkeypatch.setattr(agent_tick, "git_info", forgotten_meanwhile)  # before the create: no real read races it
     async with LocalClient() as c:
         s = await c.call("create", name="gitread", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        rec, forget["id"] = agent.sessions[s["id"]], s["id"]
         agent._git_checked.pop(s["id"], None)
-
-        rec = agent.sessions[s["id"]]
-
-        def forgotten_meanwhile(d):
-            agent.sessions.pop(s["id"], None)
-
-        monkeypatch.setattr(agent_tick, "git_info", forgotten_meanwhile)
-        await agent._refresh_git(datetime.now(UTC))
+        await agent._refresh_git(datetime.now(UTC) + timedelta(days=1))  # due, whatever the tick did
         assert s["id"] not in agent._git_checked
         agent.sessions[s["id"]] = rec  # back, so the pane is killed with it
         await c.call("kill", id=s["id"])
