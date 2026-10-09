@@ -30,6 +30,11 @@ h1 { font-size: 26px; margin: 0; text-wrap: balance; } h2 { font-size: 18px; mar
 .chg::before { counter-increment: c; content: counter(c); font: 600 14px var(--mono); color: var(--accent); }
 .chg b { display: block; } .chg p { margin: 2px 0 0; color: var(--muted); grid-column: 2; }
 .chg .t { grid-column: 2; }
+.chips { grid-column: 2; display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0 2px; padding: 10px 12px; background: #151b24; border-radius: 6px; }
+.cs { display: inline-flex; align-items: center; gap: 8px; color: #c9d1db; font-size: 13px; }
+.lc { font: 600 11px var(--mono); padding: 1px 6px; border-radius: 3px; border: 1px solid; color: #e3e8ef; }
+.lc.soft.pk { background: rgba(59,130,246,.22); border-color: rgba(59,130,246,.7); } .lc.solid.pk { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+.lc.soft.df { background: rgba(99,102,241,.22); border-color: rgba(99,102,241,.7); } .lc.solid.df { background: #6366f1; border-color: #6366f1; color: #fff; }
 ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { max-width: 80ch; }
 .ask { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 6px; padding: 14px 18px; }
 .ask h2 { color: var(--warn); }
@@ -43,14 +48,14 @@ ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { m
 
   <section>
     <div class="tabs" role="tablist">
-      <button role="tab" id="t-after" aria-selected="true" data-img="2026-10-08-org-declutter-after.png" data-cap="After: one header row per team, aligned bars, no mine/command controls, lane counts on the member cards.">After</button>
+      <button role="tab" id="t-after" aria-selected="true" data-img="2026-10-08-org-declutter-after.png" data-cap="After: one header row per team, aligned bars, lane counts on the member cards, the rollup trimmed to Agents and Needs you while one team is live.">After</button>
       <button role="tab" id="t-before" aria-selected="false" data-img="2026-10-08-org-declutter-before.png" data-cap="Before: the live page as it stands.">Before</button>
       <button role="tab" id="t-open" aria-selected="false" data-img="2026-10-08-org-declutter-after-open.png" data-cap="After, with the team's i panel and the + New menu open: the definition (Members…, where it is defined, Open file, the flow link) and not concluded now live in the panel.">After, menus open</button>
       <button role="tab" id="t-afull" aria-selected="false" data-img="2026-10-08-org-declutter-after-full.png" data-cap="After, the whole page, the stopped teams included.">After, full page</button>
       <button role="tab" id="t-bfull" aria-selected="false" data-img="2026-10-08-org-declutter-before-full.png" data-cap="Before, the whole page.">Before, full page</button>
     </div>
     <div class="shot" style="margin-top:12px"><img id="shot" src="2026-10-08-org-declutter-after.png" alt="The Org page after the proposed changes"></div>
-    <div class="cap" id="cap">After: one header row per team, aligned bars, no mine/command controls, lane counts on the member cards.</div>
+    <div class="cap" id="cap">After: one header row per team, aligned bars, lane counts on the member cards, the rollup trimmed to Agents and Needs you while one team is live.</div>
   </section>
 
   <section>
@@ -62,27 +67,35 @@ ul.obs { margin: 0; padding-left: 20px; display: grid; gap: 6px; } ul.obs li { m
       <div class="chg"><span class="t"><b>Shell and + New session merge into + New ▾</b></span><p>One button with two choices, Session and Shell. A team's own sessions still start from its + card.</p></div>
       <div class="chg"><span class="t"><b>The team header fits on one row</b></span><p>The header keeps the name, host / repo, a <code>flow: td</code> chip (its stages in the tooltip, linked to Settings), the marks, Wind down, Stop now, the fold and the i. Dropped from the header: the second "9 sessions", the flow strip, and the flow dropdown (Settings already has the same picker per team). Members…, "defined in … changed by PR", Open file and <em>not concluded:</em> move into the i panel under a Definition line. <em>flow changed · Apply</em> stays on the header because it asks you to act.</p></div>
       <div class="chg"><span class="t"><b>✉ n shows folded or not</b></span><p>The team's unread total sits beside the flow chip in both states. TD-071 drew it only while folded; that rule is reversed.</p></div>
-      <div class="chg"><span class="t"><b>The lanes line leaves the repo facet</b></span><p>Its full text becomes an i on TECHNICAL DEBT. Each member card whose lane it is carries its count (<code>lane 18</code> on the grinders, <code>lane 0</code> on the designer), tinted amber when that member is out of work with entries in its lane.</p></div>
+      <div class="chg"><span class="t"><b>The lanes line leaves the repo facet</b></span><p>Its full text becomes an i on TECHNICAL DEBT. Each member card whose lane holds entries carries the count in the repo bar's colour for that kind: blue for pickable on a grinder, purple for design-first on the designer. The chip is a soft tint while the member is busy and turns solid when it is out of work with entries waiting, so the only loud chip is the one that needs attention. No chip at 0.</p>
+        <div class="chips" aria-label="chip states">
+          <span class="cs"><span class="lc soft pk">18</span> grinder, working</span>
+          <span class="cs"><span class="lc solid pk">18</span> grinder, out of work</span>
+          <span class="cs"><span class="lc soft df">9</span> designer, working</span>
+          <span class="cs"><span class="lc solid df">9</span> designer, out of work</span>
+        </div>
+        <p>The designer's count is its lane's, not the repo bar's: in this capture the bar shows 9 design-first, but none of them is in ao-grind's lanes (the lanes line read <em>0 design-first</em>), so the designer card shows no chip.</p></div>
+      <div class="chg"><span class="t"><b>The + card reads New session</b></span><p>"your session in ao-grind" becomes "New session". The team card is the context.</p></div>
+      <div class="chg"><span class="t"><b>TECHNICAL DEBT (56 OPEN) stays on one line</b></span><p>Section labels never wrap. Where the header runs out of room, the window picker drops to its own line on the right, not the label.</p></div>
+      <div class="chg"><span class="t"><b>Doing loses "the team's ao doing calls"</b></span><p>The label and the rows say it.</p></div>
+      <div class="chg"><span class="t"><b>The rollup drops what a lone team already says</b></span><p>While one team is live, the rollup keeps Agents and Needs you; its TDs-in-motion and PR facets come back with a second live team.</p></div>
+      <div class="chg"><span class="t"><b>A team with nothing live draws no summary</b></span><p>dc-grind's "no repo here" and "nothing claimed" boxes go; its header and Start stay.</p></div>
+      <div class="chg"><span class="t"><b>The summary's columns follow their content</b></span><p>Repo and Doing get more width, TDs in motion less (1.15 : 0.85 : 1.2). The cost: TD titles in that facet truncate sooner; the reference and holder stay whole.</p></div>
     </div>
   </section>
 
   <section>
-    <h2>Seen while capturing, not mocked</h2>
+    <h2>Split out</h2>
     <ul class="obs">
-      <li><b>Two PR counts that disagree.</b> The rollup reads 84 opened / 83 closed (93 / 92 in your screenshot) and the repo facet reads 84 / 83 here but 85 / 85 there. Whatever the rollup sums, the page should say what it covers.</li>
-      <li><b>The rollup repeats a lone live team.</b> With one team live, its TDs-in-motion and PR facets restate that team's own facets.</li>
-      <li><b>A stopped team draws empty facets.</b> dc-grind shows "no repo here" and "nothing claimed" in full-height boxes while stopped.</li>
-      <li><b>Equal columns waste the summary row.</b> TDs in motion is mostly empty when it holds a few rows, while Doing next to it is cut off.</li>
-      <li><b>The footnote under the page</b> ("Inside a team: the manager, then…") could move into the page's own help.</li>
+      <li><b>Two PR counts that disagree</b> is its own entry, TD-420: the rollup read 93 / 92 in your screenshot while the repo facet read 85 / 85, and the page does not say what the rollup sums.</li>
+      <li><b>The footnote under the page</b> ("Inside a team: the manager, then…") is left for the look-and-feel round.</li>
     </ul>
   </section>
 
   <section class="ask">
-    <h2>Open calls for you</h2>
+    <h2>Before the design PR</h2>
     <ol>
-      <li>Is <code>lane n</code> the right chip text on a card, or should it name the kind (<code>18 pickable</code> / <code>0 design-first</code>)?</li>
-      <li>Should the observations above join this round, or wait for the second look-and-feel round?</li>
-      <li>When flows get their own pages, the <code>flow: td</code> chip links to the flow's page instead of Settings. Nothing else in this round depends on it.</li>
+      <li>Anything on this round you'd change? If not, the design PR for §4.5 / §4.5a goes next, then a build entry.</li>
     </ol>
   </section>
 </div>

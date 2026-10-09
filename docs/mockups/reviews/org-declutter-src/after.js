@@ -8,8 +8,10 @@
     .bseg, .blk { min-height: 26px; height: 26px; font-weight: 600; }
     .flowchip { text-decoration: none; cursor: pointer; }
     .tgroup .ghead .foldmail { display: inline-block !important; }
-    .lanechip { margin-left: 6px; flex: none; } .sc .r2 .cline { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .frepo .fhead { flex-wrap: nowrap; }
-    .lanechip.warnish { color: var(--warn-fg); background: var(--warn-bg); border-color: var(--warn-line); }
+    .lanechip { margin-left: 6px; flex: none; } .sc .r2 .cline { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .facet .kind { white-space: nowrap; } .frepo .fhead > .seg { margin-left: auto; }
+    .lanechip { font-weight: 600; color: var(--fg); } .lanechip.k-pickable { background: color-mix(in srgb, var(--k-pickable) 22%, transparent); border-color: color-mix(in srgb, var(--k-pickable) 70%, transparent); } .lanechip.k-design { background: color-mix(in srgb, var(--k-design) 22%, transparent); border-color: color-mix(in srgb, var(--k-design) 70%, transparent); } .lanechip.solid.k-pickable { background: var(--k-pickable); color: var(--seg-fg); } .lanechip.solid.k-design { background: var(--k-design); color: var(--seg-fg); }
+    .tsum { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); }
+    .rollup.lone { grid-template-columns: 2fr 1fr; }
     .defblock { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
     .newmenu { position: absolute; right: 18px; top: 46px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; z-index: 9; min-width: 210px; }
     .newmenu a { padding: 6px 10px; color: var(--fg); text-decoration: none; font-size: var(--t-small); border-radius: 4px; }
@@ -67,8 +69,16 @@
     $$(`.tgroup[data-team="${team}"] .card`).forEach((c) => {
       const role = $('.cline', c)?.textContent || ''; const r2 = $('.r2', c); if (!r2) return;
       const out = /out of work/.test(role);
-      if (/^Grinder/.test(role)) ($('.grow', r2) || r2).insertAdjacentHTML('afterend', `<span class="badge lanechip${out && +pk ? ' warnish' : ''}" title="unheld entries in its lane">lane ${pk}</span>`);
-      if (/^Designer/.test(role)) ($('.grow', r2) || r2).insertAdjacentHTML('afterend', `<span class="badge lanechip${out && +df ? ' warnish' : ''}" title="design-first entries in its lane">lane ${df}</span>`);
+      if (/^Grinder/.test(role)) ($('.grow', r2) || r2).insertAdjacentHTML('afterend', (+pk ? `<span class="badge lanechip k-pickable${out ? ' solid' : ''}" title="${pk} pickable entries in its lane">${pk}</span>` : ''));
+      if (/^Designer/.test(role)) ($('.grow', r2) || r2).insertAdjacentHTML('afterend', (+df ? `<span class="badge lanechip k-design${out ? ' solid' : ''}" title="${df} design-first entries in its lane">${df}</span>` : ''));
     });
   });
+  // round 2: the + card says New session; Doing loses its gloss
+  $$('.plusgo .meta').forEach((m) => { m.textContent = 'New session'; });
+  $$('.fv[data-fv="doing"] .fhead > .meta').forEach((m) => m.remove());
+  // a team with nothing live draws no summary
+  $$('.tgroup[data-live="0"] .tsum').forEach((t) => t.remove());
+  // the rollup drops the TD and PR facets while one team is live: that team's own facets say it
+  const live = $$('.tgroup').filter((g) => +g.dataset.live > 0);
+  if (live.length === 1) { const fs = $$('.rollup > .facet'); fs[1]?.remove(); fs[2]?.remove(); $('.rollup')?.classList.add('lone'); }
 })();

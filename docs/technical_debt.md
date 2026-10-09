@@ -71,8 +71,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-415 | Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words | Low | Open |
 | TD-416 | Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282) | Low | Open |
 | TD-417 | Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested | Low | Open |
-| TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Open — mockup reviewed with Paul 2026-10-08; three calls open |
+| TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Open — mockup reviewed with Paul 2026-10-08, two rounds; his last look before the design PR |
 | TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Open |
+| TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
 
 ---
 
@@ -1235,13 +1236,13 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (ao-paul, a UI/UX review with Paul)
 **Owner:** paul
 **Kind:** decision
-**Status:** Open — the mockup is up (`docs/mockups/reviews/2026-10-08-org-declutter.html`, published at https://claude.ai/artifact/B8ybKFKeu3n1n4PUzYgktP); Paul approved the seven changes below as recommended and has three calls open on the page. Next: a design PR for §4.5 / §4.5a (and the history), then a build entry.
-**Blocked by:** decision (paul) — the three calls on the mockup page: the lane chip's words, whether the observations join this round
+**Status:** Open — the mockup is up (`docs/mockups/reviews/2026-10-08-org-declutter.html`, published at https://claude.ai/artifact/B8ybKFKeu3n1n4PUzYgktP), two rounds with Paul on 2026-10-08: the seven changes below as recommended, then his round 2 (the lane chip in the kind's colour, the + card's words, the debt label on one line, Doing's gloss gone, and three of the observations taken in). Next, after his last look: a design PR for §4.5 / §4.5a (and the history), then a build entry.
+**Blocked by:** decision (paul) — the last look at round 2 on the mockup page
 **Location:** `src/agentorc/ui/templates/org.html`, `group_head.html`, `rollup.html`, `lanes_line.html`, `team_summary.html`, `card.html`, `base.html`; `static/app.css`, `app.js`; design §4.5, §4.5a
 
 **Why:** Paul's screenshot of the live Org page, 2026-10-08, and his list: the *mine* toggle and *show command runs* box sit in the title row though rarely used; the rollup's TDs-in-motion bar and PRs-in-motion blocks sit at different heights (the PR facet's header holds the window picker, and `.blk` is 30px against `.bar`'s 22px); the Agents facet's *in urgency order…* line is help text on the page; Shell and + New session are two top-bar buttons though a team's sessions start from its + card; the team header says *9 sessions* twice (meta and fold), the flow twice (strip and dropdown, and Settings has the same picker per team), and spends a line on a disabled Members…, its reason and Open file, and another on *not concluded:*; the team's ✉ n shows only while folded (TD-071), which reads as a bug; the lanes line (TD-361) sits mid repo facet though its counts are members' lanes.
 
-**Fix:** the seven changes on the mockup page — (1) `mine` and `kind:command` become filter words, both controls go; (2) every rollup and repo-facet header reserves the picker's height and bars and blocks share one height; (3) the Agents line becomes an i, and Needs you hides *answer needed* at 0; (4) Shell and + New session merge into **+ New ▾** (Session, Shell); (5) the team header is one row — name, place, a `flow: <name>` chip linked to Settings (to the flow's own page once flows have pages, Paul 2026-10-08), the marks, Wind down, Stop now, fold, i — with Members…, the definition's source, Open file and *not concluded:* in the i panel, and *flow changed · Apply* kept on the header; (6) ✉ n drawn folded or not; (7) the lanes line becomes an i on TECHNICAL DEBT, each member card carrying its lane's count, amber when out of work with entries in it. Seen and not yet decided: the rollup's PR counts disagree with the repo facet's without saying what they sum; the rollup restates a lone live team; a stopped team draws empty facets; the summary's equal columns. The capture and transform that made the shots are in `docs/mockups/reviews/org-declutter-src/`. **Done when** the design says the new shape and the build entry it names is open.
+**Fix:** the seven changes on the mockup page — (1) `mine` and `kind:command` become filter words, both controls go; (2) every rollup and repo-facet header reserves the picker's height and bars and blocks share one height; (3) the Agents line becomes an i, and Needs you hides *answer needed* at 0; (4) Shell and + New session merge into **+ New ▾** (Session, Shell); (5) the team header is one row — name, place, a `flow: <name>` chip linked to Settings (to the flow's own page once flows have pages, Paul 2026-10-08), the marks, Wind down, Stop now, fold, i — with Members…, the definition's source, Open file and *not concluded:* in the i panel, and *flow changed · Apply* kept on the header; (6) ✉ n drawn folded or not; (7) the lanes line becomes an i on TECHNICAL DEBT, each member card whose lane holds entries carrying the count in the repo bar's colour for its kind (pickable blue on a grinder, design-first purple on the designer), a soft tint while it works and solid when it is out of work with entries waiting, none at 0 — the lane's count, not the bar's. Round 2: (8) the + card reads *New session*; (9) a facet's label never wraps — the window picker drops to its own line first; (10) Doing loses *the team's ao doing calls*; (11) while one team is live the rollup keeps Agents and Needs you only; (12) a team with nothing live draws no summary; (13) the summary's columns 1.15 : 0.85 : 1.2. The PR counts that disagree are TD-420. The capture and transform that made the shots are in `docs/mockups/reviews/org-declutter-src/`. **Done when** the design says the new shape and the build entry it names is open.
 
 ## TD-419: A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget
 
@@ -1255,3 +1256,16 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** the `attach` RPC (TD-002) writes each file under `attachments/<session>/` and nothing removes it: not Close, not Forget, not the tick. 524K on 2026-10-08, one session's pastes, so nothing is pressing, but it grows without bound and §4.4 says nothing of its life.
 
 **Fix:** design the attachment's life in §4.4: the folder goes with the record's Forget, and the tick removes a file older than a bound (14 days suggested; a sent prompt may still name a file, so not at Close). Then a build entry.
+
+## TD-420: The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums
+
+**Priority:** Low
+**Added:** 2026-10-08 (ao-paul, a UI/UX review with Paul, split from TD-418)
+**Owner:** grinder
+**Kind:** evaluation
+**Status:** Open
+**Location:** `src/agentorc/ui/templates/rollup.html` (`ro.prs`), the rollup's builder in `src/agentorc/ui/app.py`; `team_summary.html`'s pull requests block; design §4.5a *Org: rollup*
+
+**Why:** Paul's screenshot of 2026-10-08: the rollup's PRs in motion read 93 opened / 92 closed for the day while ao-grind's repo facet, the only live team's, read 85 / 85. A later capture the same evening read 84 / 83 in both. §4.5a says the rollup sums over every live team; with one live team the two should agree, or the page should say what else is counted (another repo, a stopped team's, a different window edge).
+
+**Fix:** find what the rollup sums that the facet does not (read both builders against §4.5a), then either make them agree or label the rollup's scope on the page. **Done when** the two numbers agree with one live team, or the difference is named where it is shown.
