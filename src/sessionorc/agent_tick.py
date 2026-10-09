@@ -101,6 +101,9 @@ def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) ->
 
 
 FILLED_FOR = "[agentorc] you are filled for: "
+# `restarts` entries that are not the tick's restarts, left out of rule 9's note (§4.9a, TD-468): a
+# person's Restart, and a team's start by a schedule or by rule 8
+NOT_RESTARTS = ("person", "start", "work")
 
 
 def filled_for(cause: dict[str, Any] | None) -> str | None:
@@ -741,6 +744,8 @@ class TickMixin:
             await self._push_changes()
             return
         log.info("%s wants another run and its work is pushed: restarting it", s.id)
+        # the member's own why (*context bound*) kept on the entry, for rule 9's note (§4.9a, TD-468)
+        said = {"said": str(rw["why"])} if rw.get("why") else {}
         if s.state == "idle":
             try:
                 closer = {"by": "tick", "why": "wanted"}
@@ -755,12 +760,12 @@ class TickMixin:
                 # next tick retry it (`closed_by_tick`) rather than strand it (review of PR #461)
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
                     self._mark_closed(s, "wanted")
-                s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", "error": f"close: {e}"}]
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", **said, "error": f"close: {e}"}]
                 log.warning("%s: the close before a wanted restart failed: %s", s.id, e)
                 self._save(s)
                 await self._push_changes()
                 return
-        await self._replay(s, "wanted", keep_mail=True)
+        await self._replay(s, "wanted", mark=said, keep_mail=True)
 
     async def _sit_out_close(self, s: Session) -> None:
         """A sit-out's end (design §4.9c *Switching*, TD-309 slice 5b): a record carrying `sit_out` — a
@@ -1969,8 +1974,9 @@ class TickMixin:
         """What rule 9's note adds under its first lines (§4.9a *The home's note says more*, TD-468),
         each line only when it has something to say: the members' claims left standing and their
         drops since `start`, with each one's why; their restarts since `start` by `why`, and any at
-        the restart ceiling; the identity alarms standing on the team's records; each open `ask` or
-        `steer` a member put to the person about a reference, with its bound; and each profile the
+        the restart ceiling (a `wanted` one under the member's own why; a person's Restart and a start
+        are not the tick's restarts); the identity alarms standing on the team's records; each open
+        `ask` or `steer` a member put to the person about a reference, with its bound; and each profile the
         records name, its window readings now beside `teams.<team>.usage_at_start`."""
         out: list[str] = []
         for r in sorted(members, key=lambda r: (r.name, r.id)):
@@ -1985,8 +1991,10 @@ class TickMixin:
         whys: dict[str, int] = {}
         for r in members:
             for e in r.restarts:
-                if isinstance(e, dict) and (not start or str(e.get("at") or "") >= start):
-                    word = str(e.get("why") or "restarted")
+                if not isinstance(e, dict) or e.get("why") in NOT_RESTARTS:
+                    continue
+                if not start or str(e.get("at") or "") >= start:
+                    word = str(e.get("said") or e.get("why") or "restarted")
                     word = "cache lapsed" if word == "cache" else word
                     whys[word] = whys.get(word, 0) + 1
         ceiling = sorted(r.name for r in members if r.restart_ceiling)

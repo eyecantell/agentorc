@@ -59,14 +59,16 @@ async def test_the_note_says_what_the_records_hold(agent):
             ProgressEntry(ref="TD-4", status="dropped", why="before the start", at=BEFORE),
         ],
         restarts=[
-            {"at": AFTER, "why": "wanted"},
+            {"at": AFTER, "why": "wanted", "said": "context bound"},
             {"at": AFTER, "why": "cache"},
+            {"at": AFTER, "why": "person"},
+            {"at": AFTER, "why": "work"},
             {"at": BEFORE, "why": "crash"},
         ],
     )
     g2 = _rec(
         "g2",
-        restarts=[{"at": AFTER, "why": "wanted"}],
+        restarts=[{"at": AFTER, "why": "wanted", "said": "context bound"}, {"at": AFTER, "why": "brief"}],
         restart_ceiling={"at": AFTER, "count": 5},
         identity_alarms=[{"channel": "x", "claimed": "y", "rpc": "msg", "count": 2, "at": AFTER, "last": AFTER}],
     )
@@ -90,7 +92,7 @@ async def test_the_note_says_what_the_records_hold(agent):
     assert more == [
         "",
         "Claims left — g1: TD-5 left claimed; TD-6 dropped — asked: m-1",
-        "Restarts — 3 restarts: 2 wanted, 1 cache lapsed; at the restart ceiling: g2",
+        "Restarts — 4 restarts: 2 context bound, 1 brief, 1 cache lapsed; at the restart ceiling: g2",
         "Alarms — 1 identity alarm standing on g2 (§4.8a)",
         f"Open to you — g1: TD-005 (m-s, until {work.bound_words('2026-10-10T09:57:00Z')})",
         "Usage — grind: week 61%, from 48%; 5h 12%",

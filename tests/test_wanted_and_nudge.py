@@ -202,6 +202,7 @@ async def test_a_wanted_restart_with_its_work_pushed_is_closed_and_restarted(age
         new = agent.sessions[sid]
         assert new is not first and first.state == "closed"
         assert [r["why"] for r in new.restarts] == ["wanted"] and new.restart_wanted is None
+        assert new.restarts[0]["said"] == "context is long", "the member's own why, for rule 9's note (TD-468)"
         assert new.lane == ["TD-001"] and new.supervised
         await person.call("kill", id=sid)
 
