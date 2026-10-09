@@ -52,7 +52,6 @@ FILES = {
 # each beside the control that already sets it; **Reset this browser** clears every `ao.*` key.
 BROWSER_KEYS = (
     ("theme", "theme", "the ◐ toggle in the top bar"),
-    ("mine", "mine", "the Org's mine filter"),
     ("inboxfyi", "Inbox: FYI open", "the section's own fold"),
     ("inboxanswered", "Inbox: Answered open", "the section's own fold"),
 )

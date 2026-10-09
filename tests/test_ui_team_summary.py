@@ -416,7 +416,7 @@ def test_every_card_carries_the_word_the_state_filter_matches():
     html = ui.templates.get_template("card.html").render(s=ui.view({"id": "a", "name": "a", "state": "working"}))
     assert 'data-pill="working"' in html
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
-    assert "/^state:/i" in js and "c.dataset.pill" in js
+    assert 'low.startsWith("state:")' in js and "c.pill" in js  # the words' behaviour: test_ui_org_chrome.py
 
 
 def test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox():

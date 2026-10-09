@@ -1326,24 +1326,42 @@
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
     syncTeams();
   }
+  // The Org's filter box (§4.5a **filter…**, TD-418, built by TD-428): words, each one a test, and a
+  // card is shown when it passes them all. `team:<name>` is the form the card's team badge writes: an
+  // exact match on the badge, not a substring of the card's text, so a team whose name also appears
+  // in a branch stays clean. `state:<word>` is the form the rollup's Agents pills write (TD-176): the
+  // card's pill word, hyphenated — `needs-you`, `working`, `on-call`. `mine`, the whole word alone,
+  // is the person's own — the interactive sessions — and `kind:command` shows the command runs,
+  // hidden without it (the two in place of the *mine* toggle and the *show command runs* box). Any
+  // other word is text the card must contain.
+  AO.orgWords = function (raw) {
+    const w = { team: null, state: null, mine: false, command: false, text: [] };
+    String(raw || "").trim().split(/\s+/).filter(Boolean).forEach((word) => {
+      const low = word.toLowerCase();
+      if (low.startsWith("team:")) w.team = low.slice(5);
+      else if (low.startsWith("state:")) w.state = low.slice(6);
+      else if (low === "mine") w.mine = true;
+      else if (low === "kind:command") w.command = true;
+      else w.text.push(low);
+    });
+    return w;
+  };
+  // `c` is what a card says of itself: its `data-*` (`kind`, `team`, `pill`, `mine`) and its text.
+  AO.orgPasses = function (c, w) {
+    if (c.kind === "command" && !w.command) return false;
+    if (w.team !== null && (c.team || "").toLowerCase() !== w.team) return false;
+    if (w.state !== null && (c.pill || "") !== w.state) return false;
+    if (w.mine && !c.mine) return false;
+    const text = (c.text || "").toLowerCase();
+    return w.text.every((t) => text.includes(t));
+  };
   function applyFilter() {
-    const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
-    const mine = !!$("#mine") && $("#mine").getAttribute("aria-pressed") === "true";
-    // `team:<name>` is the form the card's team badge writes: an exact match on the badge, not a
-    // substring of the card's text, so a team whose name also appears in a branch stays clean.
-    const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
-    // `state:<word>` is the form the rollup's Agents pills write (§4.5a **filter…**, TD-176): the
-    // card's pill word, hyphenated — `needs-you`, `working`, `on-call`
-    const state = /^state:/i.test(raw) ? raw.slice(6).trim().toLowerCase() : null;
-    const q = team === null && state === null ? raw.toLowerCase() : "";
-    const filtering = !!raw || mine;
+    const raw = ($("#filter") ? $("#filter").value : "").trim(), words = AO.orgWords(raw);
+    // `kind:command` alone shows more than the bare page, so it is no filter: the + card stays
+    const filtering = words.team !== null || words.state !== null || words.mine || words.text.length > 0;
     $$("#groups .sc").forEach((c) => {
       if (c.classList.contains("plus")) { c.hidden = filtering; return; }  // a filter hides the + card (§4.5a)
-      const hideKind = c.dataset.kind === "command" && !cmd;
-      const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team
-        : state !== null ? (c.dataset.pill || "") !== state
-        : !!q && !c.textContent.toLowerCase().includes(q);
-      c.hidden = hideKind || miss || (mine && !c.dataset.mine);  // *mine* composes with the box (§4.5a)
+      c.hidden = !AO.orgPasses({ ...c.dataset, text: c.textContent }, words);
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
     // A team's card stays while no filter is set, sessions or none: it is where Start lives.
@@ -2494,12 +2512,6 @@
     const wantTeam = new URLSearchParams(location.search).get("team");
     if (wantTeam) $("#filter").value = "team:" + wantTeam;
     $("#filter").addEventListener("input", layout);
-    // *mine* (§4.5a, TD-095): a toggle this browser remembers, as it remembers a team's fold
-    const mineBtn = $("#mine");
-    const setMine = (on) => { mineBtn.setAttribute("aria-pressed", on ? "true" : "false"); mineBtn.classList.toggle("on", on); };
-    setMine(!!store.get("mine", false));
-    mineBtn.addEventListener("click", () => { const on = mineBtn.getAttribute("aria-pressed") !== "true"; store.set("mine", on); setMine(on); layout(); });
-    $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
     const box = $("#groups");
     // The card's team badge filters the page to that team; pressing it again clears the box.
@@ -4194,7 +4206,7 @@
       dd.textContent = v === null ? "not set" : typeof v === "boolean" ? (v ? "on" : "off") : String(v);
     });
     $("#setreset").addEventListener("click", () => {
-      if (!confirm("Reset this browser? Every ao.* key this browser keeps — the theme, mine, the folds, the filters, the pop-out windows — is cleared, and the page reloads. Nothing anywhere else changes.")) return;
+      if (!confirm("Reset this browser? Every ao.* key this browser keeps — the theme, the folds, the filters, the pop-out windows — is cleared, and the page reloads. Nothing anywhere else changes.")) return;
       try { Object.keys(localStorage).filter((k) => k.startsWith("ao.")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
       location.reload();
     });

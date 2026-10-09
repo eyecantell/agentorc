@@ -11,12 +11,10 @@
       {% if counts['stalled?'] %}<span class="pill s-stalled"><span class="dot"></span>{{ counts['stalled?'] }} stalled</span>{% endif %}
     </span>
     <span class="grow"></span>
-    <input class="input" id="filter" placeholder="filter… (team:name)" style="width: 200px;">
-    {# design §4.5a Org ***mine*** (TD-095, second pass): one press shows only the person's own —
-       `interactive` sessions, a taken-over worker included — a second shows everything again. A
-       toggle, composed with the box; client-side, and it changes nothing #}
-    <button class="btn ghost" id="mine" aria-pressed="false" title="show only your own sessions — the interactive ones; press again for everyone">{{ role_svg('person') }}mine</button>
-    <label class="btn ghost"><input type="checkbox" id="showcmd"> show command runs</label>
+    {# design §4.5a Org top bar **filter…** (TD-418, built by TD-428): words that compose — `team:`,
+       `state:`, `mine` (the person's own, the interactive sessions) and `kind:command` (the command
+       runs, hidden without it) — in place of the ***mine*** toggle and the *show command runs* box #}
+    <input class="input" id="filter" placeholder="filter… team: state: mine kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), kind:command (the command runs, hidden without it), or any text" style="width: 260px;">
   </div>
   {# design §4.5a *Org: rollup* (TD-176 slice 4): sums over every live team, re-sent with the groups #}
   <div id="rollup">{% with ro = rollup %}{% include "rollup.html" %}{% endwith %}</div>
@@ -60,7 +58,7 @@
     </section>
     {% endfor %}{% endif %}
   </div>
-  <div class="note" id="empty" {% if sessions %}hidden{% endif %}>No sessions on {{ host }}. Start one with <b>New session</b> or <b>Shell</b>.</div>
+  <div class="note" id="empty" {% if sessions %}hidden{% endif %}>No sessions on {{ host }}. Start one from <b>+ New ▾</b>: a Session or a Shell.</div>
   <div class="note">Inside a team: the manager, then whatever needs you first. A dashed pill means the state was guessed from the screen. A <b>team</b> badge — on a card outside its team's group, or under a filter — filters the page to that team; clear the filter box to see everyone again.</div>
 </div>
 {% endblock %}

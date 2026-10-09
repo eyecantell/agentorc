@@ -321,6 +321,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-428 slice 1, grinder-ao-2): **+ New ▾**, the filter words `mine` and `kind:command`, and the ***mine*** toggle and *show command runs* box gone are built; the rows say so.
 - 2026-10-09 (TD-457, the designer): the Inbox row *team start* also stands for a running team with a finished member closed, naming the member, and its Start replays the named members alone. Built by TD-466.
 - 2026-10-08 (TD-424, grinder-ao-1): the Due strip / Inbox board row's **Done** row said TD-338's pending mark was *not built*; TD-340 built it (#1144), as the *a control's look* and *Inbox row: pending* rows already said, so the row now reads *built — TD-340*.
 - 2026-10-08 (TD-421, the designer): the row *a URL is a link — Ctrl+click / Cmd+click* on the Focus pane. TD-422 builds it.

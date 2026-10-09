@@ -1548,7 +1548,7 @@ def test_the_filter_matches_the_tools_own_title(tmp_path, monkeypatch):
     from agentorc.ui.app import templates, view
 
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
-    assert "c.textContent.toLowerCase().includes(q)" in js
+    assert "text: c.textContent" in js  # each text word is matched in it: test_ui_org_chrome.py
     html = templates.get_template("card.html").render(
         s=view(
             {
