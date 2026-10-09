@@ -54,6 +54,7 @@ READS = frozenset(
         "ping",
         "whoami",
         "identity",
+        "doctor",
     }
 )
 

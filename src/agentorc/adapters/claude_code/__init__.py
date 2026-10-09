@@ -259,6 +259,39 @@ def hook_command() -> str | None:
     return str(beside) if beside.is_file() and os.access(beside, os.X_OK) else None
 
 
+def _resolves(command: str) -> bool:
+    """Whether a hook command's program is there to run: its first word on `PATH`, or an executable
+    file at that path (`ao doctor`'s hooks check, design §4.7)."""
+    try:
+        prog = shlex.split(command)[0]
+    except (ValueError, IndexError):
+        return False
+    if os.sep in prog:
+        return os.path.isfile(prog) and os.access(prog, os.X_OK)
+    return shutil.which(prog) is not None
+
+
+def layer_reading(profile: Profile) -> list[dict]:
+    """Each settings layer written for `profile`, one per launch shape (plain, `+cadence`,
+    `+unattended`, …): its path, and the commands it names — every hook's and the status line's,
+    dev-cadence's own line left out — with whether each resolves (design §4.7 **`ao doctor`**
+    *hooks*, TD-465). A layer is written at a launch, so a shape never launched has none."""
+    out: list[dict] = []
+    for p in sorted((paths.home() / "claude-hooks").glob(f"{profile.name}*.json")):
+        if p.stem != profile.name and not p.stem.startswith(f"{profile.name}+"):
+            continue  # another profile whose name begins with this one's
+        try:
+            doc = json.loads(p.read_text(encoding="utf-8"))
+            cmds = [str(h.get("command", "")) for g in doc.get("hooks", {}).values() for e in g for h in e["hooks"]]
+            cmds.append(str((doc.get("statusLine") or {}).get("command", "")))
+        except (OSError, ValueError, AttributeError, TypeError, KeyError) as e:
+            out.append({"path": str(p), "error": str(e) or type(e).__name__, "commands": []})
+            continue
+        named = sorted({c for c in cmds if c and c != CADENCE_HOOK_LINE})
+        out.append({"path": str(p), "commands": [{"command": c, "resolves": _resolves(c)} for c in named]})
+    return out
+
+
 def write_hooks_file(profile: Profile, cwd: Path | None = None, unattended: bool = False) -> Path:
     """Write the layer for this launch: the `+cadence` variant when `cwd` does not wire dev-cadence's
     hooks itself, the `+unattended` variant for an unattended launch. Up to four files per profile,
@@ -728,6 +761,45 @@ class ClaudeCodeAdapter:
         if not exp:
             return True
         return datetime.fromtimestamp(int(exp) / 1000, UTC) > datetime.now(UTC)
+
+    def doctor_profiles(self) -> list[dict]:
+        """What `ao doctor` reads of each profile this adapter runs (design §4.7 **`ao doctor`**
+        *hooks* and *profiles*, TD-465), for the host agent, which cannot read `profiles.yml`
+        itself: the config dir, the credentials (`credentials_ok`: True, False for a dead refresh
+        token, None for none), a metered profile's key, and its settings layers (`layer_reading`).
+        `profiles.yml` that does not parse is one entry carrying `error` in its own words."""
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, TypeError, AttributeError) as e:
+            return [{"error": f"profiles.yml: {e}"}]
+        out: list[dict] = []
+        for prof in profs.values():
+            if prof.adapter != self.name:
+                continue
+            row: dict = {
+                "profile": prof.name,
+                "account": prof.account or prof.name,
+                "config_dir": str(config_dir(prof)),
+                "metered": prof.metered,
+                "credentials": None if prof.metered else self.credentials_ok(prof),
+                "layers": layer_reading(prof),
+            }
+            if prof.metered:
+                row["key"] = self._key_set(prof)
+            out.append(row)
+        return out
+
+    def _key_set(self, profile: Profile) -> bool:
+        """Whether a metered profile has an API key to run on (§4.2a): `ANTHROPIC_API_KEY` in the
+        host agent's environment, or an `env` key or `apiKeyHelper` in its config dir's settings."""
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return True
+        try:
+            doc = json.loads((config_dir(profile) / "settings.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        env = doc.get("env") if isinstance(doc, dict) else None
+        return bool((isinstance(env, dict) and env.get("ANTHROPIC_API_KEY")) or doc.get("apiKeyHelper"))
 
     def account_for(self, profile: str) -> str | None:
         """The account a profile runs under (§4.2a, TD-122): the core polls usage once per
