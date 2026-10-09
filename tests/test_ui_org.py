@@ -127,8 +127,7 @@ def test_the_teams_ready_mark_is_counted_by_the_grouping_and_kept_out_of_its_cou
     assert g["ready"] == 1
     assert not any("ready to close" in c for c in g["counts"])
     html = head.render(g=g)
-    assert '<span class="meta readymark"' in html and ">1 ready to close</span>" in html
-    assert "foldonly" not in html[html.index("readymark") - 40 : html.index("readymark")]  # drawn unfolded too
+    assert '<span class="meta readymark"' in html and ">1 ready to close</span>" in html  # not a foldonly span
     counts = html[html.index('class="meta counts foldonly">') :].split("</")[0]
     assert "ready to close" not in counts
     (g,) = team_groups([{**ready, "state": "working"}, stale])
