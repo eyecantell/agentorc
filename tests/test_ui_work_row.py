@@ -5,6 +5,7 @@ store, Dismiss through `clear_work`, and the card's note beside *wound down*."""
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -40,6 +41,32 @@ def test_a_mark_is_one_counted_row_with_its_ids_once_and_aged_from_at():
     assert s["count"] == 1 and s["needs"][0]["row"] == "work"
     assert work_rows({}) == [] and work_rows(None) == [] and work_rows({"g": {"members": {}}}) == []
     assert work_rows({"g": "junk"}) == []
+
+
+def test_a_running_team_names_its_finished_members_and_is_running():
+    """§6 rule 8 *A member that finished while its team runs on* (TD-466): a team the card does not read
+    as wound down, its mark naming members, reads *ao-grind · grinder-ao-1 finished <t> · its lane
+    gained …*, each member by its record's name and the instant it closed."""
+    recs = [
+        {"id": "ao-g1", "name": "grinder-ao-1", "team": "ao-grind", "closed_at": "2026-09-30T00:56:00Z"},
+        {"id": "ao-g1-old", "name": "grinder-ao-1", "team": "ao-grind", "closed_at": "2026-09-29T08:00:00Z"},
+        {"id": "ao-g2", "name": "grinder-ao-2", "team": "ao-grind", "closed_at": "2026-09-30T01:10:00Z"},
+        {"id": "ao-x1", "name": "grinder-ao-1", "team": "other", "closed_at": "2026-09-30T05:00:00Z"},
+    ]
+    # the mark keys its members by name (`_work_mark`); the time is the team's latest close under it
+    (r,) = work_rows({"ao-grind": mark(members={"grinder-ao-1": ["TD-428"]})}, {}, NOW, records=recs)
+    assert r["running"] and r["lanes"] == "its lane"
+    assert r["finished"] == [{"name": "grinder-ao-1", "at": "2026-09-30T00:56:00Z"}]
+    assert r["text"] == "ao-grind · grinder-ao-1 finished 2026-09-30T00:56:00Z · its lane gained 1 entry: TD-428"
+    two_mark = mark(members={"grinder-ao-1": ["TD-1"], "grinder-ao-2": ["TD-2"]})
+    (two,) = work_rows({"ao-grind": two_mark}, {}, NOW, records=recs)
+    assert "grinder-ao-1 finished 2026-09-30T00:56:00Z, grinder-ao-2 finished 2026-09-30T01:10:00Z" in two["text"]
+    assert "their lanes gained 2 entries: TD-1, TD-2" in two["text"]
+    # a member the page holds no closed record of is drawn with no time; a wound-down team is the old row
+    (gone,) = work_rows({"ao-grind": mark(members={"gone-ao-1": ["TD-1"]})}, {}, NOW)
+    assert gone["text"].startswith("ao-grind · gone-ao-1 finished · its lane gained")
+    (down,) = work_rows({"ao-grind": mark()}, {"ao-grind": AT}, NOW, records=recs)
+    assert not down["running"] and down["text"].startswith("ao-grind · wound down · its lanes gained")
 
 
 def test_five_ids_at_most_and_one_entry_is_singular():
@@ -214,6 +241,7 @@ def page(tmp_path, monkeypatch):
 
     monkeypatch.setattr(uiapp, "LocalClient", FakeClient)
     with TestClient(uiapp.create_app()) as c:
+        c.app.state.answers = answers  # a test that reads a running team moves the list
         yield c, calls, work
 
 
@@ -245,3 +273,30 @@ def test_the_org_counts_the_row_and_the_card_says_work_waiting(page):
     work.clear()
     again = c.get("/").text
     assert "entries waiting since" not in again and 'id="personneeds">1<' not in again
+
+
+def test_a_running_teams_row_starts_its_members_through_work_start(page):
+    """The row for a team that runs on (§4.5a **Inbox row: team start**, TD-466): its finished member
+    named, its **Start** marked running so the page posts `work_start`, which the server refuses in
+    the row's words when a bound holds it back."""
+    c, calls, work = page
+    answers = c.app.state.answers
+    out = {"at": "2026-09-30T00:56:00+00:00", "why": "nothing to pick"}
+    answers["list"] = [
+        _session("m", state="idle"),
+        _session("g", state="closed", out_of_work=out, closed_at="2026-09-30T00:56:00+00:00"),
+    ]
+    work["wt"] = mark(members={"g": ["TD-213"]})
+    html = c.get("/inbox").text
+    assert re.search(r"· g finished <span class=\"localtime\" data-at=\"2026-09-30T00:56:00\+00:00\"", html)
+    assert "its lane gained 1 entry:" in html and "wound down" not in html
+    assert 'data-act="work_start" data-id="person" data-team="wt" data-running="1"' in html
+    answers["work_start"] = {"team": "wt", "started": True, "ids": ["TD-213"], "held": None}
+    assert c.post("/api/person/work_start", json={"team": "wt"}).json()["started"] is True
+    assert ("work_start", {"team": "wt"}) in calls
+    answers["work_start"] = {"team": "wt", "started": False, "ids": ["TD-213"], "held": {"why": "day", "count": 3}}
+    held = c.post("/api/person/work_start", json={"team": "wt"})
+    assert held.status_code == 409 and held.json()["detail"] == "started 3 times today"
+    answers["work_start"] = {"team": "wt", "started": False, "ids": [], "held": None}
+    assert c.post("/api/person/work_start", json={"team": "wt"}).status_code == 409
+    assert c.post("/api/person/work_start", json={}).status_code == 400

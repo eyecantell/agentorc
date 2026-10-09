@@ -304,7 +304,14 @@ def usage(doc: dict[str, Any]) -> dict[str, Any]:
 # -- teams, repos, person (§5, TD-146) -------------------------------------------------------------
 
 TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow")
-ON_WORK = ("ask", "start", "off")  # §6 rule 8: what a wound-down team whose lanes gained work does; `ask` when absent
+ON_WORK = (
+    "ask",
+    "start",
+    "off",
+)  # §6 rule 8: what a team does when a lane of it gains work (wound down, or a finished member)
+ON_WORK_DEFAULT = (
+    "start"  # §6 rule 8, §5: what a team with no `on_work` key has (Paul, 2026-10-08, TD-457; `ask` until then)
+)
 BALANCE_KEYS = ("prs", "oldest", "review")
 TERMINAL_KEYS = ("size", "face", "copy_on_select")
 TERMINAL_SIZE = (8, 32)  # a readable monospace size in px, either way of the Focus pane's default 13

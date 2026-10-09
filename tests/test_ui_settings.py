@@ -320,15 +320,15 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
             "ok"
         ]
         assert "sett-team" not in (call_sync("settings")["teams"] or {})
-        # **when work appears** (§4.5a, §6 rule 8, TD-227 slice 3): *ask me* is the default while the
-        # key is absent, the pick is written as `on_work`, and anything else is refused
+        # **when work appears** (§4.5a, §6 rule 8, TD-227 slice 3): *start the team* is the default while the
+        # key is absent (TD-457, TD-466), the pick is written as `on_work`, and anything else is refused
         page = client.get("/settings").text
-        assert 'name="on_work" data-was="ask"' in page and "ask me (default)" in page
+        assert 'name="on_work" data-was="start"' in page and "start the team (default)" in page
         assert client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "start"}).json()["ok"]
         assert call_sync("settings")["teams"]["sett-team"] == {"on_work": "start"}
         page = client.get("/settings").text
         assert 'data-was="start"' in page and '<option value="start" selected>' in page
-        assert "ask me (default)" not in page and "the home starts it" in page
+        assert "start the team (default)" not in page and "the home starts it" in page
         # the note says all three choices, the picked one first (TD-286)
         note = re.search(r'<span class="note setonwork">([^<]*)</span>', page)[1]
         assert note.startswith("wound down — start the team: the home starts it · ask me: an Inbox row")

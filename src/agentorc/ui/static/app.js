@@ -579,7 +579,10 @@
       // §4.5a **Inbox row: cadence check failed** / **merged without its read** (TD-258): **Dismiss**
       // is `clear_mark` on the member's record — the PR for the first, every standing crossing for the second
       if (action === "clear_mark") body = { sid: b.dataset.sid, kind: b.dataset.kind, pr: b.dataset.pr ? Number(b.dataset.pr) : null };
-      if (action === "work_start") {
+      // a team that runs on (§6 rule 8 *A member that finished while its team runs on*, TD-466): **Start**
+      // is `work_start` with the team, which replays the named members alone; a bound's refusal is the row's words
+      if (action === "work_start" && b.dataset.running) body = { team: b.dataset.team };
+      else if (action === "work_start") {
         const team = b.dataset.team;
         pressed();
         const r = await fetch(`/api/teams/${encodeURIComponent(team)}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });

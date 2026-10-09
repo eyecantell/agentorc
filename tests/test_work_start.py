@@ -369,11 +369,13 @@ def _running(agent, tmp_path, **grinder):
     )
 
 
-async def test_a_finished_member_of_a_running_team_is_replayed_alone(agent, tmp_path, monkeypatch):
+@pytest.mark.parametrize("conf", [{"on_work": "start"}, {}], ids=["start", "the-default"])
+async def test_a_finished_member_of_a_running_team_is_replayed_alone(agent, tmp_path, monkeypatch, conf):
     """A crew member closed after declaring, its team running on a seat, is rule 8's news: the mark
-    names it after the settle, and `start` replays it alone, `of` counting the members replayed."""
+    names it after the settle, and `start` replays it alone, `of` counting the members replayed. A team
+    with no `on_work` key has `start` (TD-457, TD-466)."""
     await park_ticks(agent)
-    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    settings_mod.save({"teams": {"g": conf}} if conf else {})
     replays = _Replays()
     monkeypatch.setattr(agent, "_replay", replays)
     recs = _running(agent, tmp_path)

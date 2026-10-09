@@ -11,7 +11,7 @@ import functools
 import re
 import sys
 import time
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -778,7 +778,10 @@ def work_held(held: Any, now: datetime) -> str:
 
 
 def work_rows(
-    work: Mapping[str, Any] | None, wound: Mapping[str, Any] | None = None, now: datetime | None = None
+    work: Mapping[str, Any] | None,
+    wound: Mapping[str, Any] | None = None,
+    now: datetime | None = None,
+    records: Iterable[Mapping[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     """design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3): one row per wound-down
     team whose lanes gained work, from the home's `work_waiting` (`work` on the `host` read) —
@@ -788,7 +791,12 @@ def work_rows(
     card's own *wound down* reading; a team it does not name is drawn without the time. Under
     *Needs you*, counted, aged from the mark's `at`; under `on_work: start` the home keeps the mark
     only while a bound holds the start back, and the row says which (`held`). Keyed `work:<team>`
-    in the attention store, so Snooze is by time alone."""
+    in the attention store, so Snooze is by time alone.
+
+    **A team that runs on** (§6 rule 8 *A member that finished while its team runs on*, TD-466): a
+    team `wound` does not name, whose mark names members, reads *`<team>` · grinder-ao-1 finished <t>
+    · its lane gained …* — each named member by its record's name and the instant it closed, from
+    `records` (the page's own list) — and is `running`, so its **Start** posts `work_start`."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for team, mark in sorted((work or {}).items()):
@@ -804,10 +812,13 @@ def work_rows(
         repo = Path(str(mark.get("repo") or "")).name
         held = work_held(mark.get("held"), at)
         n = len(ids)
-        said = f"its lanes gained {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}" if ids else ""
+        finished = work_finished(str(team), mark, records) if wound is not None and not down else []
+        lanes = ("its lane" if len(finished) == 1 else "their lanes") if finished else "its lanes"
+        said = f"{lanes} gained {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}" if ids else ""
         if n > WORK_IDS:
             said += f" and {n - WORK_IDS} more"
         said = "; ".join([*(q["words"] for q in asked), *([said] if said else [])])
+        who = ", ".join(f"{f['name']} finished" + (f" {f['at']}" if f["at"] else "") for f in finished) or "wound down"
         out.append(
             {
                 "row": "work",
@@ -824,11 +835,30 @@ def work_rows(
                 "n": n,
                 "questions": asked,
                 "held": held,
-                "text": f"{team} · wound down · {said}" + (f" · not started: {held}" if held else ""),
-                "find": " ".join(x for x in (str(team), "team start", "wound down", said, held) if x),
+                "running": bool(finished),
+                "finished": finished,
+                "lanes": lanes,
+                "text": f"{team} · {who} · {said}" + (f" · not started: {held}" if held else ""),
+                "find": " ".join(x for x in (str(team), "team start", who, said, held) if x),
             }
         )
     return out
+
+
+def work_finished(
+    team: str, mark: Mapping[str, Any], records: Iterable[Mapping[str, Any]]
+) -> list[dict[str, str]]:
+    """The members a running team's mark names (§6 rule 8 *A member that finished while its team runs
+    on*, TD-466), each `{name, at}` in the mark's order: the mark keys them by name, and the instant is
+    the latest `closed_at` among the team's records under that name (a superseded record and its
+    successor share one); a member the page holds no closed record of is drawn with no time."""
+    members = mark.get("members") if isinstance(mark.get("members"), Mapping) else {}
+    closed: dict[str, str] = {}
+    for r in records:
+        if isinstance(r, Mapping) and r.get("team") == team and r.get("closed_at"):
+            name, at = str(r.get("name") or ""), str(r["closed_at"])
+            closed[name] = max(closed.get(name, ""), at)
+    return [{"name": str(m), "at": closed.get(str(m), "")} for m in members]
 
 
 def work_note(mark: Any, now: datetime | None = None) -> dict[str, Any] | None:

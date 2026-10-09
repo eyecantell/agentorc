@@ -106,13 +106,13 @@
       {# **when work appears** (§4.5a, §6 rule 8, TD-227): `teams.<team>.on_work`, written only when the pick moves #}
       <label class="setrow"><span class="setlabel">when work appears</span>
         <select class="input setin" name="on_work" data-was="{{ t.on_work }}" title="{{ help_title('on-work') }}">
-          <option value="ask"{% if t.on_work == "ask" %} selected{% endif %}>ask me{% if not t.on_work_set %} (default){% endif %}</option>
-          <option value="start"{% if t.on_work == "start" %} selected{% endif %}>start the team</option>
+          <option value="ask"{% if t.on_work == "ask" %} selected{% endif %}>ask me</option>
+          <option value="start"{% if t.on_work == "start" %} selected{% endif %}>start the team{% if not t.on_work_set %} (default){% endif %}</option>
           <option value="off"{% if t.on_work == "off" %} selected{% endif %}>do nothing</option>
         </select>
         {#- the note says all three, the picked one first (TD-286) -#}
         {%- set says = {"ask": "ask me: an Inbox row asks when its lanes gain entries", "start": "start the team: the home starts it", "off": "do nothing: it waits for Start or its schedule"} %}
-        <span class="note setonwork">wound down — {{ says[t.on_work] if t.on_work in says else says.ask }}{% for k in ["ask", "start", "off"] if k != (t.on_work if t.on_work in says else "ask") %} · {{ says[k] }}{% endfor %}</span></label>
+        <span class="note setonwork">wound down — {{ says[t.on_work] if t.on_work in says else says.start }}{% for k in ["ask", "start", "off"] if k != (t.on_work if t.on_work in says else "start") %} · {{ says[k] }}{% endfor %}</span></label>
       {# **balance** (§4.5a, §6 *Balance*, TD-239): `teams.<team>.balance`, whole, written only when it moved;
          off, the key is absent; a field left empty is a line not drawn #}
       <div class="setrow setbalance" data-was="{{ t.balance.was }}">
