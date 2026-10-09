@@ -180,6 +180,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "pane-link",
+        "a URL is a link",
+        "Focus pane",
+        (
+            "Ctrl+click (Cmd+click on a Mac) on an http:// or https:// URL in the terminal opens it in a new "
+            "tab; the URL underlines when the pointer is over it. Press it to follow the pull request, the CI "
+            "run or the page a session just printed, instead of copying it into the address bar. A plain "
+            "click or a drag over it only selects, as before, and nothing is sent to the session."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -436,7 +447,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "switch-profile",
         ),
     ),
-    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel")),
+    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel", "pane-link")),
     (
         "inbox",
         "Inbox",

@@ -69,8 +69,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Designed 2026-10-08 (five mockup rounds with Paul) — the build is TD-427 |
 | TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Open |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
-| TD-421 | A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser | Medium | Designed — TD-422 builds it |
-| TD-422 | Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab | Medium | Open |
 | TD-423 | The Inbox rail's **Clear filters** appears and vanishes with the first pick, shoving the filter list down and up | Medium | Open |
 | TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Open |
 | TD-426 | 13 live checks wait on the anchor, some since #343, and 10 designed entries wait on them as *design-first*: the bar counted them as the designer's work while its lane held nothing | Medium | Open |
@@ -1194,51 +1192,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** Paul's screenshot of 2026-10-08: the rollup's PRs in motion read 93 opened / 92 closed for the day while ao-grind's repo facet, the only live team's, read 85 / 85. A later capture the same evening read 84 / 83 in both. §4.5a says the rollup sums over every live team; with one live team the two should agree, or the page should say what else is counted (another repo, a stopped team's, a different window edge).
 
 **Fix:** find what the rollup sums that the facet does not (read both builders against §4.5a), then either make them agree or label the rollup's scope on the page. **Done when** the two numbers agree with one live team, or the difference is named where it is shown.
-
-## TD-421: A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-08 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-08 (the designer, PR #1300): design §4.6 *A URL in the pane is a link* and §4.5a's row *a URL is a link — Ctrl+click / Cmd+click* — xterm.js's web-links addon (`@xterm/addon-web-links`, the release paired with the vendored xterm 5.5.0), `http://` and `https://` only by the addon's own regex, underlined on hover, **Ctrl+click / Cmd+click** opens a new tab with `noopener` (the press decided: VS Code's convention, the one Paul named; a plain click is a drag's start and a drag over a link still selects, a plain tap does nothing and the phone's press is TD-003's to name); TD-071's constraint read: not a control from the text — one act on what is written, nothing without a press, the press a modifier, the URL read under the pointer first; `javascript:`, `data:` and `file:` are not links, as §5's scheme rule has it for the editor button; a read-only Focus and a pop-out have it; **no person setting** — a modifier+click takes nothing from anyone, and copy on select is untouched. Mockup: `Focus.dc.html` gains a hovered URL line (`docs/mockups/reviews/2026-10-08-td421-pane-link.png`). TD-422 builds it. Before: Open.
-**Blocked by:** TD-422
-**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`: the `new Terminal(…)` and the two `loadAddon` calls — fit and WebGL — are the only addons the pane loads), `src/agentorc/ui/templates/focus.html` (the `/static/vendor/` script tags), `src/agentorc/ui/static/vendor/README.md` (the xterm.js family's version table: `@xterm/xterm` 5.5.0); design §4.6 *The mouse is the browser's*, §4.5a (the Focus rows: *Copy / Paste*, *copy on select*), §2 goal 12 (the terminal's face), §5 `person.terminal`
-
-**Why:** Paul's words (2026-10-08, the Add entry form): *Need to be able to go to a link by clicking it in the session terminal. Right now you have to copy it, and paste it in the (default) browser. It would be nice if it went automatically. The vscode terminal has this.* A session's pane is full of URLs a person wants to follow — the PR a worker just opened, a CI run, a design page — and today each is a drag, a Copy and a paste into the address bar (§4.5a *Copy / Paste*). VS Code's terminal underlines a URL on hover and opens it on Ctrl+click (Cmd+click on a Mac); xterm.js, which draws the pane, ships that as `@xterm/addon-web-links`, and the pane loads only the fit and WebGL addons. Nothing in the design says a URL in the pane is a link, and a control that is not in §4.5a's table does not exist — so this is designed before it is built. The one thing the design has to settle is Paul's own constraint (TD-071 item 8): *nothing on a page is a control that parses what an agent printed*. A link in the pane is built from text a session wrote, so the design says what makes it safe where a button from screen text would not be: it does one thing, open the URL as the browser's own address bar would (`noopener`, a new tab, no `javascript:` or `file:` schemes, as §5 `person.open_in`'s scheme rule already refuses), it opens nothing without a press, and the press is the terminal convention (a modifier+click, the URL shown first), never a bare click that a drag or a stray tap could land on a line that is being read.
-
-**Fix (to design, then build):**
-1. **Design** — one paragraph in §4.6 beside *The mouse is the browser's*: a URL in the pane is a link, how it is told from the text around it (xterm.js's web-links addon: `http://` and `https://` only, the addon's own regex), what the press is (Ctrl+click / Cmd+click as VS Code's terminal, with the underline on hover; or a plain click — decide, with the reading of TD-071's constraint above), where it opens (a new tab, `noopener`), and that it is inert on nothing: it reads, so a read-only Focus (TD-096) has it too. One row in §4.5a for the Focus pane's link. Say whether it is a person's choice (`person.terminal`, §5, beside copy on select) or has none — the lean is none: a link that opens only on a modifier+click takes nothing from anyone.
-2. **Build** — vendor `@xterm/addon-web-links` at the release paired with `@xterm/xterm` 5.5.0, with its licence file and its row in `vendor/README.md`; load it in `AO.focus` beside the fit addon, with a handler that opens the URL in a new tab through `window.open(url, "_blank", "noopener")`; the screenshot of the hover and the opened tab under `docs/mockups/reviews/` as a UI change's check asks (§4.9b *A UI change is verified by its builder*).
-
-**Done when** a URL printed in a session's Focus pane underlines on hover and opens in a new browser tab on the press the design names, a plain drag over it still selects, nothing opens without a press, §4.5a has the row and §4.6 the paragraph, and `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-071 (item 8, Paul's constraint: nothing on a page is a control that parses what an agent printed), TD-164 / TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the pane's renderer and face), §5 `person.open_in` (the editor presets' scheme rule, cited there for TD-095).
-
-## TD-422: Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-08 (the designer, from TD-421's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/vendor/` (`addon-web-links.js`, `LICENSE-addon-web-links.txt`, the row in `README.md`), `src/agentorc/ui/templates/focus.html` (the script tag beside `addon-fit.js`), `src/agentorc/ui/static/app.js` (`AO.focus`: the third `loadAddon`, with its handler), `src/agentorc/ui/help.py` (the paragraph), `tests/test_ui_focus*.py`
-
-**Why:** TD-421: a URL in the pane is copied by hand and pasted into the browser. Design §4.6 *A URL in the pane is a link*, §4.5a *a URL is a link — Ctrl+click / Cmd+click*.
-
-**Fix:** as designed —
-- **Vendor** `@xterm/addon-web-links` at the release paired with `@xterm/xterm` 5.5.0 (0.11.0 on the published pairing; match the file's SHA-256 to the package's as `vendor/README.md`'s rows were matched, and record the version there with its licence file). A newer line of the addon needs a newer xterm, which is its own change.
-- **Load** it in `AO.focus` beside the fit addon: `term.loadAddon(new WebLinksAddon.WebLinksAddon(handler))`, the addon's default regex (http and https) and its hover underline; **the modifier gate is the handler's, not the addon's** — the addon calls its handler on any click of a link, so the handler opens only when `event.ctrlKey || event.metaKey` holds (`(event, uri) => { if (!(event.ctrlKey || event.metaKey)) return; … window.open(uri, "_blank", "noopener"); }`) and a plain click falls through to the selection as before; pin that in a test, since it is what makes the design's *a plain click does nothing* true. The handler opens nothing for a scheme other than `http:` or `https:` (a guard, since the regex is the addon's: `new URL(uri).protocol` in the two).
-- **Read-only Focus and the pop-out**: no condition — the addon is loaded on every Focus; the press sends nothing to the bridge.
-- **Help**: a paragraph in `ui/help.py` under the Focus heading, key `pane-link`, in the §4.5a row's words.
-- **The shot**: the hover's underline and the opened tab, in headless Chromium under Playwright on a scratch home (`scripts/look_home.py`, §4.9b *A UI change is verified by its builder*), committed as `docs/mockups/reviews/<date>-td422-*.png` and named in the PR.
-
-**Done when** a `https://` URL printed in a Focus pane underlines on hover and Ctrl+click (Cmd+click on a Mac) opens it in a new tab with `noopener`; a plain click and a drag over it select as before and open nothing; the same on a read-only Focus; `vendor/README.md` has the row and the licence file is in place; the help paragraph is there; tests pin the script tag, the `loadAddon` call with the handler and the scheme guard, and the help key; `pdm run test` and `pdm run lint` pass; TD-421 is archived with this entry.
-
-**Related:** TD-421 (the design), TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the WebGL addon's vendoring), TD-071 (the constraint).
-
 
 ## TD-423: The Inbox rail's **Clear filters** appears and vanishes with the first pick, shoving the filter list down and up
 

@@ -3142,6 +3142,17 @@
       if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
     });
   };
+  // **a URL is a link** (§4.6 *A URL in the pane is a link*, §4.5a, TD-422): the web-links addon
+  // calls this on any click of a URL it underlined, so the modifier is the gate — a plain click
+  // falls through to the selection — and only http and https open, whatever the addon's regex took.
+  AO.paneLink = function (event, uri, open) {
+    if (!(event && (event.ctrlKey || event.metaKey))) return false;
+    let scheme;
+    try { scheme = new URL(uri).protocol; } catch (e) { return false; }
+    if (scheme !== "http:" && scheme !== "https:") return false;
+    (open || window.open)(uri, "_blank", "noopener");
+    return true;
+  };
   AO.focus = function (s, popped) {
     const id = s.id;
     document.title = AO.focusTitle(s);
@@ -3177,6 +3188,7 @@
     }
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
+    term.loadAddon(new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri)));  // on a read-only Focus too
     term.open($("#term")); fit.fit();
     AO.termRenderer(term);
     AO.termFont(term, fit);
