@@ -5,7 +5,7 @@ laptop browser ──https──▶ agentorc UI (one process on the home, `agent
                               │  terminal: `tmux attach` ↔ xterm.js websocket; ssh to a node's host, §4.6)
                               ▼  Unix socket
                         home host agent (kmaster, §4.4a): the org's graph, mail, settings
-                          ├─ tmux server (systemd user unit, linger on)
+                          ├─ tmux server (a system unit, User= the person: outlives the host agent and the user manager, §4.1)
                           ├─ state dir  ~/.agentorc/sessions/<id>.json  ◀── adapter hooks write here
                           ├─ run logs   ~/.agentorc/runs/<session>.log  ◀── tmux pipe-pane, continuous
                           ├─ policies   (§6: the tick — stop time, usage gate, seats, restarts, promote)
