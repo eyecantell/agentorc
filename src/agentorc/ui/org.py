@@ -18,7 +18,7 @@ from sessionorc.reports import branch_ref
 
 from . import uiconf
 from .cards import DEAD
-from .common import _age, _instant, _short_age
+from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
 # -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
@@ -28,7 +28,17 @@ DOING_KEPT = 50  # the doing log's ring per team (§4.8), as the host agent keep
 WINDOWS = ("day", "week", "month")
 LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
 PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))
-KIND_BARS = (("pickable", "pickable"), ("design-first", "design-first"), ("for-you", "for you"), ("other", "other"))
+# the page's seven kinds in the bar's order (§4.5a *team card: Repo facet*, §4.4 *Repo facts*, TD-418)
+KIND_BARS = (
+    ("pickable", "pickable"),
+    ("design", "design"),
+    ("for-you", "for you"),
+    ("live-check", "live check"),
+    ("blocked", "blocked"),
+    ("evaluation", "evaluation"),
+    ("other", "other"),
+)
+templates.env.globals["kind_bars"] = KIND_BARS  # the legend under the bar names them in its order
 
 
 def _https(remote: str) -> str:
@@ -73,25 +83,28 @@ def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
 def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str, Any]) -> dict[str, Any] | None:
     """The **lanes line** (§4.5a *team card: Repo facet*, §4.4 *In a team's lanes*, TD-361), from
     `ledger.in_lanes`' reading: what the team's lanes take, the rest of the pickable by owner, each
-    member out of work with unheld work in its lane, and the two segments' hovers; `text`, the line as
-    words, which the team card carries as the *i* beside *Technical debt* (TD-418) where the Repo page
-    draws it whole; `members`, each record's own count by id (`lane_count`). None for a team none of
+    member out of work with unheld work in its lane, and the hovers of the three segments a lane
+    takes; `text`, the line as words, which the team card carries as the *i* beside *Technical debt*
+    (TD-418) where the Repo page draws it whole; `members`, each record's own count by id
+    (`lane_count`). None for a team none of
     whose records carries a lane: the bars stand alone."""
     if not lanes or not team:
         return None
     rest = list(lanes.get("rest") or [])
     owners = ", ".join(f"{o['owner']} {o['n']}" for o in rest)
-    n_pick, n_design = len(lanes.get("pickable") or []), len(lanes.get("design_first") or [])
-    waits = len(lanes.get("design_first_rest") or [])
+    n_pick, n_design = len(lanes.get("pickable") or []), len(lanes.get("design") or [])
+    n_live = len(lanes.get("live_check") or [])
     pick = f"{int(by_kind.get('pickable') or 0)} pickable · {n_pick} in {team}'s lanes" + (
         f" · {owners}" if owners else ""
     )
-    design = (
-        f"{int(by_kind.get('design-first') or 0)} design-first · {n_design} in {team}'s lanes · {waits} wait on a build"
-    )
-    # the line as words: the team card's *i* carries it as its tooltip, for want of room (TD-418)
-    text = f"in {team}'s lanes: {n_pick} pickable, {n_design} design-first" + (
-        f" · the other {sum(int(o['n']) for o in rest)} pickable: {owners}" if rest else ""
+    design = f"{int(by_kind.get('design') or 0)} design · {n_design} in {team}'s lanes"
+    live = f"{int(by_kind.get('live-check') or 0)} live check · {n_live} in {team}'s lanes"
+    # the line as words: the team card's *i* carries it as its tooltip, for want of room (TD-418); a
+    # live check is named once a lane takes one, its build live
+    text = (
+        f"in {team}'s lanes: {n_pick} pickable, {n_design} design"
+        + (f", {n_live} live check" if n_live else "")
+        + (f" · the other {sum(int(o['n']) for o in rest)} pickable: {owners}" if rest else "")
     )
     text += "".join(
         f" · {m['name']} out of work with {len(m['ids'])} in its lane" for m in lanes.get("out_of_work") or []
@@ -99,19 +112,20 @@ def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str,
     return {
         "team": team,
         "pickable": n_pick,
-        "design_first": n_design,
+        "design": n_design,
+        "live_check": n_live,
         "rest": rest,
         "other": sum(int(o["n"]) for o in rest),
         "out_of_work": [
             {**m, "title": f"{', '.join(m['ids'])} — in its lane, held by nobody"}
             for m in lanes.get("out_of_work") or []
         ],
-        "titles": {"pickable": pick, "design-first": design},
+        "titles": {"pickable": pick, "design": design, "live-check": live},
         "text": text,
         # each record's own count (§4.5a *card: compact*, TD-428), by id: what its card draws in its pill
         "members": {str(m["id"]): {"n": len(m["ids"]), "k": int(m.get("k") or 0)} for m in lanes.get("members") or []},
         # a count links to its list only when the Repo page draws that list (it draws no empty one)
-        "listed": {k: int(by_kind.get(k) or 0) > 0 for k in ("pickable", "design-first")},
+        "listed": {k: int(by_kind.get(k) or 0) > 0 for k in ("pickable", "design", "live-check")},
     }
 
 

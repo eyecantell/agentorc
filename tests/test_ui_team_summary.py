@@ -24,11 +24,11 @@ def reading(root: str, **kw) -> dict:
         "ledger": {
             "entries": [
                 {"id": "TD-301", "title": "recover stuck notices", "for_page": "pickable", "priority": "high"},
-                {"id": "TD-310", "title": "what the composer says", "for_page": "design-first", "kind": "design-first",
+                {"id": "TD-310", "title": "what the composer says", "for_page": "design", "kind": "design-first",
                  "priority": "medium"},
             ],
             "by_priority": {"high": 1, "medium": 1, "low": 0},
-            "by_kind": {"pickable": 1, "design-first": 1, "for-you": 0, "other": 0},
+            "by_kind": {"pickable": 1, "design": 1, "for-you": 0, "other": 0},
             "windows": {
                 "day": {"opened": 1, "closed": 0},
                 "week": {"opened": 3, "closed": 4},
@@ -742,11 +742,9 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
 
     entries = [e(f"TD-{100 + i}", "pickable", "anchor") for i in range(20)]
     entries += [e(f"TD-{200 + i}", "pickable", "dev-cadence") for i in range(4)]
-    entries += [e("TD-300", "design-first", "designer", "design-first")] + [
-        e("TD-301", "design-first", "x", "design-first")
-    ]
+    entries += [e("TD-300", "design", "designer", "design-first")] + [e("TD-301", "design", "x", "design-first")]
     r = reading("/r/samscrape")
-    r["ledger"].update(entries=entries, by_kind={"pickable": 24, "design-first": 2, "for-you": 0, "other": 0})
+    r["ledger"].update(entries=entries, by_kind={"pickable": 24, "design": 2, "for-you": 0, "other": 0})
     oow = {"at": _iso(NOW), "why": "nothing"}
     lane = ["free-pick", "owner:grinder"]
     members = [
@@ -755,7 +753,7 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     ]
     s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    text = "in grind&#39;s lanes: 0 pickable, 1 design-first · the other 24 pickable: anchor 20, dev-cadence 4"
+    text = "in grind&#39;s lanes: 0 pickable, 1 design · the other 24 pickable: anchor 20, dev-cadence 4"
     assert f'<span class="tipmark" tabindex="0" role="img" aria-label="{text}" title="{text}">i</span>' in html
     assert "laneline" not in html  # the card carries the *i*, the Repo page the line
 
@@ -764,22 +762,36 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
         return ui.templates.get_template("lanes_line.html").render(ln=ln, url="/repo/samscrape")
 
     line = whole(s)
-    assert "in grind's lanes: " in line and ">0 pickable</a>, " in line and ">1 design-first</a>" in line
+    assert (
+        "in grind's lanes: " in line
+        and ">0 pickable</a>, " in line
+        and ">1 design</a>" in line
+        and "live check" not in line
+    )
     assert "· the other 24 pickable: " in line and ">anchor 20</a>, " in line and ">dev-cadence 4</a>" in line
     assert 'href="/repo/samscrape#debt-pickable"' in line and "lanewarn" not in line
     assert 'title="24 pickable · 0 in grind&#39;s lanes · anchor 20, dev-cadence 4"' in html
-    assert 'title="2 design-first · 1 in grind&#39;s lanes · 1 wait on a build"' in html
+    assert 'title="2 design · 1 in grind&#39;s lanes"' in html  # *wait on a build* is retired (TD-418)
     entries.append(e("TD-355", "pickable", "grinder"))
     s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
     oow = '<span title="TD-355 — in its lane, held by nobody">· '
     assert oow + '<a class="strong" href="/focus/g1">grinder-ao-1</a> out of work with 1 in its lane</span>' in whole(s)
     assert s["repo"]["ledger"]["lanes"]["text"].endswith(" · grinder-ao-1 out of work with 1 in its lane")
     # a kind the Repo page draws no list for (none of it open): its count is not a link to nothing
-    lanes = {"pickable": [], "design_first": [], "rest": [], "design_first_rest": [], "out_of_work": []}
-    ln = ui.lanes_line("grind", lanes, {"pickable": 0, "design-first": 2})
+    lanes = {"pickable": [], "design": [], "live_check": ["TD-9"], "rest": [], "out_of_work": []}
+    ln = ui.lanes_line("grind", lanes, {"pickable": 0, "design": 2, "live-check": 0})
     line = ui.templates.get_template("lanes_line.html").render(ln=ln, url="/repo/samscrape")
     assert '<span class="strong">0 pickable</span>' in line and "#debt-pickable" not in line
-    assert '<a class="strong" href="/repo/samscrape#debt-design-first">0 design-first</a>' in line
+    assert '<a class="strong" href="/repo/samscrape#debt-design">0 design</a>' in line
+    # a live check a lane takes is named, its build live (§4.4 *In a team's lanes*, TD-418)
+    assert (
+        ', <span class="strong">1 live check</span>' in line
+        and ln["text"] == "in grind's lanes: 0 pickable, 0 design, 1 live check"
+    )
+    ln = ui.lanes_line("grind", lanes, {"pickable": 0, "design": 2, "live-check": 1})
+    line = ui.templates.get_template("lanes_line.html").render(ln=ln, url="/repo/samscrape")
+    assert '<a class="strong" href="/repo/samscrape#debt-live-check">1 live check</a>' in line
+    assert ln["titles"]["live-check"] == "1 live check · 1 in grind's lanes"
     # a team with no lane on any record: the bars alone
     s = ui.team_summary("grind", [member("g1"), member("g2")], {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})

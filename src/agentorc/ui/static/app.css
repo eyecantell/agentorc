@@ -39,6 +39,7 @@
      darkened by rank; the kinds and the phases each their own; *opened* and *closed* blocks */
   --p-high: #1e3a8a; --p-medium: #2563eb; --p-low: #93c5fd;
   --k-pickable: #2563eb; --k-design: #4f46e5; --k-foryou: #d97706; --k-other: #e5e7eb; --k-other-fg: #374151;
+  --k-live: #0d9488; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #5b6b80;
   --ph-add: #db2777; --ph-design: #4f46e5; --ph-grind: #2563eb; --ph-review: #d97706;
   --blk-opened: #2563eb; --blk-closed: #059669; --seg-fg: #fff;
   --lh: 1.5; --lh-mono: 1.55;
@@ -59,6 +60,7 @@ html[data-theme="dark"] {
   --primary: #e6e9ee; --primary-fg: #0f1216;
   --p-high: #93c5fd; --p-medium: #3b82f6; --p-low: #1e3a8a;
   --k-pickable: #3b82f6; --k-design: #6366f1; --k-foryou: #d97706; --k-other: #2a313a; --k-other-fg: #c9d1db;
+  --k-live: #0f766e; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #3b4656;
   --ph-add: #ec4899; --ph-design: #6366f1; --ph-grind: #3b82f6; --ph-review: #d97706;
   --blk-opened: #1d4ed8; --blk-closed: #047857;
 }
@@ -559,8 +561,12 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .bseg, .blk { display: flex; align-items: center; justify-content: center; min-width: 22px; padding: 0 4px; border-radius: 2px; color: var(--seg-fg); font-size: var(--t-small); font-weight: 600; text-decoration: none; white-space: nowrap; overflow: hidden; }
 .blk { font-weight: 500; gap: 4px; } .blk b { font-weight: 700; }
 .bseg.p-high { background: var(--p-high); } .bseg.p-medium { background: var(--p-medium); } .bseg.p-low { background: var(--p-low); color: var(--p-high); }
-.bseg.k-pickable, .legend .k-pickable { background: var(--k-pickable); } .bseg.k-design-first, .legend .k-design-first { background: var(--k-design); }
+.bseg.k-pickable, .legend .k-pickable { background: var(--k-pickable); } .bseg.k-design, .legend .k-design { background: var(--k-design); }
 .bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }
+/* the seven kinds (TD-418): *live check* its own teal, *blocked* hatched */
+.bseg.k-live-check, .legend .k-live-check { background: var(--k-live); } .bseg.k-evaluation, .legend .k-evaluation { background: var(--k-eval); }
+.bseg.k-blocked, .legend .k-blocked { background: repeating-linear-gradient(135deg, var(--k-blocked) 0 6px, var(--k-blocked-2) 6px 12px); }
+.rrow .flag { color: var(--needs-fg); }  /* an *other* row's flag on the Repo page (TD-418) */
 .blk.opened { background: var(--blk-opened); } .blk.closed { background: var(--blk-closed); }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--t-small); color: var(--muted); }
 /* the lanes line under the legend (§4.5a *team card: Repo facet*, TD-361): its counts are links, a member out of work tinted */

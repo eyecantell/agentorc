@@ -43,7 +43,7 @@ def reading(root: str) -> dict:
                 },
             ],
             "by_priority": {"high": 1, "medium": 5, "low": 1},
-            "by_kind": {"pickable": 6, "design-first": 0, "for-you": 1, "other": 0},
+            "by_kind": {"pickable": 6, "design": 0, "for-you": 1, "other": 0},
         },
         "prs": {
             "open": [
@@ -171,7 +171,7 @@ def test_the_ledger_lists_sort_by_priority_then_id_and_the_chips_count():
 
     lists = {x["key"]: x for x in ledger_lists(reading("/r"), [])}
     assert [e["id"] for e in lists["pickable"]["rows"]][:2] == ["TD-301", "TD-310"] and lists["pickable"]["fold"] == 2
-    assert lists["design-first"]["rows"] == []
+    assert lists["design"]["rows"] == []
     rows = [{"name": "a"}, {"name": "b"}, {"name": "a"}]
     assert [(c["label"], c["n"]) for c in doing_chips(rows)] == [("all", 3), ("a", 2), ("b", 1)]
     got = pr_standing(
@@ -204,18 +204,19 @@ def test_a_team_given_the_repo_with_nothing_live_keeps_its_facets(tmp_path, monk
 
 def test_a_live_check_row_says_whether_its_build_is_live(tmp_path, monkeypatch):
     """TD-323 slice 2 (design §4.9b *A live check is a grinder's once its build is live*): a live
-    check whose build is live is among the pickable rows, marked *live check* with its build's PR;
-    one whose build is not is under *other*, saying it waits; a build's row says neither."""
+    check whose build is live is marked *live check* with its build's PR, one whose build is not says
+    it waits, both on the *live check* list (TD-418); a build's row says neither."""
     root = str(tmp_path / "samscrape")
     r = reading(root)
     r["ledger"]["entries"] += [
-        {"id": "TD-320", "title": "check the lane", "for_page": "pickable", "priority": "high", "owner": "grinder", "kind": "live-check", "built": [1051], "live": "yes"},
-        {"id": "TD-321", "title": "check the slices", "for_page": "other", "priority": "low", "owner": "grinder", "kind": "live-check", "built": [1060, 1061], "live": "no"},
+        {"id": "TD-320", "title": "check the lane", "for_page": "live-check", "priority": "high", "owner": "grinder", "kind": "live-check", "built": [1051], "live": "yes"},
+        {"id": "TD-321", "title": "check the slices", "for_page": "live-check", "priority": "low", "owner": "grinder", "kind": "live-check", "built": [1060, 1061], "live": "no"},
     ]  # fmt: skip
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
     row = html[html.index('id="TD-320"') :]
     assert row[: row.index("</div>")].count("· live check #1051</span>") == 1
-    assert 'data-list="pickable"' in html[html.index('id="TD-320"') - 200 : html.index('id="TD-320"') + 100]
+    assert 'data-list="live-check"' in html[html.index('id="TD-320"') - 200 : html.index('id="TD-320"') + 100]
+    assert 'id="debt-live-check">live check · 2</div>' in html
     row = html[html.index('id="TD-321"') :]
     assert "· waits for its build to be live #1060 #1061</span>" in row[: row.index("</div>")]
     row = html[html.index('id="TD-301"') :]

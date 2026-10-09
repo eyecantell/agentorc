@@ -50,7 +50,7 @@ def test_a_live_check_reads_live_only_when_every_build_named_is_live():
 
     yes = one("live-check #5 #6")
     assert yes["kind"] == "live-check" and yes["built"] == [5, 6] and yes["live"] == "yes"
-    assert lane_matches(["free-pick"], yes) and kind_of(yes) == "pickable"
+    assert lane_matches(["free-pick"], yes) and kind_of(yes) == "live-check"  # its own kind (TD-418)
     assert lane_matches(["free-pick", "owner:grinder"], yes)
     assert not lane_matches(["free-pick", "owner:grinder"], one("live-check #5", owner="anchor")), "the owner narrows"
     assert not lane_matches(["design-first"], yes)
@@ -60,7 +60,7 @@ def test_a_live_check_reads_live_only_when_every_build_named_is_live():
         one("live-check — after a promote"),  # prose, no build
         one("live-check #5", with_live=None),  # no reading
     ):
-        assert no["live"] == "no" and not lane_matches(["free-pick"], no) and kind_of(no) == "other"
+        assert no["live"] == "no" and not lane_matches(["free-pick"], no) and kind_of(no) == "live-check"
     (b,) = entries(_ledger("build"), live=live)
     assert "live" not in b and "built" not in b and lane_matches(["free-pick"], b), "a build is as it was"
 

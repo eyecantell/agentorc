@@ -70,8 +70,9 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "pickable": "yes",
         "for_page": "pickable",
     }
-    # an anchor's `Kind: decision` is no longer *for you* (TD-367): it waits on no person
-    assert [got[t]["for_page"] for t in got] == ["pickable", "design-first", "for-you", "other", "other"]
+    # an anchor's `Kind: decision` is no longer *for you* (TD-367): it waits on no person, and is the
+    # anchor's *evaluation*; a design-first waiting on an open entry is *blocked* (TD-418)
+    assert [got[t]["for_page"] for t in got] == ["pickable", "blocked", "for-you", "evaluation", "live-check"]
     # derived (TD-228): no Blocked by is pickable, and an open blocker is not
     assert got["TD-014"]["pickable"] == "yes" and got["TD-011"]["pickable"] == "no"
     assert got["TD-011"]["blocked_by"] == ["TD-014"]
@@ -149,7 +150,7 @@ def test_history_opens_at_the_first_commit_holding_a_section_and_closes_at_the_f
     # newest first (TD-004's opening and TD-002's close are one commit); TD-003 opened before the month
     assert [e["id"] for e in r["recent"]][0] == "TD-005"
     assert {e["id"] for e in r["recent"]} == {"TD-005", "TD-004", "TD-002"}
-    assert r["by_kind"] == {"pickable": 0, "design-first": 0, "for-you": 0, "other": 3}
+    assert r["by_kind"] == dict.fromkeys(ledger.KINDS, 0) | {"live-check": 3}  # the seven kinds (TD-418)
 
 
 def test_history_is_none_when_git_cannot_be_asked(tmp_path):
@@ -365,7 +366,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
                     {"id": "TD-013", "title": "a medium", "for_page": "pickable", "priority": "medium"},
                     {"id": "TD-014", "title": "a second high", "for_page": "pickable", "priority": "high"},
                 ],
-                "by_kind": {"pickable": 1, "design-first": 0, "for-you": 0, "other": 0},
+                "by_kind": {"pickable": 1, "design": 0, "for-you": 0, "other": 0},
             },
             "at": now.isoformat(),
         },
@@ -404,7 +405,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("r  1 open PRs, oldest 3d · this week 4 opened, 5 closed (could not look")
-    assert "6 open entries: 1 pickable, 0 design-first" in out  # the counts are the reading's `by_kind`
+    assert "6 open entries: 1 pickable, 0 design" in out  # the counts are the reading's `by_kind`
     assert "#9" in out and "pickable     TD-010  Low     grinder      a build" in out
     # the pick order (§4.8 *Choosing in a free-pick lane*, TD-202): High, Medium, Low, none; ties in file order
     order = [i for i in ("TD-012", "TD-014", "TD-013", "TD-010", "TD-011") if f"pickable     {i}" in out]
@@ -435,7 +436,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     reading[str(repo)]["work_orders"] = {"orders": [order]}
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
-    assert "6 open entries, 1 decided board line: 2 pickable, 0 design-first" in out
+    assert "6 open entries, 1 decided board line: 2 pickable, 0 design" in out
     assert "pickable     board:0123abcd  High    board        Keep the backup? · decided keep 2026-10-07" in out
     assert out.index("board:0123abcd") < out.index("pickable     TD-012")
     # the lanes take it beside the entries: the out-of-work line names it (§4.4 *In a team's lanes*)
@@ -450,19 +451,22 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
 def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):
     """TD-323 slice 2 (design §4.9b): a live check whose build is live is among the pickable lines,
     marked *live check* with its build's PR, in the pick order; one whose build is not live is a
-    `live-check` line saying it waits; one the person judges (*for you*) is on neither."""
+    `live-check` line saying it waits; one the person judges (*for you*) is on neither, nor one blocked
+    by a decision alone, which is counted under *live check* and listed nowhere (§4.7, TD-418)."""
     from agentorc import cli
 
-    def e(i, page, prio, live, built, owner="grinder"):
+    def e(i, page, prio, live, built, owner="grinder", blocked=()):
         return {"id": i, "title": f"check {i}", "for_page": page, "priority": prio, "owner": owner,
-                "kind": "live-check", "live": live, "built": built}  # fmt: skip
+                "kind": "live-check", "live": live, "built": built, "blocked_by": list(blocked),
+                "pickable": "no" if blocked else "yes"}  # fmt: skip
 
     entries = [
         {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "medium", "kind": "build"},
-        e("TD-020", "pickable", "high", "yes", [1051]),
-        e("TD-021", "other", "low", "no", []),
-        e("TD-022", "other", "high", "no", [7, 8]),
+        e("TD-020", "live-check", "high", "yes", [1051]),
+        e("TD-021", "live-check", "low", "no", []),
+        e("TD-022", "live-check", "high", "no", [7, 8]),
         e("TD-023", "for-you", "high", "no", [9], owner="paul"),
+        e("TD-024", "live-check", "high", "yes", [9], owner="anchor", blocked=["decision (anchor)"]),
     ]
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
     monkeypatch.setattr(
@@ -476,18 +480,19 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     assert "live-check   TD-022  High    grinder      waits for its build to be live (#7 #8): check TD-022" in out
     assert "live-check   TD-021  Low     grinder      waits for its build to be live (no PR on its Kind: line)" in out
     assert out.index("live-check   TD-022") < out.index("live-check   TD-021") and "TD-023" not in out
+    assert "TD-024" not in out
     assert "a build" in out and "live check #" not in out.split("TD-010")[1].split("\n")[0]
 
 
 def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):
-    """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design-first
-    list and says *decision* after its owner; a `Kind: design-first` row does not."""
+    """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design list
+    and says *decision* after its owner; a `Kind: design-first` row does not."""
     from agentorc import cli
 
     entries = [
-        {"id": "TD-151", "title": "metered", "for_page": "design-first", "priority": "low", "owner": "grinder",
+        {"id": "TD-151", "title": "metered", "for_page": "design", "priority": "low", "owner": "grinder",
          "kind": "build", "blocked_by": ["decision (designer)"]},
-        {"id": "TD-230", "title": "a question", "for_page": "design-first", "priority": "high", "owner": "designer",
+        {"id": "TD-230", "title": "a question", "for_page": "design", "priority": "high", "owner": "designer",
          "kind": "design-first", "blocked_by": []},
     ]  # fmt: skip
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
@@ -497,8 +502,8 @@ def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monk
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
-    assert "design-first TD-151  Low     grinder decision  metered" in out
-    assert "design-first TD-230  High    designer     a question" in out
+    assert "design       TD-151  Low     grinder decision  metered" in out
+    assert "design       TD-230  High    designer     a question" in out
 
 
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
@@ -622,15 +627,15 @@ def test_the_grinder_template_says_the_pick_order_and_names_the_tool():
 
 def _oct6():
     """The ledger of 2026-10-06 (TD-357): 24 pickable, 20 the anchor's and 4 dev-cadence's, one
-    design-first entry a designer's lane takes and another waiting on a build."""
+    design entry a designer's lane takes and a designed one waiting on its build, *blocked* (TD-418)."""
 
     def e(i, page, owner, kind="build"):
         return {"id": i, "title": i, "for_page": page, "owner": owner, "kind": kind, "pickable": "yes"}
 
     entries = [e(f"TD-{100 + i}", "pickable", "anchor") for i in range(20)]
     entries += [e(f"TD-{200 + i}", "pickable", "dev-cadence") for i in range(4)]
-    entries += [e("TD-300", "design-first", "designer", "design-first")]
-    entries += [{**e("TD-301", "design-first", "designer", "design-first"), "pickable": "no"}]
+    entries += [e("TD-300", "design", "designer", "design-first")]
+    entries += [{**e("TD-301", "blocked", "designer", "design-first"), "pickable": "no", "blocked_by": ["TD-999"]}]
     entries += [e("TD-400", "for-you", "paul", "decision")]
     grind = ["free-pick", "owner:grinder"]
     out = {"at": "2026-10-06T20:00:00Z", "why": "nothing pickable"}
@@ -644,7 +649,7 @@ def _oct6():
 
 
 def test_in_lanes_splits_the_repos_count_by_the_teams_lanes():
-    """§4.4 *In a team's lanes* (TD-357, TD-361) on the 2026-10-06 case: 0 pickable and 1 design-first
+    """§4.4 *In a team's lanes* (TD-357, TD-361) on the 2026-10-06 case: 0 pickable and 1 design
     in ao-grind's lanes, the rest by owner in falling count; a grinder entry filed since is in the
     lanes and in the warning, and out of it once a live member holds it; an unowned build is in a
     `free-pick` lane, and in the rest of a team whose only lane is a designer's."""
@@ -652,9 +657,10 @@ def test_in_lanes_splits_the_repos_count_by_the_teams_lanes():
 
     entries, records = _oct6()
     got = ledger.in_lanes(entries, records)
-    assert got["pickable"] == [] and got["design_first"] == ["TD-300"]
+    assert got["pickable"] == [] and got["design"] == ["TD-300"] and got["live_check"] == []
     assert [(r["owner"], r["n"]) for r in got["rest"]] == [("anchor", 20), ("dev-cadence", 4)]
-    assert got["design_first_rest"] == ["TD-301"] and got["out_of_work"] == []  # TD-301 waits on a build
+    # TD-301 waits on its build: *blocked*, in no lane's count, and *design* keeps no rest (TD-418)
+    assert "design_first_rest" not in got and got["out_of_work"] == []
     grinders = {"title": "g", "for_page": "pickable", "owner": "grinder", "kind": "build", "pickable": "yes"}
     entries += [{"id": f"TD-35{i}", **grinders} for i in (5, 8, 9)]
     got = ledger.in_lanes(entries, records, held={"TD-358"})
@@ -725,7 +731,7 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
     entries.append(
         {"id": "TD-355", "title": "g", "for_page": "pickable", "owner": "grinder", "kind": "build", "pickable": "yes"}
     )
-    by = {"pickable": 25, "design-first": 1, "for-you": 1, "other": 0}
+    by = {"pickable": 25, "design": 1, "for-you": 1, "other": 0}
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []},
                            "ledger": {"entries": entries, "by_kind": by}}}  # fmt: skip
     fleet = [{**r, "repo": str(repo)} for r in records]
@@ -738,7 +744,7 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     first = out.splitlines()[0]
-    assert "28 open entries: 25 pickable (ao-grind 1 · anchor 20, dev-cadence 4), 1 design-first (ao-grind 1)," in first
+    assert "28 open entries: 25 pickable (ao-grind 1 · anchor 20, dev-cadence 4), 1 design (ao-grind 1)," in first
     assert "  grinder-ao-1 is out of work with 1 in its lane: TD-355" in out
     assert "  grinder-ao-2 is out of work with 1 in its lane: TD-355" in out
     fleet[0]["progress"] = [{"ref": "TD-355", "status": "claimed"}]
@@ -761,7 +767,7 @@ def _own_counts():
 
     entries = [e("TD-355", "grinder"), e("TD-358", "grinder"), e("TD-360", "grinder", "live-check", live="yes")]
     entries += [e("TD-361", "grinder", "live-check", live="no"), e("TD-370", "anchor", "evaluation")]
-    entries += [{**e("TD-300", "designer", "design-first"), "for_page": "design-first"}]
+    entries += [{**e("TD-300", "designer", "design-first"), "for_page": "design"}]
     grind = ["free-pick", "owner:grinder"]
     out = {"at": "2026-10-09T09:00:00Z", "why": "nothing pickable"}
     records = [
@@ -808,7 +814,7 @@ def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch,
     entries, records = _own_counts()
     records[1]["out_of_work"] = {"at": "2026-10-09T09:00:00Z", "why": "x"}
     records[1]["state"] = "idle"  # *waiting* on you on the page: the line names it all the same
-    by = {"pickable": 5, "design-first": 1, "for-you": 0, "other": 0}
+    by = {"pickable": 5, "design": 1, "for-you": 0, "other": 0}
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []},
                            "ledger": {"entries": entries, "by_kind": by}}}  # fmt: skip
     fleet = [{**r, "repo": str(repo)} for r in records]

@@ -50,8 +50,9 @@ WORD = re.compile(r"[^\s,;]+")
 BUILT = re.compile(r"#(\d+)")  # a `Kind: live-check #<n>` line's builds (design §4.9b, TD-323)
 SQUASH = re.compile(r"\(#(\d+)\)\s*$")  # a squash commit's subject ends `(#<n>)`
 
-# The page's four kinds, in the order an entry is tested for them (§4.4 *Repo facts*).
-KINDS = ("for-you", "design-first", "pickable", "other")
+# The page's seven kinds, in the order an entry is tested for them (§4.4 *Repo facts*, TD-418)
+KINDS = ("for-you", "blocked", "design", "live-check", "pickable", "evaluation", "other")
+LANE_KINDS = ("pickable", "design", "live-check")  # the kinds a lane word takes (§4.4 *In a team's lanes*)
 PRIORITIES = ("high", "medium", "low")
 TYPES = ("debt", "feature")  # cadence §2.11: pick order within a Priority; the first is the default
 # The windows every count is kept for: the last day, week and month, rolling.
@@ -185,19 +186,39 @@ def decided_by(entry: dict[str, Any], who: str) -> bool:
 
 
 def kind_of(entry: dict[str, Any]) -> str:
-    """The page's kind for an entry (§4.4 *Repo facts*), tested in this order so each has one:
-    *for you* — what waits on the person, and only that (TD-367): `Owner: paul`, or blocked by
-    `decision (paul)`; *design-first* (`Kind: design-first`, or any entry blocked by `decision
-    (designer)`: a decision owed to the designer is design work); *pickable* (pickable, `Kind:
-    build` or none, or a live check whose build is live, TD-323), else *other* — among it a
-    `Kind: decision` the anchor owns and a build on `decision (anchor)`."""
+    """The page's kind for an entry (§4.4 *Repo facts*, TD-418), tested in this order so each has
+    one: *for you* — what waits on the person, and only that (TD-367): `Owner: paul`, or blocked by
+    `decision (paul)`; *blocked* — `Blocked by:` holds any item other than a `decision (…)` (an open
+    id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it;
+    *design* — `Kind: design-first`, or blocked by `decision (designer)` alone; *live check* —
+    `Kind: live-check`, its build live or not; *pickable* — pickable, `Kind: build` or none;
+    *evaluation* — `Kind: evaluation`, an entry blocked by `decision (anchor)` alone, or an unblocked
+    `Kind: decision` the anchor owns; else *other*, a residue that should be empty (`flags`)."""
     if str(entry.get("owner") or "").lower() == PERSON_OWNER or decided_by(entry, PERSON_OWNER):
         return "for-you"
+    if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []):
+        return "blocked"
     if entry.get("kind") == "design-first" or decided_by(entry, DESIGNER_OWNER):
-        return "design-first"
-    if entry.get("pickable") == "yes" and _buildlike(entry):
+        return "design"
+    if entry.get("kind") == "live-check":
+        return "live-check"
+    if entry.get("pickable") == "yes" and entry.get("kind") in ("", "build"):
         return "pickable"
+    anchors = str(entry.get("owner") or "").lower() == ANCHOR_OWNER
+    if entry.get("kind") == "evaluation" or decided_by(entry, ANCHOR_OWNER):
+        return "evaluation"
+    if entry.get("kind") == "decision" and entry.get("pickable") == "yes" and anchors:
+        return "evaluation"
     return "other"
+
+
+NO_KIND = "fits no page kind — check its Owner, Kind and Blocked by"
+
+
+def flags(entries: list[dict[str, Any]]) -> list[str]:
+    """This reader's flag on each entry no page kind takes (§4.4 *Repo facts*, TD-418): the Repo
+    page's *other* list and `ao repo` say it, and the bar still draws the entry."""
+    return [f"{e['id']}: {NO_KIND}" for e in entries if e.get("for_page") == "other"]
 
 
 def _buildlike(entry: dict[str, Any]) -> bool:
@@ -248,10 +269,11 @@ def in_lanes(
     TD-361) — the one reader the team card, the Repo page and `ao repo` draw from. `entries` are the
     reading's, each with its page kind (`for_page`); `records` the team's member records, live or
     ended, whose `lane`s are the team's lanes (`lane_matches`, rule 6's one rule); `held`, the
-    references a live record of the repo holds claimed. Returns `pickable` and `design_first`, the
-    ids in the lanes; `rest`, the *pickable* entries no lane takes, by `Owner:` (`UNOWNED` for none)
-    as `[{owner, n, ids}]` in falling count then name; `design_first_rest`, the ids that wait on a
-    build; `members`, **each record's own count** (TD-418, built by TD-428): `[{id, name, ids, k}]`
+    references a live record of the repo holds claimed. Returns `pickable`, `design` and
+    `live_check`, the ids of each `LANE_KINDS` kind in the lanes; `rest`, the *pickable* entries no
+    lane takes, by `Owner:` (`UNOWNED` for none) as `[{owner, n, ids}]` in falling count then name
+    (*design* and *live check* have none); `members`, **each record's own count** (TD-418, built by
+    TD-428): `[{id, name, ids, k}]`
     for every record with a lane — what `lane_matches` takes for its own lane that `held` does not
     hold, rule 6's view whatever the page kind, and `k`, how many live records (not ended) carry the
     identical lane, the same set of words; and `out_of_work`, each record carrying `out_of_work`
@@ -260,8 +282,7 @@ def in_lanes(
     lanes = [list(r["lane"]) for r in records if r.get("lane")]
     if not lanes:
         return None
-    kinds = ("pickable", "design-first")
-    open_ = [e for e in entries if e.get("for_page") in kinds]
+    open_ = [e for e in entries if e.get("for_page") in LANE_KINDS]
     taken = {e["id"] for e in open_ if any(lane_matches(lane, e) for lane in lanes)}
     by_owner: dict[str, list[str]] = {}
     for e in open_:
@@ -285,10 +306,10 @@ def in_lanes(
         if m["ids"] and by_id.get(str(m["id"]), {}).get("out_of_work")
     ]
     return {
-        "pickable": [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == "pickable"],
-        "design_first": [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == "design-first"],
+        **{
+            k.replace("-", "_"): [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == k] for k in LANE_KINDS
+        },
         "rest": rest,
-        "design_first_rest": [e["id"] for e in open_ if e["id"] not in taken and e["for_page"] == "design-first"],
         "members": members,
         "out_of_work": idle,
     }

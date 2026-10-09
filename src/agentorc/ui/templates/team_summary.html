@@ -26,7 +26,7 @@
     <div class="lv" data-lv="open">
       <div class="bar" role="img" aria-label="open entries by priority">{% for b in led.priority %}<a class="bseg p-{{ b.key }}" href="{{ r.url }}#debt" style="flex-basis: {{ b.pct }}%;" title="{{ b.n }} {{ b.label }}">{{ b.n }} {{ b.label }}</a>{% else %}<span class="meta">no open entries</span>{% endfor %}</div>
       <div class="bar" role="img" aria-label="open entries by kind">{% for b in led.kind %}<a class="bseg k-{{ b.key }}" href="{{ r.url }}#debt-{{ b.key }}" style="flex-basis: {{ b.pct }}%;" title="{{ (led.lanes.titles[b.key] if led.lanes and b.key in led.lanes.titles) or (b.n ~ ' ' ~ b.label) }}">{{ b.n }}</a>{% endfor %}</div>
-      <div class="legend">{% for k, label in (('pickable', 'pickable'), ('design-first', 'design-first'), ('for-you', 'for you'), ('other', 'other')) %}<span><i class="k-{{ k }}"></i>{{ label }}</span>{% endfor %}</div>
+      <div class="legend">{% for k, label in kind_bars %}<span><i class="k-{{ k }}"></i>{{ label }}</span>{% endfor %}</div>
     </div>
     {% if led.windows %}{% for w in ('day', 'week', 'month') %}{% set b = led.windows[w] %}
     <div class="lv" data-lv="{{ w }}" hidden>
