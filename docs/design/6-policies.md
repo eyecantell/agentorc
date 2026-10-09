@@ -112,7 +112,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      hours (a wanted restart with new work is not counted: §4.9a *Inside the ceiling*;
      `agent_common._counted`), `one_for_one` (only the session that exited, never its siblings).
      Each restart is appended to the record's `restarts: [{at, why}]` (home-owned, carried across
-     the supersede so the count survives the restart it counts; each replay's entry also carries
+     the supersede so the count survives the restart it counts, and drawn for `RESTART_WINDOW` as
+     the card's **restarted** chip, §4.5a; each replay's entry also carries
      `done: [{ref, pr}]` and `left: [ref]`, what the run it replaced reported and what it claimed
      and did not close, from the old record's `progress`, which the new record does not keep);
      **the mail is kept**: every replay of the tick's — this rule's, rule 2's, rule 7's and
