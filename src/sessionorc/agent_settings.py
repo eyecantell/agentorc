@@ -102,13 +102,16 @@ class SettingsMixin:
         }
         out: dict[str, Any] = {}
         for prof, by_label in sorted(doc.items()):
-            windows = (self._usage.get(prof) or {}).get("windows")
+            reading = self._gate_reading(prof)  # its account's when it holds no copy (TD-456)
+            windows = reading.get("windows")
             if prof in watched:
                 windows = self._gate_windows(prof, now, whole)
             out[prof] = {
                 "reserves": by_label,
                 "windows": settings_mod.lines(by_label, windows, now),
                 "labels": [str(w.get("label")) for w in windows or []],
+                **({"fetched": reading["fetched"]} if reading.get("fetched") else {}),
+                **({"source": reading.get("source") or "asked"} if reading.get("fetched") else {}),
             }
         # a metered profile's amounts (§6 *Usage gate*, TD-151 slice 5), as written, with the spend
         for prof, by_label in sorted(settings_mod.amounts(whole).items()):

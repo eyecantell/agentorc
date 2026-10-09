@@ -408,11 +408,28 @@ class TickMixin:
         projection (`usage.project`) — which the gate's pass, `_profile_gated` and `gate` all ask, so
         a profile paused on a projection is not restarted or filled the next tick. A metered
         profile's windows are its spend, which does not age, and are never projected."""
-        reading = self._usage.get(profile) or {}
+        reading = self._gate_reading(profile)
         windows = reading.get("windows")
         if windows is None or self._is_metered(profile):
             return windows
         return usage_mod.project(windows, now, settings_mod.max_age(whole), reading.get("fetched"))
+
+    def _gate_reading(self, profile: str) -> dict[str, Any]:
+        """The reading the gate judges `profile` by: its own copy, else its **account's** (TD-456).
+        A copy is kept only under a profile a live session runs under (the chip's rule, TD-073), so a
+        team wound down while a person's session keeps the account read would start under its own
+        profile with *no reading*, which is no gate. A metered profile's reading is its own spend."""
+        own = self._usage.get(profile)
+        if own is not None or self._is_metered(profile):
+            return own or {}
+        for name in adapters.names():
+            ad = adapters.get(name)
+            if not getattr(ad, "usage_for", None):
+                continue
+            key, account = _usage_key(ad, name, profile)
+            if (acct := self._usage_acct.get(key)) is not None:
+                return {**acct, "account": account, "tool": str(getattr(ad, "label", "") or name)}
+        return {}
 
     def _projection_notes(self, whole: dict[str, Any], now: datetime) -> None:
         """The person's two FYI notes on an old reading (§6 *A reading the gate can no longer
