@@ -930,7 +930,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Location:** design §4.10 (the kinds table, *A conflict is an `ask` for every rule in this section*, *A conflict, worked*), §4.5a (the conflict's rows), `src/sessionorc/mail.py`, `src/sessionorc/agent_mail.py`, `src/agentorc/briefs/` (each brief that names `--kind conflict`), `ao msg --kind conflict --cites`
 
 **Why:**
-- No session has sent a `conflict` since the kind was built (TD-039). Not one of the 654 run logs from 2026-09-07 holds a conflict send, and the 299 retained entries hold none.
+- No session has sent a `conflict` since the kind was built (TD-039). Not one of the more than 650 run logs from 2026-09-07 holds a conflict send, and the roughly 300 retained entries hold none.
 - A conflict is an `ask` addressed to two or more controllers. Every team gives a member one controller, its manager, so the case cannot arise in today's shape.
 - §4.10 already says *a conflict is an ask for every rule in this section*. Yet every brief, every Inbox row renderer, every open-question count and every fact-check carries it as its own kind.
 
