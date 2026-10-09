@@ -60,6 +60,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Open |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Open |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
+| TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 
 ---
 
@@ -981,3 +982,22 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** after a week on 200k (from about 2026-10-15), compare ao-grind's grinders' usage-window percentage per merged PR against the week before (2026-10-01–08). Count their restarts per merged PR alongside. Write the reading into the ADR's Consequences. Then keep the line in `.agentorc.yml` (and design §4.8 says this repo's grinder number is measured), or take it out (the 300k default returns), in a PR. A result that is unclear goes to Paul as a `steer` with the reading. **Done when** the line stays or goes with a written reading behind it.
 
 **Related:** TD-378 (archived), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 4, TD-249 (the bound's last change), TD-459.
+
+## TD-461: The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (docs-audit-ao-1, auditing #1305–#1317)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 screen 6 *The rail* (`docs/design/4.5-ui.md`, the paragraph at ~L840 on how counts are written), §4.5a's **Inbox page: the rail** row, `docs/design-history.md` under §4.5; `src/agentorc/ui/static/app.css` (`.rail #findn`)
+
+**Why:**
+- #1308 (TD-427) added `.rail #findn { min-height: 1lh; }`, so the find count holds a line of its own while empty and the first typed word moves no toggle. It is a behaviour of the rail, and TD-427's own Fix says "Design §4.5 screen 6 *The rail* names the count; if its place changes, the design says so in the same PR".
+- The PR touched no design file. `grep -n "findn\|keeps its line\|1lh" docs/design/4.5-ui.md docs/design/4.5a-controls.md` finds nothing; §4.5 names only the count's text (*n of all*, L843 and L879). TD-423, the same kind of change for **Clear filters**, wrote "always in place … disabled while nothing is picked or typed" into §4.5 and §4.5a (#1307).
+- `docs/design-history.md` has no TD-427 line either.
+
+**Fix:** one sentence in §4.5 screen 6 *The rail* and in §4.5a's rail row, in the present tense: the find count holds its line while empty, so typing moves no toggle. The dated fact (TD-427, 2026-10-08) goes to `docs/design-history.md` under §4.5. **Done when** both design files say it and the history line exists.
+
+**Related:** TD-427 (archived), TD-423 (the model for the wording), TD-455.
