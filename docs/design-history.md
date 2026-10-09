@@ -546,6 +546,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-09 (TD-111, the designer): `ao doctor` designed — seven checks (agent, tmux, hooks, identity, profiles, nodes, org), one line each in `ao org check`'s verdict words, every lack naming its cure, exit 1 on a lack; the hooks probe behind `--probe`, a person's own; a never-gated `doctor` RPC gathers the host side. Built by TD-465.
 - 2026-10-07 (TD-380, the designer): `ao repo` lists a decided board line among the pickable rows, first, as `board:<key>`.
 - 2026-10-07 (TD-368 slice 2, grinder-ao-1): `ao repo`'s design-first row for an entry of another kind on `decision (designer)` says *decision* after its owner.
 - 2026-10-07 (TD-367, the designer): `ao repo`'s *for you* counts what waits on the person alone, and a design-first row that is a decision owed to the designer says *decision* after its owner.
