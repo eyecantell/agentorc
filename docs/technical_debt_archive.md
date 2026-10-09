@@ -7820,3 +7820,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (PR #1360) — `tests/test_work_start.py` `test_finished_alone_passes_over_each_record_that_is_not_a_finished_member`, one case per guard (a seat, the manager, a sat-out member, a superseded record); each of the four mutations fails it.
 
 **Related:** PR #1340.
+
+## TD-467: Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (the designer, TD-459's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.10 *A lapsed cache is started again, not rung*, the `read_when` table's `idle` from a hook row; §6 rule 7 (the tick restart's third trigger); `src/sessionorc/agent_wake.py` (`_ring_typing`: after `_decide_wake` says ring, before `_type`), `src/sessionorc/agent_tick.py` (`_brief_restart`: the precondition and the close-and-replay, to share; `_just_restarted`; the `restarts` entry), `src/sessionorc/agent_common.py` (`CACHE_LIFETIME`, `CACHE_FLOOR` beside `WORK_SETTLE`), `src/sessionorc/mail.py` (`read_when`), `src/agentorc/ui/cards.py` and `src/agentorc/cli.py` (the restart note's words, *cache lapsed · idle 5h · 191k*)
+
+**Why:** TD-459: 23 of the week's 44 whole-context re-writes after a lapsed cache were doorbell rings of a grinder idle a median 5.4 h, each re-writing a median 191k tokens at the write price; a start on the brief writes about 23k ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, Paul's decision).
+
+**Resolved:** 2026-10-09 (PR #1346, PR #1371) — slice 1 (#1346, grinder-ao-1) built parts (1)–(4) and (6) at the home: `agent_common.CACHE_LIFETIME`/`CACHE_FLOOR`, `cache_lapsed`, `tick_ready`, the doorbell's hand-off to `_cache_restart`, `read_when`'s `cache` sentence, `tests/test_cache_restart.py`; slice 2 (#1371, grinder-ao-2) built part (5) in `ao status -v` — a `restarts:` line in `ending.restart_words`' words, *cache lapsed · idle 5h · 191k*, and *closed by the tick · cache lapsed* — design §4.7 and §4.10. The card's restart note has no §4.5a row and went to TD-485's design.
+
+**Related:** TD-459 (the design), TD-458 (the metered profile's lifetime), TD-460 (the context-bound trial; both change how often a grinder restarts), TD-217 (rule 7's tick restart), TD-347 (the bell).
