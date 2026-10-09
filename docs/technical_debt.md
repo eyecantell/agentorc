@@ -52,7 +52,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
-| TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Open |
+| TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | Open |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
@@ -61,6 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-468 | Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start` | Low | Open |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
+| TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
 
 ---
 
@@ -817,7 +818,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, TD-105's evaluation)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — filed from TD-105's reading. The design round decides whether the kind goes, and files the build entry if it does.
+**Status:** Designed 2026-10-09 (the designer, PR #TBD): the kind goes. §4.10 *Two controllers disagree* replaces *A `conflict` is an `ask` for every rule* — an `ask` to both controllers with `--cites`, which is accepted on an `ask` to two or more sessions and refused otherwise, an `ask` to two or more never naming the person (the gate that was the conflict's); the kinds table loses its row; `--kind conflict` is refused naming the paragraph, and a retained entry of that kind is read as an `ask`; *A disagreement, worked* keeps the judgement; every *ask, steer or conflict* enumeration in §4.10 and §4.5 reads *ask or steer*; §4.7's `--kind` list loses it. The build is TD-471. Was: Open — filed from TD-105's reading. The design round decides whether the kind goes, and files the build entry if it does.
+**Blocked by:** TD-471
 **Location:** design §4.10 (the kinds table, *A conflict is an `ask` for every rule in this section*, *A conflict, worked*), §4.5a (the conflict's rows), `src/sessionorc/mail.py`, `src/sessionorc/agent_mail.py`, `src/agentorc/briefs/` (each brief that names `--kind conflict`), `ao msg --kind conflict --cites`
 
 **Why:**
@@ -965,3 +967,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in `launch`: when `CLAUDE_CODE_PROMPT_CACHE_TTL` is in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"]` is that value for either billing (the tmux session does not inherit the host agent's environment: `new-session -e` carries each key, `tmux.py` L133); else when `prof.metered`, `"1h"`; else nothing; nothing for the subagent key. Tests: a metered profile's launch carries `1h`, a subscription's carries nothing, either with the key in the environment (monkeypatched) carries that value. **Done when** a metered profile's session starts with the key and the tests pass.
 
 **Related:** TD-458 (the design), TD-151 (metered profiles), TD-459 / TD-467 (the doorbell's `CACHE_LIFETIME`), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
+
+## TD-471: Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (the designer, TD-462's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.10 *Two controllers disagree*, *A disagreement, worked*, the kinds table; §4.7 *Mail*; `src/sessionorc/agent_mail.py` (the `conflict` gates at ~L423–L427 and ~L513–L520, the person gate; the first-reply close on every copy, which stays), `src/sessionorc/mail.py` (comments at L28, L34, L51; `MailEntry.open`), `src/agentorc/cli.py` (`--kind` choices at ~L3424, `--cites` help at ~L3435, the kind lists at ~L2599 and ~L2625), `src/agentorc/ui/inbox.py` (`PERSON_ASK_KINDS` L44, `OWING_KINDS` L1520, the docstrings at L54, L1660, L1808), `src/agentorc/ui/static/app.js` (L854), `src/agentorc/briefs/grinder.md` (*Two controllers telling you opposite things*), `src/agentorc/skill.md` (the kinds line), `docs/briefs/techlead-context.md` and `docs/briefs/director.md` (held paths: the techlead's read), `tests/test_mail.py`, `tests/test_cli.py`, `tests/test_ui_inbox.py`
+
+**Why:** TD-462: no session has sent a `conflict` since the kind was built, every brief and row renderer carries it as its own kind, and §4.10 already said it is an `ask` for every rule.
+
+**Fix:** (1) `agent_mail`: `--kind conflict` refused with *a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)*; `--cites` accepted on an `ask` whose `to` names two or more sessions and refused otherwise with the same words; the gate *an `ask` to two or more never names the person* in place of the conflict's; the first-reply close on every copy unchanged; an entry whose stored `kind` is `conflict` read as `ask` wherever a kind is tested (`MailEntry.open`, the open-question counts, the rows); (2) the lists: `cli.py`'s choices and kind tuples, `inbox.py`'s `PERSON_ASK_KINDS` and `OWING_KINDS`, `app.js` L854 — each drops `conflict`; (3) the words: `grinder.md`'s bullet says `--kind ask --cites`, `skill.md`'s kinds line drops `conflict` and names `--cites` on an `ask` to two or more, `techlead-context.md` L116 and `director.md` L16 likewise (held paths: the techlead reads the PR); (4) tests: an `ask` to two controllers with `--cites` lands in both and closes on the first reply; `--cites` on an `ask` to one refused; `--kind conflict` refused; the person gate on an `ask` to two. **Done when** no file under `src/` or `docs/briefs/` names the `conflict` kind, the four tests pass, and `ao msg --kind conflict` is refused naming §4.10.
+
+**Related:** TD-462 (the design), TD-039 (the conflict), TD-105 (archived; the evaluation), TD-052 (mail).
