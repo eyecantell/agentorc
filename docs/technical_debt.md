@@ -49,7 +49,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
-| TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1–8 (§4.5a, §6, §4.10, §4.5, §4.9c, §4.4a, §4.8, §4.4) 2026-10-09 |
+| TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1–9 (§4.5a, §6, §4.10, §4.5, §4.9c, §4.4a, §4.8, §4.4, §4.9b) 2026-10-09 |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Partly done — slice 1 PR #1340 |
 | TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | In progress |
@@ -67,6 +67,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
+| TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
 
 ---
 
@@ -763,7 +764,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from TD-109 step (6))
 **Owner:** designer
 **Kind:** design-first
-**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,494 words. Slice 2, §6 (2026-10-09): the policies cut to what each does, reads, writes, sends and refuses; 22,961 → 20,849 words. Slice 3, §4.10 (2026-10-09): cut to how mail works, provenance and incident counts to the history; 19,384 → 17,994 words. Slice 4, §4.5 (2026-10-09): cut to what each screen shows and does; 18,406 → 16,799 words. Slice 5, §4.9c (2026-10-09): cut to what a flow is and does, the migration and the build record to the history; 10,689 → 9,445 words. Slice 6, §4.4a (2026-10-09): already written as rules, so provenance alone left it; 10,388 → 10,237 words. Slice 7, §4.8 (2026-10-09): cut to what each capability, channel and role key is; 9,473 → 9,033 words. Slice 8, §4.4 (2026-10-09): cut to what the host agent does; 9,337 → 8,652 words. Before the pass the design was 192,692 words across `docs/design/`. The rest of the sections, largest first (§4.9b, §4.9, §4.2, …, by `wc -w`), each its own PR. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
+**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,494 words. Slice 2, §6 (2026-10-09): the policies cut to what each does, reads, writes, sends and refuses; 22,961 → 20,849 words. Slice 3, §4.10 (2026-10-09): cut to how mail works, provenance and incident counts to the history; 19,384 → 17,994 words. Slice 4, §4.5 (2026-10-09): cut to what each screen shows and does; 18,406 → 16,799 words. Slice 5, §4.9c (2026-10-09): cut to what a flow is and does, the migration and the build record to the history; 10,689 → 9,445 words. Slice 6, §4.4a (2026-10-09): already written as rules, so provenance alone left it; 10,388 → 10,237 words. Slice 7, §4.8 (2026-10-09): cut to what each capability, channel and role key is; 9,473 → 9,033 words. Slice 8, §4.4 (2026-10-09): cut to what the host agent does; 9,337 → 8,652 words. Slice 9, §4.9b (2026-10-09): cut to what the seat is and does; 7,896 → 7,599 words. Before the pass the design was 192,692 words across `docs/design/`. The rest of the sections, largest first (§4.9, §4.2, …, by `wc -w`), each its own PR. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
 **Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
 
 **Why:**
@@ -1049,3 +1050,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Build the `review_pr` case on a claim whose ref names no open branch (say `ref: "TD-1"`, `review_pr=1302`) and assert *waiting · review #1302*. Re-run the mutation and see it fail.
 
 **Related:** PR #1354, TD-428.
+## TD-483: `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (the designer, from the fact-check of #1366)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *In a team's lanes* and *A member's own count*; `src/sessionorc/ledger.py` (`in_lanes`, ~L253 and ~L279: the `design_first_rest` key), `src/agentorc/ui/org.py` (~L83: `waits`, drawn as *· n wait on a build* on the repo facet's design line)
+
+**Why:** TD-418 retired *what waits on a build* — *blocked* says it, and the page's kinds since TD-428 put a designed entry waiting on its build under *blocked* — and the design's §4.4 (slice 8 of TD-464) carries only the retirement in its history; the code still computes the list and draws the count, from a `for_page == "design-first"` test that the seven kinds no longer produce the same way, so the number is either stale or always zero.
+
+**Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
+
+**Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
+
