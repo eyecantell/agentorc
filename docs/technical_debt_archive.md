@@ -6950,3 +6950,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** design §4.5 browser mechanics (VS Code links), §5, phase 2.
 
 **Resolved:** 2026-10-08 (PR #1292, the anchor) — what was left was the ssh transport's host entries and, with them, the `unreachable` card state and the volatile sort slot. The entries are not coming: the home and node split replaced the hub-and-spoke ssh transport (§7 phase 2), and §5 now says so. A machine node in use is TD-057's. `unreachable` was already built (`agent_serve.py`'s overlay for a node whose link is down). The volatile slot is `cards.host_volatile`: an unreachable card on a host whose `nodes:` flags, or own `local` entry, say `volatile` takes the `idle` rank (§4.5's order), pinned by `tests/test_card_volatile.py`. The *Done when* (the top bar's name and the VS Code alias from the file) has held since 2026-09-10 (PR #55).
+
+## TD-424: §4.5a's *Done* row says the pending mark is *not built*; TD-340 built it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (docs-audit-ao-1, auditing the last ten merged PRs against §4.5a; found beside #1296's rail row)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/design/4.5a-controls.md` (the *Due strip / Inbox board row* · **Done** row)
+
+**Why:** The row reads *the row leaves on the press and the toast waits for the landing (**pending**, TD-338 — designed 2026-10-05, not built)*. The rows for the same work say the opposite: *a control's look* (*designed 2026-10-05 (TD-338; built — TD-340 …)*) and *Inbox row: pending* (*built — TD-340*), and the archived TD-340 and TD-338 entries both record PR #1144 as the build, with *checking off…* in the pending table for Done. §4.5a is the table a control is read from, and this row still says *designed* for what was built.
+
+**Resolved:** 2026-10-08 (PR #1303) — the row reads *(**pending**, designed 2026-10-05 (TD-338; built — TD-340))*, the neighbouring rows' form; no other line of `4.5a-controls.md` calls the mark unbuilt; a dated line in `docs/design-history.md` §4.5a.
+
+**Done when** the row reads *built — TD-340* where it now reads *not built*, in the form the neighbouring rows use, and no other line of `docs/design/4.5a-controls.md` says TD-338's pending mark is unbuilt; the doc-bound tests pass.
+
+**Related:** TD-338 (the design), TD-340 (the build, #1144).
