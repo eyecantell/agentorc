@@ -49,7 +49,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Open |
 | TD-456 | The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
-| TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Open |
+| TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Designed 2026-10-09 — TD-470 builds it |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
@@ -61,6 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | Open |
 | TD-468 | Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start` | Low | Open |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
+| TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 
 ---
 
@@ -756,7 +757,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
+**Status:** Designed 2026-10-09 (the designer, PR #TBD): §4.2a *A metered profile's prompt cache lives an hour* — the claude-code adapter's launch of a session on a `metered` profile carries `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` beside `CLAUDE_CONFIG_DIR`, the subagent key left to the tool, a subscription's launch setting nothing; the one way off is the key in the host agent's own environment, passed through for either billing, no `profiles.yml` field; the doorbell's `CACHE_LIFETIME` is the same hour for both billings because of it. The build is TD-470. Was: Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
+**Blocked by:** TD-470
 **Location:** design §4.2a (`billing: metered`, the profile's layer); `src/agentorc/profiles.py`; the claude-code adapter's launch environment
 
 **Why:**
@@ -964,3 +966,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the run-log sweep, after the logs: for each folder under `attachments_dir()` whose session id names no live record (the same `live` reading the logs use: any record of the session not exited or closed — a record forgotten counts as not live), unlink each file whose mtime is older than `runs_keep_days` and remove the folder when it is empty; `0` keeps everything, as for logs; a folder whose session is live is left whole whatever its files' age; an `OSError` on one file is logged and skipped. Runs in the thread the sweep runs in; touches files, never `self.sessions`. Tests: a closed session's old file goes and the folder with it, a young file stays, a live session's old file stays, `runs_keep_days: 0` deletes nothing. **Done when** the sweep prunes attachments by the rule and the tests pass.
 
 **Related:** TD-419 (the design), TD-002 (the attach), TD-096.
+
+## TD-470: Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-458's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2a *A metered profile's prompt cache lives an hour*; `src/agentorc/adapters/claude_code/__init__.py` (`launch`, the `env` dict beside `CLAUDE_CONFIG_DIR`, ~L504–L510), `src/agentorc/profiles.py` (`Profile.metered`)
+
+**Why:** TD-458: on an API key Claude Code caches for five minutes, and 4% of a week's requests fell in the 5–60-minute gap that an hour's cache turns from a re-write into a hit; no team runs metered yet, so the cost is still to come.
+
+**Fix:** in `launch`, when `prof.metered` and `CLAUDE_CODE_PROMPT_CACHE_TTL` is not in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"] = "1h"`; nothing for a subscription profile; nothing for the subagent key. Tests: a metered profile's launch carries the key, a subscription's does not, a metered one with the key in the environment (monkeypatched) gets none of the adapter's. **Done when** a metered profile's session starts with the key and the tests pass.
+
+**Related:** TD-458 (the design), TD-151 (metered profiles), TD-459 / TD-467 (the doorbell's `CACHE_LIFETIME`), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.

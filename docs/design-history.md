@@ -99,6 +99,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-09 (TD-458, the designer): **a metered profile's prompt cache lives an hour** — the adapter's launch sets `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` for a `metered` profile unless the host agent's environment carries the key; no profile field. ADR 2026-10-08 option 2, Paul's decision. Built by TD-470.
 - 2026-10-07 (TD-151, grinder-ao-1): built — `spend.sums` keeps the rows' `turns` and each window's `begins`, and `spend.reading` gives each window `turns` and `pace` (`{per_hour, unit, at}`); a pace that moves with the clock alone is kept current at the host agent and pushed with the next move of the spend.
 - 2026-10-07 (TD-151, the designer): a metered reading's windows carry `turns` and `pace` beside `spent`.
 - 2026-09-11 (TD-031): landed the model-in-use observation — the card's third part shows the model actually in use when the adapter can tell it, and `opus-5 (profile)` when only the declared one is known.
