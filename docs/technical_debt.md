@@ -1192,6 +1192,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a `https://` URL printed in a Focus pane underlines on hover and Ctrl+click (Cmd+click on a Mac) opens it in a new tab with `noopener`; a plain click and a drag over it select as before and open nothing; the same on a read-only Focus; `vendor/README.md` has the row and the licence file is in place; the help paragraph is there; tests pin the script tag, the `loadAddon` call with the handler and the scheme guard, and the help key; `pdm run test` and `pdm run lint` pass; TD-421 is archived with this entry.
 
 **Related:** TD-421 (the design), TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the WebGL addon's vendoring), TD-071 (the constraint).
+
 ## TD-425: agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself
 
 **Priority:** Low
