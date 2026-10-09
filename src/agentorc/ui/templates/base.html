@@ -45,7 +45,7 @@
   {# design §4.5a top bar **+ New ▾** (TD-418, built by TD-428): one button, a menu of two —
      **Session** opens the New session form (`n` presses it), **Shell** starts a shell: host + directory #}
   <form method="post" action="/shell" class="inline" id="shellform"><input type="hidden" name="dir" value=""></form>
-  <details class="more newmenu" id="newmenu">
+  <details class="more" id="newmenu">
     <summary class="btn primary" title="start a session or a shell">+ New ▾</summary>
     <div class="menu">
       <a href="/new" id="newsession" title="the New session form (n)">Session</a>
