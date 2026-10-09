@@ -104,3 +104,90 @@ def test_focus_draws_put_away_and_the_rail_read_before_the_first_paint(client, t
     assert 'id="siderail"' in side and 'id="sideback"' in side and ">«</button>" in side
     assert 'id="railglyphs"' in side
     client.post(f"/api/sessions/{sid}/kill")
+
+
+# The presses themselves (TD-417): `AO.wireRail` with fake elements and a real localStorage map, and
+# the template's inline script run against what the presses stored, so the two keys must agree.
+PRESS = """
+const fs = require("fs");
+const noop = () => {};
+const els = {};
+function el(name) {
+  const cls = new Set(), on = {};
+  return els[name] = { name, dataset: {}, style: {}, open: false, scrolled: false, cls,
+    classList: { toggle: (c, f) => (f ? cls.add(c) : cls.delete(c)), add: (c) => cls.add(c),
+      remove: (c) => cls.delete(c), contains: (c) => cls.has(c) },
+    addEventListener: (k, f) => { on[k] = f; }, fire: (k, e) => on[k] && on[k](e || {}),
+    scrollIntoView() { this.scrolled = true; } };
+}
+const mem = {};
+global.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+const document = { documentElement: el("html"), body: el("body"), querySelector: () => null,
+  querySelectorAll: () => [], addEventListener: noop, createElement: () => el("x"),
+  getElementById: (i) => els[i] };
+global.window = {}; global.document = document;
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const inline = process.argv[3];
+const AO = window.AO;
+const side = el("side"), away = el("sideaway"), back = el("sideback"), glyphs = el("railglyphs");
+const cards = { inbox: el("inbox") };
+AO.wireRail({ side, away, back, glyphs, card: (n) => cards[n] || null });
+// the template's script on a fresh page load: a new `side` element, the same storage
+const reload = () => { const s = el("side"); eval(inline); return s.cls.has("rail"); };
+const glyph = (rail) => ({ target: { closest: (sel) => (sel === "[data-rail]" ? { dataset: { rail } } : null) } });
+const out = {};
+away.fire("click");
+out.away = { rail: side.cls.has("rail"), stored: mem["ao.focus.side"], reload: reload() };
+back.fire("click");
+out.back = { rail: side.cls.has("rail"), reload: reload() };
+away.fire("click");
+glyphs.fire("click", glyph("inbox"));
+out.glyph = { rail: side.cls.has("rail"), open: cards.inbox.open, scrolled: cards.inbox.scrolled, reload: reload() };
+away.fire("click");
+glyphs.fire("click", glyph(""));  // needs-you: the panel comes back, no card to open
+out.needs = { rail: side.cls.has("rail") };
+away.fire("click");
+glyphs.fire("click", { target: { closest: () => null } });  // a press between glyphs
+out.between = { rail: side.cls.has("rail") };
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.unit
+def test_put_away_bring_back_and_a_glyph_press_and_the_choice_survives_a_reload():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rail's presses are JavaScript, and nothing else runs it")
+    html = (UI / "templates" / "focus.html").read_text()
+    inline = re.search(
+        r'<script>(try \{ if \(JSON\.parse\(localStorage\.getItem\("ao\.focus\.side"\).*?)</script>', html
+    )
+    assert inline, "the template's before-first-paint script"
+    probe = pathlib.Path(tempfile.mkdtemp()) / "rail_press.js"
+    probe.write_text(PRESS)
+    run = [node, str(probe), str(UI / "static" / "app.js"), inline.group(1)]
+    out = subprocess.run(run, capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    # » put away: the rail, remembered as this browser's choice, and drawn again on the next load
+    assert got["away"] == {"rail": True, "stored": '"away"', "reload": True}
+    # «: the panel back, and the next load draws it so
+    assert got["back"] == {"rail": False, "reload": False}
+    # a glyph: the panel back with that card open and in view
+    assert got["glyph"] == {"rail": False, "open": True, "scrolled": True, "reload": False}
+    assert got["needs"] == {"rail": False}  # needs-you's glyph opens no card, but brings the panel back
+    assert got["between"] == {"rail": True}  # a press that is not on a glyph does nothing
+
+
+@pytest.mark.unit
+def test_focus_wires_the_rail_to_the_templates_ids():
+    js = (UI / "static" / "app.js").read_text()
+    focus = js[js.index("AO.focus = function") :]
+    call = focus[focus.index("AO.wireRail({") :][:300]
+    for part in ('side: $("#side")', 'away: $("#sideaway")', 'back: $("#sideback")', 'glyphs: $("#railglyphs")'):
+        assert part in call, part
+    assert 'details.side[data-side="${name}"]' in call

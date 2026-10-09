@@ -3127,6 +3127,21 @@
     if (ready) g.push({ card: "ready", text: "✓", title: "Ready to close — every check passes" });
     return g;
   };
+  // **» put away** / **«** and the glyphs (§4.5a, TD-412): `side` gains `rail` and the choice is
+  // remembered per browser as `focus.side`, the key the template's inline script reads before the
+  // first paint; a glyph brings the panel back with its card open — `card(name)` finds the fold,
+  // and opening it writes the fold's key as a click would.
+  AO.wireRail = function ({ side, away, back, glyphs, card }) {
+    const putAway = (on) => { side.classList.toggle("rail", on); store.set("focus.side", on ? "away" : null); };
+    away.addEventListener("click", () => putAway(true));
+    back.addEventListener("click", () => putAway(false));
+    glyphs.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-rail]"); if (!b) return;
+      putAway(false);
+      const d = b.dataset.rail ? card(b.dataset.rail) : null;
+      if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
+    });
+  };
   AO.focus = function (s, popped) {
     const id = s.id;
     document.title = AO.focusTitle(s);
@@ -3563,16 +3578,9 @@
       const el = $("#railglyphs");
       if (el && el.innerHTML !== html) el.innerHTML = html;
     }
-    const sidePanel = $("#side");
-    const putAway = (away) => { sidePanel.classList.toggle("rail", away); store.set("focus.side", away ? "away" : null); };
-    $("#sideaway").addEventListener("click", () => putAway(true));
-    $("#sideback").addEventListener("click", () => putAway(false));
-    // a glyph brings the panel back with its card open — the fold's key written as a click would
-    $("#railglyphs").addEventListener("click", (e) => {
-      const b = e.target.closest("[data-rail]"); if (!b) return;
-      putAway(false);
-      const d = b.dataset.rail ? $(`details.side[data-side="${b.dataset.rail}"]`) : null;
-      if (d) { d.open = true; d.scrollIntoView({ block: "nearest" }); }
+    AO.wireRail({
+      side: $("#side"), away: $("#sideaway"), back: $("#sideback"), glyphs: $("#railglyphs"),
+      card: (name) => $(`details.side[data-side="${name}"]`),
     });
     // design §4.5a **Reports** / **grants** chip (§4.8, TD-028 step 4). The lists come from the
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
