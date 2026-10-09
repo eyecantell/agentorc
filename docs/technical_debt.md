@@ -841,9 +841,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Priority:** Medium
 **Type:** debt
 **Added:** 2026-10-08 (the anchor, from the CI read that closed TD-063 and TD-078)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — each was seen in CI and passed on a re-run, or on the other Python of the same run. None is reproduced yet.
+**Owner:** anchor
+**Kind:** live-check #1332
+**Status:** Built by #1332 (2026-10-09); a week of CI is still to read. #1332 fixed three of the four. The board test now waits on its fetching read's start, not a 2 s poll. The mail test now settles its members before the wait's cursor. The forget test had a real cause: `_refresh_git` wrote `_git_checked` for a record forgotten while its git read ran. That is fixed, with a regression test. The fourth, `test_a_screen_rules_state_goes_back_when_its_screen_is_gone`, did not reproduce in 50 runs beside a full suite and is **watched**. **To read on or after 2026-10-16:** CI runs from #1332's merge for any of the four. None failed: archive this entry. One did: a new entry for it, and this one `**Blocked by:**` it. The week is the only thing to wait for, so the owner is the anchor.
 **Location:** `tests/test_ui_board.py`, `tests/test_mail.py`, `tests/test_agent_paths.py` (the tests below)
 
 **Why:**

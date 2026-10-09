@@ -44,12 +44,34 @@ async def test_forget_leaves_no_side_table_entry(agent, hookstub, tmp_path):
     async with LocalClient() as c:
         s = await c.call("create", name="side", dir=str(tmp_path), adapter="hookstub")
         await c.call("hook", session=s["id"], state="idle")
-        await asyncio.sleep(0.5)  # a tick: git checked
-        assert s["id"] in agent._last_hook and s["id"] in agent._git_checked
+        assert await wait_for(lambda: s["id"] in agent._git_checked)  # a tick: git checked
+        assert s["id"] in agent._last_hook
         await c.call("kill", id=s["id"])
         await wait_state(c, s["id"], "exited")
         await c.call("remove", id=s["id"])
         assert all(s["id"] not in d for d in (agent._last_hook, agent._git_checked, agent._pre_limited))
+
+
+async def test_a_forget_during_the_git_read_leaves_no_git_key(agent, tmp_path, monkeypatch):
+    """TD-463: the tick reads git off the loop; a record forgotten while that read runs gets no
+    `_git_checked` key when it comes back (the CI flake of 2026-10-08 in the test above)."""
+    from sessionorc import agent_tick
+
+    forget = {}
+
+    def forgotten_meanwhile(d):
+        if forget:
+            agent.sessions.pop(forget["id"], None)
+
+    monkeypatch.setattr(agent_tick, "git_info", forgotten_meanwhile)  # before the create: no real read races it
+    async with LocalClient() as c:
+        s = await c.call("create", name="gitread", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        rec, forget["id"] = agent.sessions[s["id"]], s["id"]
+        agent._git_checked.pop(s["id"], None)
+        await agent._refresh_git(datetime.now(UTC) + timedelta(days=1))  # due, whatever the tick did
+        assert s["id"] not in agent._git_checked
+        agent.sessions[s["id"]] = rec  # back, so the pane is killed with it
+        await c.call("kill", id=s["id"])
 
 
 async def test_closed_sessions_are_forgotten_after_keep(agent, tmp_path, monkeypatch):

@@ -2318,6 +2318,8 @@ async def test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wake
         mk = _mk(person, tmp_path)
         mgr = await mk("mgr", team="ao-grind", unattended=True)
         w, tl = [await mk(n, team="ao-grind", unattended=True, controllers=[mgr]) for n in ("w", "tl")]
+        for sid in (mgr, w, tl):  # settled, so a shell starting up does not return the wait (TD-463)
+            await wait_state(person, sid, "idle")
         async with LocalClient(caller=mgr) as mc:
             await mc.call("wait", timeout=0)  # the cursor, so a member's change is a change
         client, task = await start_wait(mgr)
