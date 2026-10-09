@@ -169,6 +169,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "side-panel",
+        "» put away",
+        "Focus side panel",
+        (
+            "Puts the side panel away to a narrow rail, and the terminal takes its width; « or any of the "
+            "rail's glyphs brings it back, a glyph opening its card. Press it when the terminal is what you "
+            "want wide — on a laptop, or reading a long diff. It hides no prompt and changes no fold: Allow "
+            "and Deny stay on the identity line, and the choice is this browser's, for every session."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -425,7 +436,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "switch-profile",
         ),
     ),
-    ("focus", "Focus", ("wrap-up", "kill", "resume")),
+    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel")),
     (
         "inbox",
         "Inbox",

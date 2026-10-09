@@ -66,9 +66,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
-| TD-408 | The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows | Medium | Designed — TD-412 builds it |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
-| TD-412 | Build TD-408: the Focus side panel's **» put away** / **«** rail — the terminal takes the width, remembered per browser, key `s`, the phone's row | Medium | Open |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Open |
 
 ---
@@ -1136,25 +1134,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-380 (the design), TD-381 (the anchor seat, its other taker), TD-305 (archived: the answered row), TD-227 (archived: rule 8), TD-323 (archived: a live check in free-pick).
 
-## TD-408: The Focus side panel cannot be put away: its cards fold one by one, but the panel keeps its width, so the terminal never grows
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-08 (the person's session, from Paul: *make the right side bar (Session, Ready to close, Git sections) collapsible — that way the terminal window can expand*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-08 (the designer, PR #1283): design §4.5 *The panel put away* and §4.5a's row *» put away / « (the rail)* — one control on the side column's top line collapses the whole panel to a 28px rail; the rail holds **«** and one glyph per card with something to say (**!** needs you, **✎** Working, the Reports and Inbox counts, **✓** Ready to close), each press bringing the panel back with that card open, so a put-away panel hides no prompt (Allow / Deny is the identity line's anyway); the terminal takes the width and refits through the pty by the fit observer it already has; the folds inside are untouched; remembered per browser as the folds are (`focus.side`), one choice for every session and the popped-out window; key `s` on Focus; below 720px the rail is one row under the composer, which TD-003's narrow mode keeps. Mockup `FocusRail.dc.html` (`docs/mockups/reviews/2026-10-08-td408-side-rail.png`, the open state beside it in `-focus-open.png`). TD-412 builds it. Before: Open.
-**Blocked by:** TD-412
-**Location:** design §4.5 *The Focus screen's anatomy*, §4.5a (the Focus side panel's rows); `src/agentorc/ui/templates/focus.html` (`<div class="side">`), `src/agentorc/ui/static/app.css`, `src/agentorc/ui/static/app.js` (the terminal's fit on resize)
-
-**Why:** every card in the Focus side panel (Session, Ready to close, Git, Reports, Inbox …) is a `<details>` fold remembered per browser (TD-156), but folding them all leaves the column at its width. The terminal cannot take the space, and on a laptop screen it is the terminal Paul wants wide.
-
-**Fix (to design):** one control that collapses the whole panel to a thin rail and back, the terminal refitting to the width it gains (columns resized through the pty, as a window resize is). Decide where the control sits, whether the choice is remembered per browser (as the folds are) or per session, a key for it, what stays visible on the rail (a needs-you or Ready to close mark, so a collapsed panel hides no prompt), and how it meets TD-003's phone layout, which plans a collapsed panel of its own.
-
-**Done when** the Focus page has the control, collapsing gives the terminal the panel's width with its columns refit, expanding restores it, and the choice survives a reload.
-
-**Related:** TD-156 (the side panel's folds), TD-003 (the phone layout, which plans a collapsed side panel and has not built one).
-
 ## TD-410: Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do*
 
 **Priority:** Medium
@@ -1181,30 +1160,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane, the manager is filled the first time one of its readings is due, a fill's first reads are its brief and the rule it was filled for, and a week's journal shows no *nothing due* close for a manager.
 
 **Related:** TD-118 (archived; its step (4), the manager on Haiku, dropped for this), TD-247 (the manager's jobs moved to the tick), TD-259 (the seat on call), TD-386 (the held create), TD-381 (the anchor seat's record without a pane).
-
-## TD-412: Build TD-408: the Focus side panel's **» put away** / **«** rail — the terminal takes the width, remembered per browser, key `s`, the phone's row
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-08 (the designer, from TD-408's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/templates/focus.html` (`<div class="side">`: the top line's button, the rail), `src/agentorc/ui/static/app.css` (`.focus .side`, the rail's width, the phone's row under 720px), `src/agentorc/ui/static/app.js` (`AO.focus`: the toggle and `store` key `focus.side`; `AO.KEYS`: `s` on page `focus`), `src/agentorc/ui/help.py` (the control's paragraph), `tests/test_ui_focus*.py`
-
-**Why:** TD-408: every side card folds, but the column keeps its 320px and the terminal never grows. Design §4.5 *The panel put away* and §4.5a *» put away / « (the rail)*.
-
-**Fix:** as designed —
-- **The control**: a small plain button **» put away** on the side column's top line, above the first card; pressed, the column becomes a 28px rail: **«** at its top, then one glyph per card that has something to say, in the panel's order — amber **!** while the session is `needs-you`, **✎** while `doing` is set, the Reports count, the Inbox count, **✓** while Ready to close passes — each with the card's heading and line as its title; a press on **«** or any glyph brings the panel back, a glyph's press opening that card (its `<details>` set open, the fold's store key written as a click would). The glyphs are drawn from the same pushed delta the cards are (`render`), so a rail is as current as the panel.
-- **The terminal**: the `.main` column takes the width; the fit's `ResizeObserver` on `#term` refits and `term.onResize` sends the columns through the websocket as today — no new message. Test that `.side` has the rail class and the box's width is what the stylesheet says; the refit itself is xterm's.
-- **Remembered per browser**: `store` key `focus.side` (`"away"` or absent), read at `AO.focus` before the first paint so a put-away panel never flashes open; the same key in a popped-out window. The per-card fold keys are untouched.
-- **The key**: one row in `AO.KEYS` — `{ keys: ["s"], page: "focus", control: "put the side panel away / bring it back", sel: "..." }` — pressing the control's element, so the `?` overlay lists it; the terminal's element is editable to the handler as today, so the key is the pane's while the terminal has focus.
-- **Below 720px** (`@media (max-width: 720px)`): the panel stacks under the terminal already; put away, the rail is the same glyphs laid as one row under the composer, 44px tap targets.
-- **Help**: a paragraph in `ui/help.py` under the Focus heading, key `side-panel`, in the §4.5a row's words — the control, the rail's glyphs, that the folds are untouched and the choice is this browser's.
-
-**Done when** the Focus page has **» put away**; pressing it gives the terminal the column's width (a Playwright shot of the live page at 1440 shows the rail and the wider terminal, committed as `docs/mockups/reviews/<date>-td412-*.png`), **«** and every glyph bring it back, a glyph's press opens its card, the choice survives a reload and a pop-out, `s` toggles it with the terminal unfocused and is listed by `?`, the phone row draws under 720px; `tests/test_ui_focus*.py` pin the button, the rail's glyphs for a `needs-you` session with `doing`, reports, inbox and a passing checklist, the `AO.KEYS` row, and the help paragraph; `pdm run test` and `pdm run lint` pass; TD-408 is archived with this entry.
-
-**Related:** TD-408 (the design), TD-156 (the side panel's folds), TD-046 (Pop out), TD-124 (the keys table), TD-003 (the phone layout).
 
 ## TD-413: Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads
 

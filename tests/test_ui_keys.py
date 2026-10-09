@@ -157,7 +157,8 @@ def test_every_key_names_a_control_the_page_draws(monkeypatch, tmp_path):
         if not k.get("sel"):
             assert any(k.get(f) for f in ("move", "g", "help", "step")), k  # the few keys that press nothing
             continue
-        pages = {"all": [org, inbox], "org": [org], "inbox": [inbox], "msg": [msg]}[k["page"]]
+        focus = (UI / "templates" / "focus.html").read_text()  # the side panel's put-away (TD-412)
+        pages = {"all": [org, inbox], "org": [org], "inbox": [inbox], "msg": [msg], "focus": [focus]}[k["page"]]
         # `/` focuses whichever filter box the page has: the Org's or the Inbox's
         needles = [_needle(s) for s in k["sel"].split(",")]
         for html in pages:
