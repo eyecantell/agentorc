@@ -832,8 +832,9 @@ def create_app() -> FastAPI:
         no more than a few seconds behind the Org."""
         icons = await role_icons(fleet)
         seats = await seats_of(fleet)
-        waits = await person_waits()
-        views = [view(s, fleet, icons=icons, seats=seats, waits=waits) for s in fleet]
+        # what each waits on (§4.2 *Waiting*, TD-428), so a row's pill is the Org card's
+        waits, repos = await person_waits(), (await repo_facts())[0]
+        views = [view(s, fleet, icons=icons, seats=seats, repos=repos, waits=waits) for s in fleet]
         info = await identity_info()
         rows = state_rows(
             views,
