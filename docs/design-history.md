@@ -988,6 +988,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-09 (TD-456, grinder-ao-1): *Usage gate* — a profile with no copy of the reading (no live session under it, TD-073) reads its account's at the gate (`_gate_reading`, behind `_gate_windows`) and in `ao gate`, which now carries the reading's `fetched` and `source`. Read live 2026-10-08: `ao gate` printed *no reading yet* for three grind profiles while the account they share had a reading a minute old, so a start under them was never gated.
 - 2026-10-09 (TD-110, the designer): rule 9's note carries §4.9a's added lines.
 - 2026-10-09 (TD-459, the designer): rule 7's tick restart also serves §4.10's lapsed-cache restart, `why: cache`.
 - 2026-10-09 (TD-457, the designer): rule 8 reads member by member — a crew member closed after declaring, its team not wound down, whose lane gains an id is the same `work_waiting` mark, and a start on a running team replays the named members alone (`why: work`); `on_work`'s default is `start` (Paul, 2026-10-08); rule 6's *told by neither rule* sentence replaced; a seat still holds a wind-down; rule 9's race needs no hold. Built by TD-466.

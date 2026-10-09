@@ -1160,7 +1160,10 @@ teams:
   **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on a
   profile when **any** of its reported windows reaches that window's **line**, and resume them when
   every window is back under its line — the windows being the **account's** reading (reported or asked, §4.4 *Usage*), the one poll
-  every profile on that account shares (§4.2a, TD-122), read against this profile's own lines; a
+  every profile on that account shares (§4.2a, TD-122), read against this profile's own lines — a
+  profile no live session runs under, which keeps no copy of the reading (the chip's rule, TD-073),
+  reads its account's, so a start under a wound-down team's profile is gated by the reading a
+  person's session keeps fresh, and `ao gate` prints it with its age and source (TD-456); a
   fetch failure never pauses — the last good reading stands, as the chip's does (§4.5a, TD-087).
   **A reading the gate can no longer trust** (TD-230; designed 2026-09-28, the host agent's
   half built — TD-233 slice 4: `usage.project` is the one reader, `_gate_windows` asks it for

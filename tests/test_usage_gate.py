@@ -502,3 +502,40 @@ async def test_last_weeks_reading_pauses_nothing_and_a_pause_on_it_lifts(agent, 
         assert rec.gated is None
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate(agent, hookstub, tmp_path, monkeypatch):
+    """TD-456: two profiles on one account, a reading over the line held under the live one. A start
+    under the other (no live session, so no copy of its own, TD-073) reads the account's reading at
+    the gate and in `ao gate`, with its age and source, rather than *no reading yet*, which is no gate."""
+    await park_ticks(agent)
+    monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "paul"})
+    fetched = _iso(datetime.now(UTC).replace(microsecond=0))
+    reading = {"windows": [{"label": "5h", "pct": 95, "resets": None}], "fetched": fetched, "source": "reported"}
+    async with LocalClient() as person:
+        s = await person.call("create", name="pa", dir=str(tmp_path), adapter="hookstub", profile="pa")
+        agent._usage_acct["hookstub:paul"] = reading
+        agent._usage["pa"] = {**reading, "account": "paul", "tool": "Stub"}
+        await person.call("set_settings", profile="pg", reserves={"5h": 30})
+        now = datetime.now(UTC)
+        assert "pg" not in agent._usage
+        assert agent._profile_over("pg", now)["label"] == "5h"
+        assert agent._profile_gated("pg", now)
+        got = (await person.call("gate"))["profiles"]["pg"]
+        assert got["windows"][0]["pct"] == 95 and got["windows"][0]["line"] == 70
+        assert got["fetched"] == fetched and got["source"] == "reported"
+        # an account nobody reads is still no reading, and no gate
+        monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "other"})
+        assert not agent._profile_gated("pg", now)
+        assert "fetched" not in (await person.call("gate"))["profiles"]["pg"]
+        # the profile's own tool is read, never another's account of the same name: a record under
+        # `pg` names its adapter, and a shell polls no usage
+        monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "paul"})
+        assert agent._profile_gated("pg", now)
+        sh = await person.call(
+            "create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], profile="pg"
+        )
+        assert agent.sessions[sh["id"]].profile == "pg" and not agent._profile_gated("pg", now)
+        for x in (s, sh):
+            await person.call("kill", id=x["id"])

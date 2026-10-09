@@ -47,7 +47,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
 | TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Built (#1306); live check: an unattended session's env, then tell dev-cadence |
 | TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Open |
-| TD-456 | The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
 | TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Open |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
@@ -715,22 +714,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 7. **The techlead's name, and the help text** — where the page says *reader* it names the seat's role (*waiting · review #n with the techlead*, the PRs waiting hover, Settings' *the techlead's queue past its bound*), the person as *you*; then the help text: §4.5a's list and `help.py` together, in one PR, for the + card (*New session*), the fold (a team with nothing live drawing only its facets that hold something), *not concluded* (now on the panel's Definition line), and a new entry for the Definition line if the panel names it. Done when `tests/test_help.py` passes with the design's list changed in the same PR.
 
 **Done when** every slice above is merged and the live Org, read after its promote, shows the mockup's after-shot on that day's data.
-
-## TD-456: The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (the anchor, met on TD-233's live check for TD-426)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_gate_windows`, which reads `self._usage.get(profile)`; `_profile_over`; the pruning in `_refresh_usage` after *Only profiles a live session is running under are shown*, TD-073; `_usage_spread`), `src/sessionorc/agent_settings.py` (`rpc_gate`), `src/agentorc/cli.py` (`ao gate`); design §6 *Usage gate*, §4.4 *Usage*
-
-**Why:** read live 2026-10-08 21:3x MDT: `ao gate` printed *grind · 5h 30 → no reading yet · week 5 → no reading yet* for all three grind profiles, while `usage.json` held a reported reading a minute old (5h 25%, week 33%) for the account they share with the two live sessions, both on the default profile. The reading is kept per account (`_usage_acct`) but copied per profile only under a profile a live session runs under, and every gate read (`_gate_windows`, behind `_profile_over`, the gate's pass and `rpc_gate`) takes the per-profile copy. So whenever a team is wound down and a person's session keeps the account's reading fresh, a start under the team's profile (rule 8's `on_work: start`, a schedule, a restart) reads no reading, which is *no gate*, and goes ahead past a reserve the account is already over, until its first report spreads the reading and the next tick pauses it. The cost is one start's first turns, and an `ao gate` that says *no reading yet* when there is one.
-
-**Fix:** let the one reader fall back to the account's reading, by `_usage_key`, for a profile with no copy of its own (the chip's TD-073 rule unchanged: the copy is still what is shown); `ao gate` prints it, with its age and source. A test: two profiles on one account, a reading over the line held under the live one, and `_profile_gated` for the other reads it.
-
-**Done when** a profile with no live session reads its account's reading at the gate and in `ao gate`, and the test above passes.
 
 ## TD-457: New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart
 
