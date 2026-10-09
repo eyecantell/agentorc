@@ -997,8 +997,17 @@ class HostAgent(
                 # AGENT_NAME is the name the Org shows, for whatever in the session signs its work —
                 # dev-cadence's commit hook writes it as a co-author (TD-185). Tool-neutral: every
                 # adapter's session gets it, and a blank name was given its automatic one above.
+                # CADENCE_ATTENTION_SCOPE tells dev-cadence's start hook whose board to nudge from —
+                # its own for an unattended session, the machine's for one a person drives — so the
+                # synced script never asks `ao status` (design §4.3, §8, TD-425).
                 shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
-                env = {**spec.env, "AGENTORC_SESSION": sid, "AGENTORC_HOME": str(paths.home()), "AGENT_NAME": shown}
+                env = {
+                    **spec.env,
+                    "AGENTORC_SESSION": sid,
+                    "AGENTORC_HOME": str(paths.home()),
+                    "AGENT_NAME": shown,
+                    "CADENCE_ATTENTION_SCOPE": "own" if unattended else "machine",
+                }
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
                 try:
                     await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
