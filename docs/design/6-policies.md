@@ -807,7 +807,7 @@ code and needs no grant; a session doing the same work does.
      with work is still finished, and is closed the tick its work reads pushed, its manager live or already closed, with nothing said again: a team whose manager carries the mark was announced. A manager on a node gets no line and the close
      alone, routed as rule 2 routes one, and waits for the link. **The announcement the manager
      did not make** the home makes: one `system` note to the person with the two lines §4.9a
-     asks of the manager — the pull requests in the members' `progress` entries reported `done`
+     asks of the manager, and the lines §4.9a *The home's note says more* adds (TD-110) — the pull requests in the members' `progress` entries reported `done`
      with a `pr` since the team's start, the start being the earliest `created` among the
      team's records that are neither superseded nor forgotten (§4.9a's own list is the
      manager's, from `gh`), and each member's `out_of_work.why` — written on the tick the manager
