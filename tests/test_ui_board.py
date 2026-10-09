@@ -878,11 +878,12 @@ def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, mon
             "at": "2026-09-01",
         }
 
-    gate, reads, board_ = threading.Event(), [], board
+    gate, started, reads, board_ = threading.Event(), threading.Event(), [], board
 
     def fake(run=None, *, fetch=False, board=""):
         reads.append(board or ("fetch" if fetch else "plain"))
         if fetch and not board:
+            started.set()
             assert gate.wait(10)
             return [row(board_, "answered"), row(other, "from origin")], ""
         if board:
@@ -912,11 +913,8 @@ def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, mon
         assert c.get("/api/person/inbox").json()["needs"] == 2 and reads == ["plain"]
         c.get("/api/person/inbox")
         c.get("/api/person/inbox")
-        # the fetch is a task on the app's loop, so it may not have reached its thread yet
-        for _ in range(100):
-            if len(reads) > 1:
-                break
-            threading.Event().wait(0.02)
+        # the fetch is a task on the app's loop, so it may not have reached its thread yet (TD-463)
+        assert started.wait(10)
         assert reads == ["plain", "fetch"]  # one fetching read, the requests answered meanwhile
         r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 3, "text": "answered"})
         assert r.status_code == 200 and reads == ["plain", "fetch", board]
