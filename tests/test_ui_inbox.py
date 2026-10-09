@@ -2767,7 +2767,6 @@ def test_the_page_draws_the_rail_pressed_from_the_url(monkeypatch, tmp_path):
     assert '<span id="n-needs">1 of 3</span>' in html.replace('class="meta" ', "")
 
 
-
 def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(monkeypatch, tmp_path):
     """TD-423 (§4.5 screen 6 *The rail*, Paul 2026-10-08): **Clear filters** is drawn at the rail's
     head whatever is picked, so the toggles under it never move; with nothing picked or typed it is
@@ -2789,6 +2788,7 @@ def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(m
     js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
     assert '$("#railclear").disabled = !c.filtered;' in js
     assert 'railclear").classList.toggle("hidden"' not in js
+
 
 RAIL_PROBE = """
 const fs = require("fs");
