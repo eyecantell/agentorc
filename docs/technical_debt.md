@@ -69,6 +69,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 | TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
+| TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Open |
+| TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
 
 ---
 
@@ -1081,3 +1083,35 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
 
 **Related:** TD-464 (the pass), PR #1376 (archived it).
+
+## TD-493: A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.6 *A URL in the pane is a link*, §4.5a *Focus pane: a URL is a link*, §4.5a *card: the editor button* and *Transcript: VS Code*, §5 `person.open_in` (`{path}`, `{remote}`, the scheme rule); `src/agentorc/ui/static/app.js` (`AO.paneLink`, the web-links addon loaded in `AO.focus`), `src/agentorc/ui/static/vendor/addon-web-links.js` (0.11.0)
+
+**Why:** Paul, 2026-10-09: *add a link to files that show up in our convo and are in our repo (if this is not too complicated) — the link should open the file in vscode (or whatever is configured)*. Claude Code names files as `src/agentorc/cli.py:364` in its answers and its tool lines; today the only road from the pane to the file is to copy the path and open it by hand, while an `http` URL on the same row opens on Ctrl+click (TD-422) and the card's editor button opens the session's whole directory through `person.open_in`. The value is the person reading a finding and being in the file one press later, in the editor they configured. What is open is the design: a path is text a session wrote, so TD-071's rule applies as §4.6 argued it for a URL (a modifier press, nothing opens without it, what opens is read under the pointer); unlike a URL a path has to be resolved — against the record's `dir` on its host, and only one that exists there (*and are in our repo*) — and the link is the editor template with `{path}` and `{remote}` as the Transcript page's **VS Code** fills it, absent under `open_in: none`.
+
+**Fix:** a design round: a sentence beside §4.6 *A URL in the pane is a link* for a path — the shape read (a run like `path/to/file.py` or `file.py:12`, xterm's link provider on the addon's side), what resolves it and how its existence is read (a client read of the host, never a control built from the text), and the editor template per §5 — with a §4.5a row *Focus pane: a path is a link*; then a build entry. *Not too complicated* is Paul's own bound: the round may answer *not worth it* if an existence check over the bridge makes the link heavy, and say so here.
+
+**Related:** TD-421 / TD-422 (the URL link), TD-071 (nothing on a page is a control that parses what an agent printed), TD-164 (`open_in`), TD-494 (a wrapped URL).
+
+## TD-494: A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`: `term.loadAddon(new WebLinksAddon…)`, `AO.paneLink`), `src/agentorc/ui/static/vendor/addon-web-links.js` (0.11.0); design §4.6 *A URL in the pane is a link*, §4.5a *Focus pane: a URL is a link*
+
+**Why:** Paul, 2026-10-09: *It appears that urls are now clickable, but in the case of multiple lines it only links the first line.* The web-links addon (TD-422, built 2026-10-08) reads one screen row and follows the next only when xterm marked it wrapped (`isWrapped`); the Focus terminal shows a tmux pane with `scrollback: 0` (§4.6: tmux owns the history), and tmux repaints a long line as separate rows with no wrap mark, so a URL longer than the pane's width is two rows to the addon: the first row matches as a cut URL, underlined and opened cut on Ctrl+click (a wrong page or a 404), and the rest has no scheme and is no link. The harm is that the link the person reaches for is the one that is wrong, with nothing on the row to say so.
+
+**Fix:** (1) confirm the mechanism on a scratch home: a URL longer than the pane width printed in an `ao` session, Ctrl+click on each row. (2) A link provider of the page's own that hands the addon's regex the row joined with the rows after it while a row is full to its last column and the next begins with a URL character — the addon's regex still decides what a link is (§4.6's rule: *the addon's regex, never one of ours*; the join only restores the line tmux cut) and the link's range spans the rows, so the whole underlines and one press opens the whole. (3) §4.6's paragraph gains the sentence (a row tmux cut is joined before the addon reads it; two rows that merely end at the width stay two) and §4.5a's row says *the whole URL, over the rows it wraps across*, in the same PR. Tests under node, as `tests/test_attach.py`'s `_node` harness runs the page's functions (TD-370). **Done when** a 200-character URL on an 80-column pane underlines whole and opens whole on one press, and two lines that merely meet at the width stay two links or none.
+
+**Related:** TD-421 / TD-422 (the URL link), TD-493 (a path as a link), TD-174 (the mouse is the browser's).
