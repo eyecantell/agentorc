@@ -7734,7 +7734,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** design §4.4a (*identity comes from the channel*), §4.8 (the gates), §4.10 (the `[controller]` / `[person]` marks; `system`, new in TD-069, which the home alone writes), §9 invariants 5 and 14, TD-075 (the go-between, which raises the stakes), TD-057 (container nodes), TD-064 (peer-message policy).
 
-**Resolved:** 2026-10-09 (this PR) — (c), the last step, is dropped rather than built. Paul's answer to `m-15f0fe73efad`: *Drop it: §4.8a already sends every alarm on kmaster to the person, nothing built.* §4.8a *Who answers first* now says every alarm goes to the person; the `alarms` grant, `ALARM_ANSWER`, the techlead's *Steering* row and §4.8's planned exception are gone from the design (§4.9b, §4.8, §4.5, §4.5a), and `docs/design-history.md` §4.8a has the dated line. The cgroup clause is unchanged. Option E (an OS boundary) as the condition for a cheaper model beside the techlead is recorded in that line and left to Paul, not decided here.
+**Resolved:** 2026-10-09 (PR #1331) — (c), the last step, is dropped rather than built. Paul's answer to `m-15f0fe73efad`: *Drop it: §4.8a already sends every alarm on kmaster to the person, nothing built.* §4.8a *Who answers first* now says every alarm goes to the person; the `alarms` grant, `ALARM_ANSWER`, the techlead's *Steering* row and §4.8's planned exception are gone from the design (§4.9b, §4.8, §4.5, §4.5a), and `docs/design-history.md` §4.8a has the dated line. The cgroup clause is unchanged. Option E (an OS boundary) as the condition for a cheaper model beside the techlead is recorded in that line and left to Paul, not decided here.
 
 ## TD-106: Identity on one host is finished as built
 
@@ -7749,4 +7749,24 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-077 (identity), TD-075 (the techlead), §4.4a (*A node that carries no person*).
 
-**Resolved:** 2026-10-09 (this PR, with TD-077) — the recommendation is taken: the unbuilt techlead alarm path and the `alarms` grant are dropped from the design (Paul's answer to `m-15f0fe73efad`). The cgroup clause stays as built, the default of the anchor's steer of 2026-10-08 that Paul's answer did not change; it has since been extended by a pane's own cgroup scope (TD-362, TD-360).
+**Resolved:** 2026-10-09 (PR #1331, with TD-077) — the recommendation is taken: the unbuilt techlead alarm path and the `alarms` grant are dropped from the design (Paul's answer to `m-15f0fe73efad`). The cgroup clause stays as built, the default of the anchor's steer of 2026-10-08 that Paul's answer did not change; it has since been extended by a pane's own cgroup scope (TD-362, TD-360).
+
+## TD-425: agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from TD-159's ADR)
+**Owner:** anchor
+**Kind:** live-check #1306
+**Status:** Resolved — **Read 2026-10-09 (the anchor), the interactive half holds:** `ao-agentorc-ao-paul`, interactive, started 14:28Z on live `cbb8dad`, has `CADENCE_ATTENTION_SCOPE=machine` beside `AGENTORC_SESSION` in its pane's environment. dev-cadence is told by its TD-088 (dev-cadence PR #215). Built 2026-10-08 (grinder-ao-1, PR #1306): the launch env sets `CADENCE_ATTENTION_SCOPE` beside `AGENTORC_SESSION` — `own` unattended, `machine` interactive — on every launch (restart, relaunch and fill included, since they share the one line); design §4.3 says so; `tests/test_agent.py::test_a_launch_tells_the_start_hook_whose_board_to_nudge_from` pins both. **The live check:** once #1306 is live (`ao promote status`), read with no press of yours the environment of an unattended session started after the promote (`/proc/<pane pid>/environ`, the pid from `tmux display -p -t <id> '#{pane_pid}'`) for `CADENCE_ATTENTION_SCOPE=own`, and of an interactive one for `machine`; then tell dev-cadence that `attention_scope`'s `ao status` branch can go (its change, cadence §3 — an entry on its ledger or mail to its team) and archive this entry. **Read 2026-10-09 (grinder-ao-1), live `cbb8dad`, which holds #1306:** the unattended half holds. `ao-agentorc-grinder-ao-1`, started 13:22Z after the promote, has `CADENCE_ATTENTION_SCOPE=own` beside `AGENTORC_SESSION` in its environment. **The interactive half waits for a person to start an interactive session.** No live session was interactive (`ao status --json`: the one interactive record, `ao-agentorc-ao-paul`, is closed), and a worker cannot start one. Whoever next sees an interactive session that started after #1306 went live reads its pane's environ for `machine`, then does the rest above. The owner is the anchor, so this is not picked again each run.
+**Location:** `src/sessionorc/agent.py` (the launch env beside `AGENTORC_SESSION`, about line 1001), design §4.3 (*A repo's start hooks*) and §8; `scripts/cadence_hooks.sh` (`attention_scope`, SYNCED, read only)
+
+**Why:** `cadence_hooks.sh`'s `attention_scope` scopes the session-start nudge to the session's own board for an unattended agentorc session. It finds out by running `ao status --json` with a five-second timeout and matching `AGENTORC_SESSION`, so a synced file calls `ao`. That breaks the rule in design §8 (ADR 2026-10-08). The script already reads `CADENCE_ATTENTION_SCOPE=own|machine` first, so the seam exists, but agentorc never sets it.
+
+**Fix:** the launch sets `CADENCE_ATTENTION_SCOPE=own` for an unattended session and `machine` for an interactive one, beside `AGENTORC_SESSION`. A relaunch or restart sets it again from the record's mode at that moment. §4.3 says so in a sentence. A test checks the env on both kinds of launch. Once this is live on every host that runs the hook, tell dev-cadence (its own session's change, cadence §3) that the `ao status` branch can go.
+
+**Done when** an unattended session's SessionStart scopes the nudge without calling `ao status` (the env reaches the runner), an interactive one reads `machine`, and the test passes.
+
+**Related:** TD-159 (the ADR), TD-118 (agentorc's scoping), dev-cadence TD-077 (the branch).
+
+**Resolved:** 2026-10-09 (the anchor) — both halves read live (`own` on grinder-ao-1, `machine` on ao-paul); the `ao status` branch's removal is dev-cadence's TD-088.
