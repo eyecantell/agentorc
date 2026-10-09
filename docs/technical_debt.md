@@ -58,7 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
-| TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
+| TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | In progress |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
@@ -911,7 +911,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (the designer, TD-473's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** In progress — slice 1, the host agent's half (parts 1–4: `ATTACH_PIECE_BYTES`, `person.attach.max`, `attach`'s `upload`/`offset`/`total`/`cancel` and the `.part` linked into place, the hour's `.part` sweep), is PR #1370 (grinder-ao-1, 2026-10-09); `paths.ATTACH_BYTES_MAX` stays for the page's one-call route until slice 2 deletes it. **Left:** slice 2, the page's half in `src/agentorc/ui/` — (5) `attach_file`, (6) `AO.wireAttach`'s pieces, progress and ✕, (7) the You card's attachment bound — then the *Done when*'s 50 MB PDF.
 **Location:** design §4.4 *Attachment drop*, §4.5a *Attach / drop / paste*, §5 `person:`, §4.5 screen 8 **You**, §4.6 *Run-log retention*; `src/sessionorc/paths.py` (`ATTACH_BYTES_MAX` → `ATTACH_PIECE_BYTES`), `src/sessionorc/settings.py` (`PERSON_KEYS`, the `attach` parse), `src/sessionorc/agent.py` (`rpc_attach`, `_write_attachment`), `src/sessionorc/agent_tick.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`attach_file`), `src/agentorc/ui/static/app.js` (`AO.wireAttach`, ~L152; the Focus upload ~L3347), `src/agentorc/ui/settings_page.py` (the You card)
 
 **Why:** TD-473: a file rode base64 on the RPC's one 8 MiB line, so a Focus attachment was at most 4 MiB and a deck, a Word file or a scanned PDF was refused, leaving the person to copy it onto the host by hand.

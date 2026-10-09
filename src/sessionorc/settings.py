@@ -312,7 +312,10 @@ INBOX_KEYS = ("board_show",)
 BOARD_SHOW_DEFAULT = "next:10"  # §4.5 screen 6 *The board's horizon*: what the page reads when nothing is set
 BOARD_SHOW_NEXT = (1, 50)  # `next:<n>`, the soonest n per team
 BOARD_SHOW_DAYS = (1, 365)  # `<n>d`, what falls due within n days
-PERSON_KEYS = ("open_in", "terminal", "inbox")
+ATTACH_KEYS = ("max",)
+ATTACH_MAX_DEFAULT = "256M"  # §4.4 *Attachment drop*: the most a Focus attachment may be when nothing is set
+ATTACH_MAX = (1 << 20, 4 << 30)  # `1M` to `4G`: the bound is for the disk the sweep frees, not for the tool
+PERSON_KEYS = ("open_in", "terminal", "inbox", "attach")
 
 
 def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
@@ -491,8 +494,8 @@ def parse_open_in(v: Any) -> str | dict[str, str]:
 
 
 def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
-    """`person:` — `open_in`, `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164) and
-    `inbox: {board_show}` (TD-220)."""
+    """`person:` — `open_in`, `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164),
+    `inbox: {board_show}` (TD-220) and `attach: {max}` (TD-478)."""
 
     def terminal(v: Any) -> dict[str, Any]:
         v = _fields(v, TERMINAL_KEYS, "terminal", drop)
@@ -518,8 +521,30 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
     def inbox(v: Any) -> dict[str, Any]:
         return _each(_fields(v, INBOX_KEYS, "inbox", drop), {"board_show": parse_board_show}, drop)
 
+    def attach(v: Any) -> dict[str, Any]:
+        return _each(_fields(v, ATTACH_KEYS, "attach", drop), {"max": parse_attach_max}, drop)
+
     value = _fields(value, PERSON_KEYS, "person", drop)
-    return _each(value, {"open_in": parse_open_in, "terminal": terminal, "inbox": inbox}, drop)
+    return _each(value, {"open_in": parse_open_in, "terminal": terminal, "inbox": inbox, "attach": attach}, drop)
+
+
+def parse_attach_max(v: Any) -> str:
+    """`person.attach.max` (§5, §4.4 *Attachment drop*, TD-478): a count of MiB or GiB, `<n>M` or
+    `<n>G`, from `1M` to `4G`; kept as written with its leading zeros dropped."""
+    m = re.fullmatch(r"([0-9]+)([MG])", v.strip()) if isinstance(v, str) else None
+    if m and ATTACH_MAX[0] <= attach_bytes(f"{int(m.group(1))}{m.group(2)}") <= ATTACH_MAX[1]:
+        return f"{int(m.group(1))}{m.group(2)}"
+    raise ValueError(f"attach.max is <n>M or <n>G from 1M to 4G, not {v!r}")
+
+
+def attach_bytes(word: str) -> int:
+    """A parsed `attach.max` (`256M`, `1G`) as bytes."""
+    return int(word[:-1]) << (20 if word[-1] == "M" else 30)
+
+
+def attach_max(doc: dict[str, Any]) -> int:
+    """The bound on a Focus attachment in bytes: `person.attach.max`, or `ATTACH_MAX_DEFAULT`."""
+    return attach_bytes(person(doc).get("attach", {}).get("max", ATTACH_MAX_DEFAULT))
 
 
 def parse_board_show(v: Any) -> str:

@@ -2797,7 +2797,19 @@ class TickMixin:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
         of forgotten sessions are the common case — Forget keeps the file until this sweep. `0`
-        keeps everything. Runs in a thread: touches files, never `self.sessions`."""
+        keeps everything. An attachment's `.part` nothing has written to for an hour goes whatever
+        the bound (§4.4 *Attachment drop*, TD-478): a browser closed mid-upload leaves nothing.
+        Runs in a thread: touches files, never `self.sessions`."""
+        idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
+        for f in paths.attachments_dir().glob("*/*.part"):
+            try:
+                # an upload's `.part` alone (`<name>.<16 hex>.part`): a finished file a person named
+                # `notes.part` is an attachment, kept as any other is
+                if paths.UPLOAD_PART.fullmatch(f.name) and f.stat().st_mtime < idle:
+                    f.unlink()
+                    log.info("pruned attachment upload %s (nothing written for an hour)", f)
+            except OSError:
+                continue
         keep = hosts.local_host().runs_keep_days
         if keep <= 0:
             return

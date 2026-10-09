@@ -182,8 +182,8 @@ class SettingsMixin:
           None is cleared, a team set to None removed. The team's name is the client's to check
           against the org's definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
         - `repos`: `{repo: {promote?: {auto: bool}, pull?: bool} | None}`.
-        - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?}}`, a None
-          clearing that key (or that field of terminal or inbox).
+        - `person`: `{open_in?, terminal?: {size?, face?, copy_on_select?}, inbox?: {board_show?},
+          attach?: {max?}}`, a None clearing that key (or that field of terminal, inbox or attach).
         - `usage`: `{max_age: "1h" | "90m" | "off" | None}` (§6 *A reading the gate can no longer
           trust*, TD-233), None clearing it back to the default hour.
         - `notify`: `{telegram: {on?, secrets?, link?} | None}` (§4.10 *Told on Telegram when nobody is
@@ -444,10 +444,14 @@ class SettingsMixin:
 
     @staticmethod
     def _person_change(current: Any, change: Any) -> dict[str, Any]:
-        """`person:` with `change` laid over it: a key set to None cleared; `terminal` and `inbox` merged
+        """`person:` with `change` laid over it: a key set to None cleared; `terminal`, `inbox` and `attach` merged
         field by field, a field set to None cleared. Validated whole before it is returned."""
         known = settings_mod.PERSON_KEYS
-        nested = {"terminal": settings_mod.TERMINAL_KEYS, "inbox": settings_mod.INBOX_KEYS}
+        nested = {
+            "terminal": settings_mod.TERMINAL_KEYS,
+            "inbox": settings_mod.INBOX_KEYS,
+            "attach": settings_mod.ATTACH_KEYS,
+        }
         if not isinstance(change, dict) or not change:
             raise RpcError(f"set_settings: person is a mapping of {', '.join(known)} (design §5)")
         if unknown := sorted(set(map(str, change)) - set(known)):

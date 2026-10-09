@@ -44,6 +44,7 @@ from sessionorc import (
     work,
 )
 from sessionorc import balance as balance_mod
+from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
@@ -218,11 +219,11 @@ from sessionorc.store import (
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
 
 
-def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
-    """`raw` as a new file in `where` (made `0700`), named `paths.attachment_name(name)`, or with
-    `-2`, `-3`… before its extension where that is taken: never over an earlier attachment, whose
-    path a sent prompt may still name. The file is `0600`."""
-    where.mkdir(mode=0o700, parents=True, exist_ok=True)
+def _place_attachment(where: Path, name: str, place: Any) -> Path:
+    """The first free name in `where` for `name` — `paths.attachment_name(name)`, or with `-2`,
+    `-3`… before its extension where that is taken — taken by `place(path)`, which raises
+    `FileExistsError` when the name is someone's: never over an earlier attachment, whose path a
+    sent prompt may still name."""
     base = paths.attachment_name(name)
     stem, dot, ext = base.rpartition(".")
     if not stem:
@@ -230,13 +231,71 @@ def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
     for n in range(1, 1000):
         path = where / (base if n == 1 else f"{stem}-{n}{dot}{ext}")
         try:
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            place(path)
         except FileExistsError:
             continue
-        with os.fdopen(fd, "wb") as f:
-            f.write(raw)
         return path
     raise RpcError(f"attach: {base} is taken a thousand times over in {where}")
+
+
+def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
+    """`raw` as a new `0600` file in `where` (made `0700`), named by `_place_attachment`."""
+    where.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    def write(path: Path) -> None:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+
+    return _place_attachment(where, name, write)
+
+
+def _start_part(part: Path, raw: bytes) -> None:
+    """An upload's first piece as its new `0600` `.part` (§4.4 *Attachment drop*, TD-478)."""
+    part.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(raw)
+
+
+def _append_part(part: Path, offset: int, raw: bytes, total: int) -> tuple[int, str]:
+    """One later piece of an upload appended to its `.part`: `(written, why)`, `why` empty when it
+    went on, else the refusal — the `.part` deleted with it, since an upload out of order is no
+    longer the file. A missing `.part` was cancelled or swept, and is never made again here: it is
+    opened without `O_CREAT`, so a cancel between two pieces cannot leave a new one behind."""
+    try:
+        fd = os.open(part, os.O_WRONLY | os.O_APPEND)
+    except FileNotFoundError:
+        return 0, "is gone (cancelled, or nothing written to it for an hour)"
+    with os.fdopen(fd, "ab") as f:
+        have = os.fstat(fd).st_size
+        if offset != have:
+            part.unlink(missing_ok=True)
+            return have, f"sent a piece at {offset} bytes, but {have} are written: the upload is dropped"
+        if have + len(raw) > total:
+            part.unlink(missing_ok=True)
+            return have, f"sent {have + len(raw)} bytes of a {total}-byte file: the upload is dropped"
+        f.write(raw)
+    return have + len(raw), ""
+
+
+def _finish_part(part: Path, name: str) -> Path:
+    """A whole `.part` linked into its final name — the `-2`, `-3`… rule applied now, `os.link`
+    never over a file — and unlinked, so no prompt can name a file that is not whole."""
+    try:
+        path = _place_attachment(part.parent, name, lambda p: os.link(part, p))
+    except BaseException:
+        part.unlink(missing_ok=True)  # the upload is spent either way: nothing names this `.part`
+        raise
+    part.unlink(missing_ok=True)
+    return path
+
+
+def _mib(n: int) -> str:
+    """A size as the attach refusal says it: whole MiB, rounded up, or GiB from a GiB on."""
+    if n >= 1 << 30 and n % (1 << 30) == 0:
+        return f"{n >> 30} GiB"
+    return f"{-(-n // (1 << 20))} MiB"
 
 
 def _bound(path: Path) -> socket.socket:
@@ -573,6 +632,10 @@ class HostAgent(
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}
+        # An attachment's upload in pieces (§4.4 *Attachment drop*, TD-478): its id → the session,
+        # the `.part`, the name and the file's `total`. In memory: a restart drops it, and the hour's
+        # sweep the `.part` it leaves.
+        self._uploads: dict[str, dict[str, Any]] = {}
         self._promote_read_at = float("-inf")  # monotonic: the first tick reads
         self._promote_watch_at = float("-inf")
         self._promote_bad: dict[str, str] = {}
@@ -2027,25 +2090,80 @@ class HostAgent(
             out["reason"] = f"rule {m.rule} matched and no fresher hook state exists — applied as scraped"
         return out
 
-    async def rpc_attach(self, id: str, name: str = "", data: str = "", caller: Any = None) -> dict[str, Any]:
+    async def rpc_attach(
+        self,
+        id: str,
+        name: str = "",
+        data: str = "",
+        upload: str = "",
+        offset: int = 0,
+        total: int | None = None,
+        cancel: bool = False,
+        caller: Any = None,
+    ) -> dict[str, Any]:
         """The Focus composer's **Attach** / drop / paste (design §4.4 *Attachment drop*, §4.5a,
-        TD-002): the person's file, base64 in `data`, written under `attachments/<session>/` by its
-        name made safe for a prompt (`paths.attachment_name`, `-2`, `-3`… where it is taken), and its
-        path returned for the composer to insert — Claude Code reads a path in a prompt. A person's
-        own act. A session on this host only: `_get` refuses a node's, whose copy over ssh is §7's
-        phase 2. Refused past `paths.ATTACH_BYTES_MAX` or when `data` is not base64."""
+        TD-002), in pieces (TD-478): the person's file, base64 in `data`, written under
+        `attachments/<session>/` by its name made safe for a prompt (`paths.attachment_name`, `-2`,
+        `-3`… where it is taken), and its path returned for the composer to insert — Claude Code
+        reads a path in a prompt. A file of one piece (no `total`, or `data` is all of it) is written
+        whole and answers `{path, bytes}`. A first piece short of `total` mints an `upload` id and
+        starts `<name>.<upload>.part`, answered `{upload, bytes}`; each later piece names the
+        `upload` and its `offset`, refused (and the `.part` deleted) unless the offset is the bytes
+        written so far; the piece that makes `total` links the `.part` into its final name and
+        answers `{path, bytes}`. `cancel` with the `upload` deletes the `.part`. A file past
+        `person.attach.max` (§5) is refused on its first piece, before anything is written. A
+        person's own act, for a session on this host only: `_get` refuses a node's, whose copy over
+        ssh is §7's phase 2."""
         agent_common.person_only(caller, "attach a file", "§4.5a")
         s = self._get(id)
+        if upload:
+            up = self._uploads.get(upload)
+            if up is None or up["session"] != s.id:
+                raise RpcError(
+                    f"attach: no upload {upload} for {s.id} (finished, cancelled, or the host agent restarted)"
+                )
+            if cancel:
+                self._uploads.pop(upload, None)
+                await asyncio.to_thread(up["part"].unlink, missing_ok=True)
+                return {"upload": upload, "cancelled": True}
+        elif cancel:
+            raise RpcError("attach: cancel names the upload it cancels")
         try:
             raw = base64.b64decode(data, validate=True)
         except (binascii.Error, ValueError):
             raise RpcError("attach: the file did not arrive as base64") from None
-        if len(raw) > paths.ATTACH_BYTES_MAX:
-            raise RpcError(
-                f"attach: {len(raw)} bytes is past the {paths.ATTACH_BYTES_MAX // (1024 * 1024)} MiB a file may be"
-            )
-        path = await asyncio.to_thread(_write_attachment, paths.attachments_dir() / s.id, name, raw)
-        return {"path": str(path), "bytes": len(raw)}
+        if upload:
+            written, why = await asyncio.to_thread(_append_part, up["part"], offset, raw, up["total"])
+            if not why and upload not in self._uploads:  # cancelled while this piece was written
+                await asyncio.to_thread(up["part"].unlink, missing_ok=True)
+                why = "was cancelled"
+            if why:
+                self._uploads.pop(upload, None)
+                raise RpcError(f"attach: upload {upload} {why}")
+            if written < up["total"]:
+                return {"upload": upload, "bytes": written}
+            self._uploads.pop(upload, None)
+            path = await asyncio.to_thread(_finish_part, up["part"], up["name"])
+            return {"path": str(path), "bytes": written}
+        if total is None:
+            total = len(raw)
+        if isinstance(total, bool) or not isinstance(total, int) or total < len(raw):
+            raise RpcError(f"attach: total is the file's whole size in bytes, at least this piece's {len(raw)}")
+        bound = await asyncio.to_thread(lambda: settings_mod.attach_max(settings_mod.load()))
+        if total > bound:
+            label = paths.attachment_name(name)
+            raise RpcError(f"attach: {label} is {_mib(total)}, past the {_mib(bound)} a file may be")
+        where = paths.attachments_dir() / s.id
+        if len(raw) == total:
+            path = await asyncio.to_thread(_write_attachment, where, name, raw)
+            return {"path": str(path), "bytes": len(raw)}
+        for gone in [k for k, v in self._uploads.items() if not v["part"].exists()]:
+            self._uploads.pop(gone)  # cancelled by a closed page and swept: nothing will name it again
+        upload = secrets.token_hex(8)
+        part = where / f"{paths.attachment_name(name)}.{upload}.part"
+        await asyncio.to_thread(_start_part, part, raw)
+        self._uploads[upload] = {"session": s.id, "part": part, "name": name, "total": total}
+        return {"upload": upload, "bytes": len(raw)}
 
     async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
         self._get(id)

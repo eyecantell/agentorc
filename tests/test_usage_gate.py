@@ -154,6 +154,32 @@ def test_board_show_takes_the_four_modes_and_the_reader_drops_the_rest():
             settings.parse_person(bad)
 
 
+@pytest.mark.unit
+def test_attach_max_takes_mib_or_gib_from_1m_to_4g_and_the_reader_drops_the_rest():
+    """§5 `person.attach.max`, §4.4 *Attachment drop* (TD-478): `<n>M` or `<n>G` from `1M` to `4G`,
+    leading zeros dropped; anything else refused naming the shape, and dropped by the reader, which
+    then bounds a file at `256M`."""
+    for word, kept in (
+        ("1M", "1M"),
+        ("256M", "256M"),
+        ("1G", "1G"),
+        ("4G", "4G"),
+        ("4096M", "4096M"),
+        (" 064M ", "64M"),
+    ):
+        assert settings.parse_attach_max(word) == kept
+    for bad in ("0M", "9G", "4097M", "5G", "256", "256MB", "1g", "", 256, None, "1.5G", "-1M"):
+        with pytest.raises(ValueError, match="attach.max is <n>M or <n>G from 1M to 4G"):
+            settings.parse_attach_max(bad)
+    assert settings.attach_max({}) == 256 << 20
+    assert settings.attach_max({"person": {"attach": {"max": "1G"}}}) == 1 << 30
+    doc = {"person": {"open_in": "none", "attach": {"max": "9G"}}}
+    assert settings.person(doc) == {"open_in": "none", "attach": {}} and settings.attach_max(doc) == 256 << 20
+    for bad in ({"attach": {"max": "9G"}}, {"attach": {"most": "1G"}}, {"attach": "1G"}):
+        with pytest.raises(ValueError):
+            settings.parse_person(bad)
+
+
 @pytest.mark.integration
 async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it_makes(agent, tmp_path):
     """§5 (TD-146): teams, repos and person through one RPC, each validated before anything is
@@ -194,6 +220,15 @@ async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it
         assert settings.load()["person"]["inbox"] == {"board_show": "7d"}  # written as parsed
         await person.call("set_settings", person={"inbox": {"board_show": None}})
         assert "inbox" not in settings.person(settings.load())
+        # the attachment bound (TD-478): the same, under person.attach
+        got = await person.call("set_settings", person={"attach": {"max": "01G"}})
+        assert got["person"]["attach"] == {"max": "1G"} and settings.load()["person"]["attach"] == {"max": "1G"}
+        with pytest.raises(AgentError, match="person: attach.max is <n>M or <n>G"):
+            await person.call("set_settings", person={"attach": {"max": "9G"}})
+        with pytest.raises(AgentError, match="person.attach: unknown key most"):
+            await person.call("set_settings", person={"attach": {"most": None}})
+        await person.call("set_settings", person={"attach": {"max": None}})
+        assert "attach" not in settings.person(settings.load())
         with pytest.raises(AgentError, match="unknown key resrve"):
             await person.call("set_settings", teams={"ao-grind": {"resrve": None}})
         with pytest.raises(AgentError, match="needs reserves, teams, repos, person, usage or notify"):
