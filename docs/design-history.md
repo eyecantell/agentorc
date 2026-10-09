@@ -321,6 +321,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-457, the designer): the Inbox row *team start* also stands for a running team with a finished member closed, naming the member, and its Start replays the named members alone. Built by TD-466.
 - 2026-10-08 (TD-424, grinder-ao-1): the Due strip / Inbox board row's **Done** row said TD-338's pending mark was *not built*; TD-340 built it (#1144), as the *a control's look* and *Inbox row: pending* rows already said, so the row now reads *built — TD-340*.
 - 2026-10-08 (TD-421, the designer): the row *a URL is a link — Ctrl+click / Cmd+click* on the Focus pane. TD-422 builds it.
 - 2026-10-08 (TD-422, grinder-ao-2): *The help text* gains **a URL is a link** (Focus pane), the Help page's Focus paragraph, in the row's words.
@@ -954,6 +955,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-09 (TD-457, the designer): `teams.<team>.on_work` defaults to `start`, and covers a finished member's lane as well as a wound-down team's.
 - 2026-09-10 (TD-004): the shared `sessionorc.hosts` parser landed; in phase 1 the UI and the host agent run on one machine and read the same `local` entry (`name`, `vscode_host`, `local`, `volatile`, `repos_registry`, `runs_keep_days`); the env-var overrides were removed. The ssh entries stayed phase 2 work, becoming the node→home link of §4.4a.
 - 2026-09-16 (§4.4a): `home:` was added to `hosts.yml`.
 - 2026-09-21 (TD-095 second pass): `ui.yml` designed as the person's own scope, beside `hosts.yml` and `org.yml`. Built the same day (PR #390): `ui.yml` and `open_in:` for the card's button and Focus's; *edit yml* left waiting for the Commands page.
@@ -981,6 +983,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-09 (TD-457, the designer): rule 8 reads member by member — a crew member closed after declaring, its team not wound down, whose lane gains an id is the same `work_waiting` mark, and a start on a running team replays the named members alone (`why: work`); `on_work`'s default is `start` (Paul, 2026-10-08); rule 6's *told by neither rule* sentence replaced; a seat still holds a wind-down; rule 9's race needs no hold. Built by TD-466.
 - 2026-10-08 (TD-414, grinder-ao-1): rule 6's *`lane_seen` is the lane's memory* sentence said a pruned id's drop was kept under `dropped`; `work.reread` has removed the mark with the id since TD-411, and that is the half that holds (a kept mark would make the returning entry's later drop read as already told), so the sentence now says the mark leaves with the id.
 - 2026-10-08 (TD-413, grinder-ao-1): TD-410 built — a Start and Apply write a manager on call `held` (`teamrun.on_call_gate`; its line *on call — comes when a member needs a reading*), the held create moves the kept mail as a fill does, a fill's prompt ends with *[agentorc] you are filled for: <by> — <member or question>* (`agent_tick.filled_for`; `restarts` `for: seat_due`), and `docs/briefs/manager-ao-1.md`'s first reads moved under the readings that need them.
 - 2026-10-08 (TD-411, grinder-ao-1): TD-407 built — `work.reread` prunes `lane_seen` and reads the news in one pass, for rule 6 (`_lane_news`, which writes the pruned memory for a gone member as for a live one), rule 8 (`work.gained`) and the anchor seat's `work` trigger (`_work_due`).
