@@ -5,6 +5,7 @@ since `ao` runs without the `ui` extra."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -53,7 +54,7 @@ def restart_words(entry: Mapping[str, Any]) -> str:
     words = why
     if why == "cache":
         words = "cache lapsed"
-        if isinstance(idle := entry.get("idle"), int | float) and not isinstance(idle, bool):
+        if isinstance(idle := entry.get("idle"), int | float) and not isinstance(idle, bool) and math.isfinite(idle):
             words += f" · idle {round(idle)}h"
         if isinstance(tokens := entry.get("context"), int) and not isinstance(tokens, bool):
             words += f" · {tokens_short(tokens)}"
