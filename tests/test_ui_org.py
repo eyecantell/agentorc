@@ -1560,3 +1560,89 @@ def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
     )
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
     assert "(o.seat || `in use by ${o.occupants.join" in js
+
+
+def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypatch):
+    """§4.2 *Waiting*, §4.5 *The card's anatomy* (TD-418, built by TD-428): an `idle` record with a
+    claim whose PR the repo reading holds open, or an open `ask`/`steer` to the person whose `about`
+    names a reference, draws the teal *waiting* pill — its own filter word and Agents pill, ranked after
+    `working` — with the wait as the slot's ending; the payload's state stays `idle`."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import card_order, rollup, state_counts, view, waits_of
+    from sessionorc.models import STATE_RANK
+
+    repos = {
+        "/r": {
+            "name": "r",
+            "prs": {"open": [{"number": 1302, "branch": "td009-x"}, {"number": 7, "branch": "td428-pill"}]},
+        }
+    }
+
+    def claim(**kw):
+        return [{"ref": "TD-009", "status": "claimed", "at": "2026-10-09T10:00:00Z", **kw}]
+
+    # a claim's own PR, open in the reading: *waiting · review #1302*
+    v = view(_card(progress=claim(pr=1302)), repos=repos)
+    assert (v["state"], v["state_class"], v["state_label"], v["pill_word"]) == ("idle", "waiting", "waiting", "waiting")
+    assert v["slot"]["text"] == "waiting · review #1302"
+    assert STATE_RANK["working"] < v["rank"] < STATE_RANK["idle"] - 0.5  # after working, before an unseen idle
+    # the tick's `review_pr`, and an open PR whose head branch names the reference, are the same reading
+    assert view(_card(progress=claim(review_pr=1302)), repos=repos)["pill_word"] == "waiting"
+    assert view(_card(progress=claim()), repos=repos)["slot"]["text"] == "waiting · review #1302"
+    # *with the techlead* while the seat's `prs_waiting.asks` holds this record's ask for that PR
+    asks = [{"from": "ao-w@kmaster", "pr": 1302}]
+    seat = {"id": "ao-tl", "name": "techlead-1", "role": "techlead", "state": "idle",
+            "prs_waiting": {"n": 1, "oldest": "2026-10-09T10:00:00Z", "asks": asks}}  # fmt: skip
+    rec = _card(progress=claim(pr=1302))
+    assert view(rec, [rec, seat], repos=repos)["slot"]["text"] == "waiting · review #1302 with the techlead"
+    other = {**seat, "prs_waiting": {"n": 1, "asks": [{"from": "ao-other", "pr": 1302}]}}
+    assert view(rec, [rec, other], repos=repos)["slot"]["text"] == "waiting · review #1302"
+    # a PR the reading does not hold open (merged, closed, unknown), no reading at all, a done entry: idle
+    for idle in (
+        view(_card(progress=claim(pr=1301)), repos=repos),
+        view(_card(progress=claim(pr=1302))),
+        view(_card(progress=[{"ref": "TD-009", "status": "done", "pr": 1302}]), repos=repos),
+        view(_card(progress=[{"ref": "TD-1", "status": "claimed"}]), repos=repos),
+    ):
+        assert (idle["state_class"], idle["pill_word"]) == ("idle", "idle")
+    # only an idle record: a working one with the same claim is working
+    assert view(_card(state="working", progress=claim(pr=1302)), repos=repos)["pill_word"] == "working"
+
+    # the person-inbox wait (TD-274): an ask naming a reference makes a wait; one in prose makes none
+    def ask(about):
+        return {"id": "m-a", "from": "ao-w", "to": ["person"], "kind": "ask", "about": about, "text": "q?"}
+
+    v = view(_card(), waits=waits_of([ask("TD-222")]))
+    assert v["pill_word"] == "waiting" and v["slot"]["text"] == "waiting on you: TD-222"
+    assert view(_card(), waits=waits_of([ask("the colour of the button")]))["pill_word"] == "idle"
+    # a member that declared out of work and waits on you reads *waiting*, the declaration in the slot
+    oow = {"at": "2026-10-09T09:00:00Z", "why": "nothing pickable"}
+    v = view(_card(out_of_work=oow), waits=waits_of([ask("TD-222")]))
+    assert v["pill_word"] == "waiting"
+    assert v["slot"]["text"] == "out of work · waiting on you: TD-222 — nothing pickable"
+    # *idle · unseen* wins on an interactive session that waits; the slot still says the wait
+    mine = view(_card(unattended=False, seen_at=None), waits=waits_of([ask("TD-222")]))
+    assert (mine["state_label"], mine["pill_word"]) == ("idle · unseen", "unseen")
+    assert mine["slot"]["text"] == "waiting on you: TD-222"
+
+    # the sort, the header's counts and the rollup's Agents pill
+    waiting = view(_card(name="a", progress=claim(pr=1302)), repos=repos)
+    cards = [
+        view(_card(name="b")),
+        mine,
+        waiting,
+        view(_card(name="c", state="working")),
+    ]
+    assert [c["pill_word"] for c in sorted(cards, key=card_order)] == ["working", "waiting", "unseen", "idle"]
+    assert state_counts(cards) == ["1 working", "1 waiting", "1 unseen", "1 idle"]
+    for c in cards:
+        c["team"] = "t"
+    agents = rollup(
+        [{"team": "t", "live": True, "members": cards, "summary": {"phases": {}, "answers": [], "asked": None}}]
+    )["agents"]
+    assert [(a["word"], a["cls"], a["n"]) for a in agents] == [
+        ("working", "working", 1),
+        ("waiting", "waiting", 1),
+        ("unseen", "idle", 1),
+        ("idle", "idle", 1),
+    ]

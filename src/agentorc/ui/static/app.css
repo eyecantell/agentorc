@@ -18,6 +18,8 @@
      green means working and nothing else. Blue is also the accent for what is new (`--new`). */
   --working: #16a34a; --working-bg: #dcfce7; --working-fg: #166534;
   --idle: #2563eb; --idle-bg: #dbeafe; --idle-fg: #1e40af;
+  /* *waiting* (§4.5 *The card's anatomy*, TD-418): teal — at rest on someone else's move, `idle` in every payload */
+  --waiting: #0d9488; --waiting-bg: #ccfbf1; --waiting-fg: #115e59;
   --ended: #9ca3af; --ended-bg: #e5e7eb; --ended-fg: #4b5563;
   --new: #2563eb; --new-bg: #dbeafe; --new-fg: #1e40af;
   --stalled: #dc2626; --stalled-bg: #fecaca; --stalled-fg: #991b1b;
@@ -49,6 +51,7 @@ html[data-theme="dark"] {
   --term: #0b0e12; --termfg: #d5dbe3; --tail: #8b95a3;
   --needs-bg: #4a3608; --needs-fg: #fde68a; --working: #22c55e; --working-bg: #123d27; --working-fg: #bbf7d0;
   --idle: #3b82f6; --idle-bg: #1a2c52; --idle-fg: #bfdbfe; --ended-bg: #2a313a; --ended-fg: #c9d1db;
+  --waiting: #14b8a6; --waiting-bg: #0f3b38; --waiting-fg: #99f6e4;
   --new: #3b82f6; --new-bg: #1a2c52; --new-fg: #bfdbfe; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
   --limited-bg: #2e1d5c; --limited-fg: #ddd6fe; --done-bg: #0d3d2c; --done-fg: #a7f3d0;
   --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
@@ -130,6 +133,7 @@ details#morefields[open] > summary { margin-bottom: 10px; }
 .pill.s-scheduled::before { content: "◷"; font-size: 1.1em; } .pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
 .pill.s-closed::before { content: "✓"; font-size: 1.1em; } .pill.s-unreachable::before { content: "⌀"; font-size: 1.1em; }
 .pill.s-oncall::before { content: "◇"; font-size: 1.1em; }  /* a seat with nobody in it (TD-097) */
+.pill.s-waiting::before { content: "⋯"; font-size: 1.1em; }  /* idle on someone else's move (TD-418) */
 .sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: .9em; letter-spacing: 0; }  /* not the idle glyph's tuning */
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
@@ -355,7 +359,7 @@ details.fold[open] > summary { margin-bottom: 3px; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
-.s-idle { background: var(--idle-bg); color: var(--idle-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
+.s-idle { background: var(--idle-bg); color: var(--idle-fg); } .s-waiting { background: var(--waiting-bg); color: var(--waiting-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
 /* the shared idle / exited / unreachable rule is split (TD-095): what is over is grey, idle is not */
 .s-exited, .s-closed, .s-oncall, .s-unreachable { background: var(--ended-bg); color: var(--ended-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
 .badge { display: inline-block; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; font-size: var(--t-cap); color: var(--muted); font-family: "JetBrains Mono", monospace; background: transparent; }
@@ -426,6 +430,7 @@ details.more .menu button:disabled { opacity: .45; cursor: default; } details.mo
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: var(--t-title); font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
 .sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); } .sc.s-idle .sbar { background: var(--idle); }
+.sc.s-waiting .sbar { background: var(--waiting); }
 .sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); }
 .sc.s-needs { box-shadow: 0 0 0 2px var(--needs); }  /* ringed: what to press, seen from across the room */
 /* the keyboard's ring (§4.5a Org **keys**, TD-124): the browser's focus ring, blue and offset

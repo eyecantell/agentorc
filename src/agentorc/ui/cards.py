@@ -15,7 +15,7 @@ from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
 from agentorc.ending import NO_CLOSER, closer_words, waiting_words
 from agentorc.org import ANCHOR_WHEN, MANAGER_WHEN
-from sessionorc import hosts, identity, mail, work
+from sessionorc import hosts, identity, mail, naming, work
 from sessionorc.adapters import short_model
 from sessionorc.agent_common import CLOSED_KEEP
 from sessionorc.models import (
@@ -32,6 +32,7 @@ from sessionorc.models import (
     stop_note,
     tokens_short,
 )
+from sessionorc.reports import branch_ref
 
 from .common import _age, _instant, editor_link, host_name
 
@@ -331,6 +332,15 @@ def view(
     d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     d["flow_mark"] = flow_mark(s, hosts.local_host().name) if s.get("team") else None
     d["waiting"] = waiting_view((waits or {}).get(s.get("id")))
+    # **waiting** (§4.2 *Waiting*, §4.5 *The card's anatomy*, TD-418, built by TD-428): an `idle` session
+    # that waits on someone — a claim whose PR the repo reading holds open, or the mark above — is drawn
+    # *waiting*, teal, in the order after `working`; it stays `idle` in every payload. *idle · unseen*
+    # wins over it: the person's cue to go and look, and the slot still says the wait.
+    d["review_wait"] = review_wait(s, fleet, repos) if state == "idle" else ""
+    d["wait_reason"] = (d["waiting"] or {}).get("text") or (f"waiting · {d['review_wait']}" if d["review_wait"] else "")
+    if state == "idle" and not d["unseen"] and d["wait_reason"]:
+        d["state_class"] = d["state_label"] = d["pill_word"] = "waiting"
+        d["rank"] = STATE_RANK["working"] + 0.25  # after `working`, before an unseen `idle` (idle - 0.5)
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
     # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
@@ -627,6 +637,44 @@ def waits_of(entries: Any) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+def review_wait(
+    s: Mapping[str, Any], fleet: Collection[Mapping[str, Any]] | None, repos: Mapping[str, Any] | None
+) -> str:
+    """What a claim of the record waits on in review (§4.2 *Waiting*, TD-428): *review #1302* when a
+    `claimed` entry's PR — its own `pr`, the tick's `review_pr`, or else an open PR whose head branch
+    names the reference, the *review* phase's reading (`org.motion_rows`) — is one the repo reading
+    holds open; *review #1302 with the techlead* while a seat's `prs_waiting.asks` holds this
+    record's ask for that PR, the seat named by its role. "" when it waits on no review, and with no
+    reading: never guessed."""
+    want = str(Path(str(s.get("repo") or "")).resolve()) if s.get("repo") else None
+    # the record's repo's reading, `pr_marks`' lookup
+    r = next((r for root, r in (repos or {}).items() if want and str(Path(str(root)).resolve()) == want), None)
+    opened = [
+        p for p in ((r if isinstance(r, dict) else {}).get("prs") or {}).get("open") or [] if isinstance(p, Mapping)
+    ]
+    numbers = {p["number"] for p in opened if isinstance(p.get("number"), int)}
+    by_branch: dict[str, int] = {}
+    for p in opened:
+        if isinstance(p.get("number"), int) and (ref := branch_ref(p.get("branch"))):
+            by_branch.setdefault(ref, p["number"])
+    pr = None
+    for p in s.get("progress") or ():
+        if not isinstance(p, Mapping) or p.get("status") != "claimed":
+            continue
+        got = p.get("pr") or p.get("review_pr") or by_branch.get(str(p.get("ref") or ""))
+        if isinstance(got, int) and got in numbers:
+            pr = got
+    if pr is None:
+        return ""
+    me = str(s.get("id") or "")
+    for o in fleet or ():
+        w = o.get("prs_waiting")
+        for a in (w.get("asks") or ()) if isinstance(w, Mapping) else ():
+            if isinstance(a, Mapping) and a.get("pr") == pr and naming.split_address(str(a.get("from")))[0] == me:
+                return f"review #{pr} with the {o.get('role') or o.get('name') or 'reader'}"
+    return f"review #{pr}"
+
+
 def waiting_view(questions: Any) -> dict[str, str] | None:
     """The **waiting** mark (§4.5a, TD-274) as the slot and the Focus chip draw it: `ending.waiting_words`
     for the text, and on hover the sooner question's first paragraph. None when it waits on nothing."""
@@ -805,6 +853,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     elif d.get("waiting"):
         # alone, on a session that declared nothing: still an ending's place, row 5 (b)
         text, full = d["waiting"]["text"], d["waiting"]["full"]
+    elif d.get("review_wait"):
+        # the *waiting* pill's reason (§4.2 *Waiting*, TD-428): its claim's PR is open, in review
+        text = f"waiting · {d['review_wait']}"
+        full = f"{text}: it holds a claim whose pull request is open — idle on someone else's move (design §4.2)"
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (
@@ -936,6 +988,7 @@ COUNT_ORDER = (
     ("stalled?", "stalled?"),
     ("unreachable", "unreachable"),
     ("working", "working"),
+    ("waiting", "waiting"),
     ("unseen", "unseen"),
     ("idle", "idle"),
     ("oncall", "on call"),
@@ -951,6 +1004,7 @@ def state_counts(members: list[dict[str, Any]]) -> list[str]:
     tally: dict[str, int] = {}
     for m in members:
         key = "unseen" if m.get("unseen") else "oncall" if m.get("seat") else str(m.get("state") or "")
+        key = "waiting" if m.get("pill_word") == "waiting" else key
         tally[key] = tally.get(key, 0) + 1
     return [f"{tally[k]} {label}" for k, label in COUNT_ORDER if tally.get(k)]
 
