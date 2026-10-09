@@ -7888,3 +7888,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** a pass section by section, largest first, each section its own PR with a fact-check. Move dated reasons and *was* clauses to the history. Cut each reason to one sentence, and keep every rule and every number. Shorten the §4.5a cells to the control and its rule, with the rest in the section the cell points to. **Mind** the doc-bound tests (`tests/test_primer.py`, `help.py`'s bound text): a pass never rewords what they read without the same PR fixing them. **Done when** every section has had its pass, no rule lost, each PR fact-checked, and the total is written here before and after.
 
 **Related:** TD-109 (archived; step 6), TD-410 (what a fill reads), TD-378 (what reads cost).
+
+## TD-481: PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1354)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` `heads` (`view(s, fleet, seats=seats, repos=repos, waits=waits)`), `person_states` (`view(..., repos=repos, waits=waits)`), `repo_page` (`view(..., repos=repos, waits=waits)`); `tests/test_ui_org.py` `test_an_idle_session_that_waits_on_someone_reads_waiting`
+
+**Why:** The PR's one test calls `view(...)` and `rollup(...)` directly with `repos=` and `waits=`; no test names `person_waits`, `person_states` or `review_wait` (`grep -rn` over `tests/`). Mutation probes on `origin/main` (9013f3ad), each over `tests/test_ui*.py` (536 passed at baseline): dropping `waits=waits` from the `heads` list comprehension — 536 passed; dropping `repos=repos, waits=waits` from `person_states`' `views = [...]` — 536 passed; dropping them from `repo_page`'s `vs = [...]` — `tests/test_ui_org.py tests/test_ui_repo_page.py tests/test_ui_team_summary.py` 83 passed (the same edit made the full-suite run hang past 4 minutes with no result, so it is no more reliable a catch). Each revert returns the old pill (*idle*) on the Org's group heads, the Agents pill's rows and the Repo page, while the Org card's own `view` still reads *waiting*: the very split the comment on `person_states` says the wiring prevents (*so a row's pill is the Org card's*).
+
+**Resolved:** 2026-10-09 (PR #1379) — `tests/test_ui_waiting_wiring.py`: the events stream's group head and rollup (`heads`) and the Inbox's *idle · open work* row (`person_states`) read *waiting* for a PR wait and a person-inbox wait; the Repo page draws no member pill, so its call shape is pinned by a spy on `view`. Each of the three mutations fails a test.
+
+**Related:** PR #1354, TD-428.
