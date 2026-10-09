@@ -321,7 +321,7 @@ EXTRA = {
     # no `doing` on tdgrind-3 on purpose: it is `limited`, and the slot shows the cap — what needs
     # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
     "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2,
-                  "restarted": "restarted · cache lapsed · idle 5h · 191k"},
+                  "restarted": "restarted · cache lapsed"},
     # declared itself out of work: plain `idle` — *unseen* is drawn only on an interactive session
     # (§4.2, TD-095 f), its manager read the result; the ending is said once, in the slot, and
     # *ready to close ✓* is its caption; it holds a steer to the person about #809, so the slot
