@@ -738,6 +738,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9a Winding down: a team that runs out of work
 
+- 2026-10-09 (TD-110, the designer): **the home's note says more** — rule 9's wind-down note gains claims left, restarts by why, standing alarms, open questions to the person and each profile's usage against the start's reading (`teams.<team>.usage_at_start`); no `ao team report`, no board line. Built by TD-468.
 - 2026-10-08 (TD-053 step 4, the anchor): **the three guards against false exhaustion were settled: one kept, one moved to the home, one dropped.** The design had left them unset, to be chosen against a running team: the manager re-reading the ledger before a team-wide wind-down, and an exhaustion declared soon after a start reported rather than acted on. By this date rule 9 (TD-240) had made *finished* the home's reading, with `FINISHED_SETTLE`, and rules 6 and 8 read the lanes themselves. So the second opinion is the home's and not the manager's. The early bound was dropped: the running teams' early declarations were correct (grinder-sam-1 at 90 s after a full search; samscrape-grind-anchor at 24 s on an empty lane), so a bound would have sent the person right answers. `RESTART_EARLY` stays the restart's alone.
 - 2026-10-07 (TD-384 slice 3, grinder-ao-1): the grinder brief's paragraph built. *A decided board line comes first*: claim `board:<key>`, read the line, then one of the four outcomes, each a PR that closes the line with `board_edit.py done --why`, then `ao progress done board:<key> --pr <n>`. The brief's *Out of work* counts an unclaimed decided line as work.
 - 2026-10-07 (TD-380, the designer): a team is not out of work while a decided line is unclaimed; *What a session does with a decided line* — claim `board:<key>`, then close it, do it, ledger it for its owner, or ask back, by PR.
@@ -984,6 +985,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-09 (TD-110, the designer): rule 9's note carries §4.9a's added lines.
 - 2026-10-09 (TD-459, the designer): rule 7's tick restart also serves §4.10's lapsed-cache restart, `why: cache`.
 - 2026-10-09 (TD-457, the designer): rule 8 reads member by member — a crew member closed after declaring, its team not wound down, whose lane gains an id is the same `work_waiting` mark, and a start on a running team replays the named members alone (`why: work`); `on_work`'s default is `start` (Paul, 2026-10-08); rule 6's *told by neither rule* sentence replaced; a seat still holds a wind-down; rule 9's race needs no hold. Built by TD-466.
 - 2026-10-08 (TD-414, grinder-ao-1): rule 6's *`lane_seen` is the lane's memory* sentence said a pruned id's drop was kept under `dropped`; `work.reread` has removed the mark with the id since TD-411, and that is the half that holds (a kept mark would make the returning entry's later drop read as already told), so the sentence now says the mark leaves with the id.
