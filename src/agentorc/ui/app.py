@@ -71,6 +71,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     flow_mark,  # noqa: F401
     gated_view,  # noqa: F401
     group_place,  # noqa: F401
+    host_volatile,  # noqa: F401
     next_act,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401

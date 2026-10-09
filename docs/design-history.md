@@ -958,6 +958,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-28 (TD-220 slice 1, grinder-ao-2): `person.inbox.board_show` read and written — `parse_person` checks it, the reader drops a bad value field by field as it does `terminal`'s, `set_settings` merges `inbox` field by field and refuses `next:0`, `next:51`, `0d` and `soon` naming the four shapes; a number written with a leading zero is kept without it (`07d` → `7d`). Nothing on the page reads it yet (slices 2–4).
 - 2026-10-01 (TD-222, the designer): `repos.<repo>.pull: true|false` joins `promote.auto` in `settings.yml` — the one opt-out of §6 *Pull*, `true` when absent; a repo absent under `repos:` is pulled.
 - 2026-10-03 (TD-298, grinder-ao-1): an unset `repos_registry` defaults by home — dev-cadence's roster on `~/.agentorc`, `repos.txt` under any other home (`hosts.default_repos_registry`). Until this date every home defaulted to the machine roster.
+- 2026-10-08 (TD-004, the anchor): §5 stopped promising per-host `transport: ssh|local` and `ssh` target entries *with the ssh transport*: §7 phase 2 had already recorded that the home and node split replaced that transport, so nothing would ever read them. A node's `volatile` flag under `nodes:` now places its *unreachable* card with *idle*, as §4.5's order said; until then the order had one slot for every unreachable card.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 

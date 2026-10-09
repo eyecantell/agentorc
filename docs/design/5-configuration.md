@@ -4,9 +4,11 @@
   agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
   fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
   you sit at), `volatile: true|false`, `repos_registry` path (unset: dev-cadence's `~/.config/dev-cadence/repos.txt` on the default home `~/.agentorc`, `repos.txt` under any other home — TD-298), `runs_keep_days`, `identity` (§4.8a)
-  and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). The UI
-  host's entries for other hosts — `transport: ssh|local` and an `ssh` target each — arrive with
-  the ssh transport (TD-004, phase 2); nothing reads them today. The UI process may run on a
+  and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). There are
+  no per-host `transport:` or `ssh` target entries: the hub-and-spoke ssh transport they were for
+  was replaced by the home and node split (§4.4a, §7 phase 2), where a node dials the home with its
+  `link:` and the home lists it under `nodes:` with its flags (`volatile` among them, which sorts
+  that host's *unreachable* card with *idle*, §4.5; TD-004). The UI process may run on a
   laptop; only the session hosts need to stay awake. The parser is `sessionorc.hosts`, shared by the UI and the host agent (TD-004; there are
   no env-var overrides). A field the *agent* acts on (`runs_keep_days`) is read on the session host
   from its own file's `local` entry, so every session host carries its own copy. `local.name`, `home:` and `local.identity`
