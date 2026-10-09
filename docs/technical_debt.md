@@ -50,7 +50,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-456 | The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
 | TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Open |
-| TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Open |
+| TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Open |
@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | Open |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Open |
+| TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | Open |
 
 ---
 
@@ -770,7 +771,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — decided by Paul 2026-10-08 (option 3 of the ADR); the design in §4.10 and §6 first, then its build entry.
+**Status:** Designed 2026-10-09 (the designer, PR #TBD): §4.10 *A lapsed cache is started again, not rung* — when the doorbell has decided to ring (every check passed, the wake charged) a member idle longer than `CACHE_LIFETIME` (1 h) whose context reading is over `CACHE_FLOOR` (100k), the home restarts it on its brief by rule 7's tick restart under rule 7's precondition (hook-confirmed idle, no claim in progress, declared nothing, git clean and known, not past its stop, not gated, not suspended), `restarts: [{why: cache, idle, context}]`; without the precondition it rings as today; the restart is the wake (one unit, the watermark advanced); not a seat (rule 3's grace closes an idle seat), never a person's session (invariant 5), not on a node yet (as rule 7); the two numbers live in `agent_common`, not in settings; `read_when`'s idle sentence says which. §6 rule 7 names the third trigger. The build is TD-467. Was: Open — decided by Paul 2026-10-08 (option 3 of the ADR); the design in §4.10 and §6 first, then its build entry.
+**Blocked by:** TD-467
 **Location:** design §4.10 (the doorbell), §6 (rule 5's precondition, restarts and their `why`); `src/sessionorc/agent_wake.py`, `src/sessionorc/agent_tick.py`
 
 **Why:**
@@ -910,3 +912,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §6 rule 8 says, in slices: (1) the reading — `_work_mark` also watches a crew member that is `closed` or `exited` with `out_of_work` while its team is not wound down (not one a person killed or closed; not one sat out), its `lane_seen` kept as rule 6 keeps it, the same mark and settle, `members` naming it; the mark removed when every named member is live again, when no id is new, or under `off`; (2) the start — `_work_start` reads at the start whether the team is wound down: whole as today, else only the named members, each replayed alone with `why: work`, its `ids`, `start`, `of` = the members replayed, under the five bounds (usage read for the member's profile, one such start counting in `work_started`), a named member at its ceiling, suspended, sat out or without a launch record left and a mark naming only such members held as `nothing`; (3) `work_start {team}`, a person's own RPC in `HOME_EDITS`, the same replay under the same bounds, refused in the row's words when one holds; the row (`inbox.py`) reads *`<team>` · `<member>` finished <t> · its lane gained …* for a running team and its **Start** calls `work_start` instead of the team's start; (4) the default: `start` when absent in `agent_tick.py`, `agent_notify.py`, `settings_page.py`, `ON_WORK`'s comment, the picker's *(default)* on *start the team*; (5) the help text: §4.5a's **when work appears** paragraph loses *It does nothing while the team is live* and says a finished member of a running team is started alone, and **Start** (Inbox row: team start) says it starts the named members when the team is running — word for word in `help.py` and §4.5a's list together (`tests/test_help.py`); (6) tests: a finished member closed while a seat runs, the mark, the one-member replay under `start`, the row under `ask`, `work_start` refused by a bound, the default with no key. **Done when** a crew member closed after declaring, its team running on, is replayed alone within `WORK_SETTLE` of its lane gaining an entry under `on_work: start` (and the default), the row names it under `ask` and its Start replays it, and the help text and tests agree.
 
 **Related:** TD-457 (the design), TD-214 / TD-227 (rule 8), TD-240 / TD-241 (rule 9), TD-407 (no hold for an untold entry), TD-271 (a question's end is work: unchanged).
+
+## TD-467: Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (the designer, TD-459's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.10 *A lapsed cache is started again, not rung*, the `read_when` table's `idle` from a hook row; §6 rule 7 (the tick restart's third trigger); `src/sessionorc/agent_wake.py` (`_ring_typing`: after `_decide_wake` says ring, before `_type`), `src/sessionorc/agent_tick.py` (`_brief_restart`: the precondition and the close-and-replay, to share; `_just_restarted`; the `restarts` entry), `src/sessionorc/agent_common.py` (`CACHE_LIFETIME`, `CACHE_FLOOR` beside `WORK_SETTLE`), `src/sessionorc/mail.py` (`read_when`), `src/agentorc/ui/cards.py` and `src/agentorc/cli.py` (the restart note's words, *cache lapsed · idle 5h · 191k*)
+
+**Why:** TD-459: 23 of the week's 44 whole-context re-writes after a lapsed cache were doorbell rings of a grinder idle a median 5.4 h, each re-writing a median 191k tokens at the write price; a start on the brief writes about 23k ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, Paul's decision).
+
+**Fix:** as §4.10 says: (1) the two constants; (2) in `_ring_typing`, once `_decide_wake` has decided and charged the ring, a member whose `since` is older than `CACHE_LIFETIME` and whose `context.tokens` is over `CACHE_FLOOR` goes to the tick restart instead of `_type` — `_brief_restart`'s precondition and close-and-replay factored so a third trigger (`why: cache`, with `idle` in hours and `context` in tokens on the entry) shares them; when the precondition fails, the ring goes on as today; the restart counts as the ring for `_bells`, `_rang` and the watermark (one per idle stretch), and a failed close or replay is retried as rule 7 retries, the ring not re-decided; (3) never a seat, never `unattended: false` (already behind `_bell_blocked`), never a node's member (rung as today); (4) `read_when`'s `idle` from a hook sentence says *started again on its brief within a tick, and reads it first* when the record would be restarted rather than rung; (5) the card's restart note and `ao status -v` word `why: cache` as *cache lapsed · idle 5h · 191k*; (6) tests: idle 2 h with 150k and clean → replayed with `why: cache`, the budget charged once, no line typed; the same with a claim in progress, or a dirty tree, or idle 30 min, or 60k → rung; a seat → rung; the `read_when` sentence. **Done when** a clean idle member past the hour with a long context is restarted on its brief when mail lands, one that fails the precondition is rung, the record's `restarts` says why, and the tests pass.
+
+**Related:** TD-459 (the design), TD-458 (the metered profile's lifetime), TD-460 (the context-bound trial; both change how often a grinder restarts), TD-217 (rule 7's tick restart), TD-347 (the bell).
