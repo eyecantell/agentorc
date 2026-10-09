@@ -135,6 +135,7 @@ PERSON_ONLY = frozenset(
         "promote",
         "clear_promote",
         "clear_work",
+        "work_start",
         "clear_mark",
         "restart",
         "relaunch",

@@ -354,3 +354,90 @@ async def test_a_member_its_flow_sat_out_is_not_replayed_by_a_start(agent, tmp_p
     )  # fmt: skip
     await agent._work_marks(later)
     assert [c[0] for c in replays.calls] == ["grinder-ao-1"] and replays.calls[0][2]["of"] == 1
+
+
+# -- a member that finished while its team runs on (§6 rule 8, TD-457, TD-466) ---------------------
+
+
+def _running(agent, tmp_path, **grinder):
+    """Team `g` running on its anchor seat; its grinder closed after declaring, its lane gaining TD-002."""
+    return (
+        _rec("grinder-ao-1", controllers=["ao-t-manager-ao"], **grinder),
+        _rec("grinder-ao-2", controllers=["ao-t-manager-ao"]),  # finished too, its lane gained nothing new
+        _rec("manager-ao", lane=["TD-900"], state="closed"),
+        _rec("anchor-ao", seat={"trigger": "work"}, out_of_work=None, state="working", lane=["TD-900"]),
+    )
+
+
+async def test_a_finished_member_of_a_running_team_is_replayed_alone(agent, tmp_path, monkeypatch):
+    """A crew member closed after declaring, its team running on a seat, is rule 8's news: the mark
+    names it after the settle, and `start` replays it alone, `of` counting the members replayed."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    recs = _running(agent, tmp_path)
+    recs[1].lane_seen = {"at": "x", "ids": ["TD-001", "TD-002"]}
+    later = await _settled(agent, tmp_path, *recs)
+    assert replays.calls == [] and "work_waiting" not in _team_rec(agent), "not before the settle"
+    await agent._work_marks(later)
+    rec = _team_rec(agent)
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1"], "the finished member alone, never the team"
+    assert replays.calls[0][1] == "work" and replays.calls[0][2] == {
+        "ids": ["TD-002"],
+        "start": rec["work_started"][-1],
+        "of": 1,
+    }
+    assert "work_waiting" not in rec and len(rec["work_started"]) == 1
+
+
+async def test_a_running_teams_mark_names_its_member_and_goes_when_it_is_live(agent, tmp_path, monkeypatch):
+    """Under `ask` the mark names the finished member; it is removed once that member is live again.
+    One a person closed is *stopped* and left alone, as is a seat or a live member."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "ask"}}})
+    recs = _running(agent, tmp_path)
+    later = await _settled(agent, tmp_path, *recs)
+    await agent._work_marks(later)
+    mark = _team_rec(agent)["work_waiting"]
+    assert mark["members"] == {"grinder-ao-1": ["TD-002"], "grinder-ao-2": ["TD-002"]} and "held" not in mark
+    for r in recs[:2]:
+        r.state = "idle"
+    await agent._work_marks(later + timedelta(seconds=1))
+    assert "work_waiting" not in _team_rec(agent), "every named member live again"
+    recs[0].state, recs[0].closer = "closed", {"by": "person", "why": None, "at": "x"}
+    await agent._work_marks(later + timedelta(seconds=2))
+    await agent._work_marks(later + WORK_SETTLE + timedelta(seconds=3))
+    assert "work_waiting" not in _team_rec(agent), "a member a person closed is stopped, not finished"
+
+
+async def test_work_start_replays_the_named_members_and_a_bound_refuses_it(agent, tmp_path, monkeypatch):
+    """`work_start {team}`, the row's Start for a team that runs on: a person's own, the home's alone;
+    the members the mark names replayed under the five bounds, and a holding bound returned as `held`."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "ask"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    recs = _running(agent, tmp_path)
+    recs[1].lane_seen = {"at": "x", "ids": ["TD-001", "TD-002"]}
+    later = await _settled(agent, tmp_path, *recs)
+    await agent._work_marks(later)
+    assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}
+    async with LocalClient(caller=recs[3].id) as seat:
+        with pytest.raises(Exception, match="person"):
+            await seat.call("work_start", team="g")
+    async with LocalClient() as person:
+        assert (await person.call("work_start", team="nobody"))["started"] is False
+        got = await person.call("work_start", team="g")
+        assert got["started"] is True and got["ids"] == ["TD-002"] and got["held"] is None
+        assert [c[0] for c in replays.calls] == ["grinder-ao-1"] and "work_waiting" not in _team_rec(agent)
+        # inside WORK_EARLY of that start, the next one is held back and says why
+        await agent._work_marks(later + timedelta(seconds=1))
+        replays.calls.clear()
+        recs[1].lane_seen = {"at": "x", "ids": ["TD-001"]}
+        await agent._work_marks(later + timedelta(seconds=2))
+        await agent._work_marks(later + WORK_SETTLE + timedelta(seconds=3))
+        assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"], "grinder-ao-2": ["TD-002"]}
+        got = await person.call("work_start", team="g")
+        assert got["started"] is False and got["held"]["why"] == "early" and replays.calls == []
+        assert _team_rec(agent)["work_waiting"]["held"]["why"] == "early"

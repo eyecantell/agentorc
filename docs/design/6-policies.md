@@ -677,7 +677,8 @@ code and needs no grant; a session doing the same work does.
      waiting by this rule.
      **A member that finished while its team runs on** (TD-457; Paul, 2026-10-08: *restarting a full
      team (and waiting for a stop) seems clumsy vs just telling a member when new work arrives*;
-     designed 2026-10-09, built by TD-466). A team is not wound down while a seat or a member is
+     designed 2026-10-09; the reading, the one-member start and `work_start` built — TD-466 slice 1, its
+     `on_work` default, the row and the help text to come). A team is not wound down while a seat or a member is
      live, and a closed member is written to by no rule: on 2026-10-09 rule 9 closed ao-grind's
      grinders and designer two minutes after TD-428 merged into the grinders' lane, the anchor seat
      was at work, so the team read *1 live* and the entry waited for a wind-down a long seat never

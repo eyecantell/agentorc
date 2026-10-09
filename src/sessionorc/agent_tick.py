@@ -1481,15 +1481,23 @@ class TickMixin:
         repos is written for the first registry root in order; the other's waits for the next
         wind-down. A crew member's ledger that cannot be read keeps what stands: *could not look*
         is not *no id new* (the techlead's read of #788)."""
-        if on_work == "off" or work_mod.team_wound_down(records) is None:
+        if on_work == "off":
+            return None
+        wound = work_mod.team_wound_down(records) is not None
+        # a team that runs on: only its members that finished alone are read (§6 rule 8 *A member that
+        # finished while its team runs on*, TD-457); none, and there is nothing for this rule
+        alone = None if wound else {r.id for r in work_mod.finished_alone(records)}
+        if alone is not None and not alone:
             return None
         # a question's end (§6 rule 8 *A question's end is work*, TD-274) is written once, at the
         # lapse or the answer, and stands with the mark until a start, Dismiss or a live team clears it
-        questions = list(old.get("questions") or []) if isinstance(old, dict) else []
+        questions = list(old.get("questions") or []) if isinstance(old, dict) and wound else []
         news: dict[str, dict[str, list[str]]] = {}  # repo → member → ids
         for r in sorted(work_mod.crew(records), key=lambda r: (r.name, r.id)):
             if r.seat is not None or r.superseded_by or work_mod.sat_out(r):
                 continue  # a member its flow sat out has no lane that is the team's work (§4.9c)
+            if alone is not None and r.id not in alone:
+                continue  # live, or not finished: rule 6's, or nobody's
             led = (self._repos.get(r.repo or "") or {}).get("ledger") or {}
             if "error" in led or not isinstance(led.get("entries"), list):
                 if isinstance(old, dict):
@@ -1590,6 +1598,11 @@ class TickMixin:
         if not started:
             rec.pop("work_started", None)
         replays = self._work_replays(records, now)
+        if work_mod.team_wound_down(records) is None:
+            # what a start replays is read at the start (TD-457): a team that runs on has only the
+            # members the mark names replayed, each alone; one left by `_work_replays` holds as `nothing`
+            named = set(mark.get("members") or {})
+            replays = [r for r in replays if r.name in named]
         standing = (rec.get("work_waiting") or {}).get("held")
         held = self._work_held(replays, started, conf, now, team, records, standing)
         bare = {k: v for k, v in mark.items() if k != "held"}
