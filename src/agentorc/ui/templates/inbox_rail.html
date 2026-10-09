@@ -26,7 +26,7 @@
 
 {% macro rail_html(rail, picks, needs_title) -%}
 <aside class="rail" id="rail" aria-label="Filters">
-  <button type="button" class="btn sm railclear{% if not rail.filtered %} hidden{% endif %}" id="railclear" title="clear every pick and the find">Clear filters</button>
+  <button type="button" class="btn sm railclear" id="railclear"{% if not rail.filtered %} disabled{% endif %} title="clear every pick and the find">Clear filters</button>
   <div class="railfind">
     <input class="input" id="ifilter" type="search" placeholder="find…" value="{{ picks.find }}" aria-label="find: every word must match, in any order" title="every word typed must match, in any order — a fourth pick, AND’d with the rail’s">
     <span class="meta" id="findn" aria-live="polite"></span>

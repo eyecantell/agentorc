@@ -2252,7 +2252,7 @@
       $(".railn", b).textContent = num(cnt, c.filtered);
       b.classList.toggle("dim", c.filtered && !cnt.shown);
     });
-    $("#railclear").classList.toggle("hidden", !c.filtered);
+    $("#railclear").disabled = !c.filtered;  // held in place, so the toggles never move under the pointer (TD-423)
     // the ledger's rows (TD-368): the *Teams* picks and the find alone
     AO.ledgerFilter(document, rail.team, words);
     // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
