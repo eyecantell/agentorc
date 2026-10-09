@@ -757,7 +757,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #TBD): §4.2a *A metered profile's prompt cache lives an hour* — the claude-code adapter's launch of a session on a `metered` profile carries `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` beside `CLAUDE_CONFIG_DIR`, the subagent key left to the tool, a subscription's launch setting nothing; the one way off is the key in the host agent's own environment, passed through for either billing, no `profiles.yml` field; the doorbell's `CACHE_LIFETIME` is the same hour for both billings because of it. The build is TD-470. Was: Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
+**Status:** Designed 2026-10-09 (the designer, PR #1341): §4.2a *A metered profile's prompt cache lives an hour* — the claude-code adapter's launch of a session on a `metered` profile carries `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` beside `CLAUDE_CONFIG_DIR`, the subagent key left to the tool, a subscription's launch setting nothing; the one way off is the key in the host agent's own environment, passed through for either billing, no `profiles.yml` field; the doorbell's `CACHE_LIFETIME` is the same hour for both billings because of it. The build is TD-470. Was: Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
 **Blocked by:** TD-470
 **Location:** design §4.2a (`billing: metered`, the profile's layer); `src/agentorc/profiles.py`; the claude-code adapter's launch environment
 
