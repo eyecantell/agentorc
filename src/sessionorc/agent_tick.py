@@ -422,7 +422,13 @@ class TickMixin:
         own = self._usage.get(profile)
         if own is not None or self._is_metered(profile):
             return own or {}
-        for name in adapters.names():
+        # the profile's own tool first — the adapter of a record under it — so another tool's
+        # account of the same name is never read for it; every polling adapter only for a profile no
+        # record names
+        mine = list(dict.fromkeys(s.adapter for s in self.sessions.values() if s.profile == profile))
+        for name in mine or adapters.names():
+            if name not in adapters.names():
+                continue
             ad = adapters.get(name)
             if not getattr(ad, "usage_for", None):
                 continue

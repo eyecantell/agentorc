@@ -529,4 +529,13 @@ async def test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate(age
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "other"})
         assert not agent._profile_gated("pg", now)
         assert "fetched" not in (await person.call("gate"))["profiles"]["pg"]
-        await person.call("kill", id=s["id"])
+        # the profile's own tool is read, never another's account of the same name: a record under
+        # `pg` names its adapter, and a shell polls no usage
+        monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "paul"})
+        assert agent._profile_gated("pg", now)
+        sh = await person.call(
+            "create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], profile="pg"
+        )
+        assert agent.sessions[sh["id"]].profile == "pg" and not agent._profile_gated("pg", now)
+        for x in (s, sh):
+            await person.call("kill", id=x["id"])
