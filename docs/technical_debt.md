@@ -1058,7 +1058,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Status:** Open
 **Location:** `docs/technical_debt_archive.md` `## TD-464`, its `**Resolved:**` line
 
-**Why:** the line reads *each slice its own PR … (#1325 §4.5a, #1343 §6, #1351 §4.10, …)*. `gh pr view 1325` is *TD-063, TD-078: the CI read — named flakes fixed and quiet; archive; file TD-463*, and `gh pr view 1343` is *TD-462: the conflict mail kind folded into an ask to both controllers*. The slices are `git log origin/main --grep "TD-464 slice"`: slice 1 (§4.5a) is #1345 and slice 2 (§6) is #1350. The other seven numbers it names (#1351, #1355, #1357, #1362, #1365–#1369, #1372, #1373) match their slice titles. The line also says *the last PR for §4 and the sections under 900 words* without a number; that PR is #1376 (slice 14).
+**Why:** the line reads *each slice its own PR … (#1325 §4.5a, #1343 §6, #1351 §4.10, …)*. `gh pr view 1325` is *TD-063, TD-078: the CI read — named flakes fixed and quiet; archive; file TD-463*, and `gh pr view 1343` is *TD-462: the conflict mail kind folded into an ask to both controllers with --cites; TD-471 builds it*. The slices are `git log origin/main --grep "TD-464 slice"`: slice 1 (§4.5a) is #1345 and slice 2 (§6) is #1350. The other eleven numbers it names (#1351, #1355, #1357, #1362, #1365–#1369, #1372, #1373) match their slice titles. The line also says *the last PR for §4 and the sections under 900 words* without a number; that PR is #1376 (slice 14).
 
 **Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
 
