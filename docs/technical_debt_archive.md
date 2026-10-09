@@ -7681,3 +7681,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 - **(3) is done.** TD-038, TD-058, TD-095, TD-096 and TD-097 are all in the archive.
 - **(4) is not needed.** The rule that the design keeps its dated record in `docs/design-history.md` is agentorc's own convention: CLAUDE.md states it, and the design's index links it. It is not a cadence rule every consumer repo needs. dev-cadence's ledger holds no entry for it and none is asked.
 - **(6) is filed as TD-464.** The design has grown from the pass's 69,000 words to about 190,000 (`docs/design/`, 2026-10-08), so the second pass is now worth more than when it was written.
+
+## TD-456: The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, met on TD-233's live check for TD-426)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_gate_windows`, which reads `self._usage.get(profile)`; `_profile_over`; the pruning in `_refresh_usage` after *Only profiles a live session is running under are shown*, TD-073; `_usage_spread`), `src/sessionorc/agent_settings.py` (`rpc_gate`), `src/agentorc/cli.py` (`ao gate`); design §6 *Usage gate*, §4.4 *Usage*
+
+**Why:** read live 2026-10-08 21:3x MDT: `ao gate` printed *grind · 5h 30 → no reading yet · week 5 → no reading yet* for all three grind profiles, while `usage.json` held a reported reading a minute old (5h 25%, week 33%) for the account they share with the two live sessions, both on the default profile. The reading is kept per account (`_usage_acct`) but copied per profile only under a profile a live session runs under, and every gate read (`_gate_windows`, behind `_profile_over`, the gate's pass and `rpc_gate`) takes the per-profile copy. So whenever a team is wound down and a person's session keeps the account's reading fresh, a start under the team's profile (rule 8's `on_work: start`, a schedule, a restart) reads no reading, which is *no gate*, and goes ahead past a reserve the account is already over, until its first report spreads the reading and the next tick pauses it. The cost is one start's first turns, and an `ao gate` that says *no reading yet* when there is one.
+
+**Resolved:** 2026-10-09 (PR #1338) — `_gate_reading` in `src/sessionorc/agent_tick.py` falls back to the account's reading (`_usage_acct`, by `_usage_key`) for a profile with no copy; `_gate_windows` and `rpc_gate` read through it, and `ao gate` prints the reading's age and source. Design §6 *Usage gate*; `tests/test_usage_gate.py::test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate`.
+
+**Done when** a profile with no live session reads its account's reading at the gate and in `ao gate`, and the test above passes.
