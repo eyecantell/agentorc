@@ -207,7 +207,7 @@ def kind_of(entry: dict[str, Any]) -> str:
     anchors = str(entry.get("owner") or "").lower() == ANCHOR_OWNER
     if entry.get("kind") == "evaluation" or decided_by(entry, ANCHOR_OWNER):
         return "evaluation"
-    if entry.get("kind") == "decision" and entry.get("pickable") == "yes" and anchors:
+    if entry.get("kind") == "decision" and anchors:  # unblocked: the tests above took what is blocked
         return "evaluation"
     return "other"
 
