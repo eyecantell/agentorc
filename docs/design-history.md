@@ -26,6 +26,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 2. Goals
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 14): goal 12's two TD-038 markers left for this record (the Dark Modern palette and the WebGL renderer are TD-038's).
 - 2026-09-13 (TD-038): the Focus pane took VS Code's Dark Modern terminal palette as literals, not tokens, so the pane does not follow the page.
 - 2026-09-20 (TD-038): the Focus pane's face became bundled JetBrains Mono (OFL, ligatures off) and it draws through xterm.js's WebGL renderer where available, DOM renderer otherwise.
 - A hosted service was originally a non-goal; it became the `relay` transport (§4.5b), kept compatible from phase 1 and scheduled after phase 5.
@@ -44,6 +45,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4. Architecture
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 14): the diagram redrawn as the home and node shape of §4.4a — the UI on the home over its Unix socket, nodes dialling the home over the link — in place of the hub-and-spoke ssh fan-out it still drew (the UI reaching every host agent over ssh, hosts named vps, host1, vpnmaster), which §5 says was replaced by the home and node split.
 - No dated facts removed from the §4 intro diagram.
 
 ## 4.1 Session substrate: tmux, one session per conversation
@@ -1207,6 +1209,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 7. Phases
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 14): phase 1's *Attachments came later (TD-002, 2026-10-07)* reads *Attachments (TD-002)*. §4.5b, §4.5c, §1, §3, §8 and §11 were read and left as they are: short, and already rules, prior art or references.
 - 2026-10-07: attachments (TD-002) built for a session on this host, so phase 1 lacks only the phone layout (TD-003).
 - 2026-09-10: `ao --skill` (TD-019) was pulled forward from phase 5 and landed in phase 1.
 - 2026-09-10: herdr confirmed not to replace the second-host step — phase 2 builds the ssh transport as designed ([ADR](decisions/2026-09-10-herdr-spike.md)).

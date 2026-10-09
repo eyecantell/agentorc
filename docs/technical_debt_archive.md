@@ -7868,3 +7868,23 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (PR #1378) — `tests/test_ui_org.py::test_the_teams_ready_mark_is_counted_by_the_grouping_and_kept_out_of_its_counts` asserts `team_groups`' `ready` and its absence from `counts`, and the header's mark unfolded; both mutations each fail it.
 
 **Related:** PR #1348.
+
+## TD-464: The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from TD-109 step (6))
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Resolved:** 2026-10-09 (the designer) — every section has had its pass, each slice its own PR with a Sonnet fact-check (#1325 §4.5a, #1343 §6, #1351 §4.10, #1355 §4.5, #1357 §4.9c, #1362 §4.4a, #1365 §4.8, #1366 §4.4, #1367 §4.9b, #1368 §4.9, #1369 §4.7, #1372 §4.8a/§4.2/§4.6, #1373 §5/§4.1/§4.3/§4.2a/§9/§10, and the last PR for §4 and the sections under 900 words). **Before: 192,692 words across `docs/design/`; after: 180,089.** What the pass took is in the history, one dated line per section; no rule and no number left the design, and the fact-checks found four stale sentences on the way (the §4.9 container paragraph, §4.9b's reader *Not built* list, §4.2a's *not built — TD-233*, §10's *Build list*), each corrected, and one leftover in the code (TD-483). The sections are now mostly rules: a third pass would have to merge rules restated across sections (the second bullet of *Why*), which this pass did not attempt — file it when a reader's cost asks for it.
+**Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
+
+**Why:**
+- Every session that reads a section pays for it in context. TD-410 counts ~60k tokens of design read by a manager fill that found nothing to do, and TD-378's ADR shows reads are most of the week's cost.
+- A rule restated in several sections drifts apart, and every fact-check has to carry each copy.
+- Much of the growth is dated reasoning written in place (*until 2026-…*, *was:*, the review rounds), which by CLAUDE.md belongs in `docs/design-history.md`.
+
+**Fix:** a pass section by section, largest first, each section its own PR with a fact-check. Move dated reasons and *was* clauses to the history. Cut each reason to one sentence, and keep every rule and every number. Shorten the §4.5a cells to the control and its rule, with the rest in the section the cell points to. **Mind** the doc-bound tests (`tests/test_primer.py`, `help.py`'s bound text): a pass never rewords what they read without the same PR fixing them. **Done when** every section has had its pass, no rule lost, each PR fact-checked, and the total is written here before and after.
+
+**Related:** TD-109 (archived; step 6), TD-410 (what a fill reads), TD-378 (what reads cost).
