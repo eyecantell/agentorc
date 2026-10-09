@@ -9,6 +9,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 Two header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`anchor`, `designer`, `grinder`, `paul`, `dev-cadence`); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`). Every open entry carries them; keep them true when the Status changes. **Pickable is derived, never written** (cadence §2.4, TD-228): an entry is pickable while its `**Blocked by:**` names nothing still open and no decision, so what waits on another entry or on a person's word says so there, with its pointer; what nothing blocks and a grinder still cannot build — a live look, an evaluation, the anchor's edit — is said by its **Kind** or its **Owner**, and the Status says what is next. A `live-check` is followed on its line by its build's last merged PR — `**Kind:** live-check #<n>`, written by the PR that makes the entry a live check — and once that PR is live (`ao promote status`) the check is in a `free-pick` lane whose owner it has (design §4.9b, TD-320); cadence's script reads the word alone. A grinder's pick list is therefore `ao repo` (its pickable entries, a live check whose build is live among them), and `python3 scripts/ledger.py --list --pickable yes --owner grinder --kind build` lists the builds alone; the designer's is `--owner designer --kind design-first`. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the two lines' shape, so a new word is added there and nowhere else.
 
 Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build | design-first | live-check | evaluation | decision
+| TD-455 | The Inbox rail's disabled Clear filters and held find-count line are pinned by source-text greps: a dead-coded line passes both (#1307, #1308) | Low | Open |
 
 ---
 
@@ -1164,3 +1165,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** an unattended session's SessionStart scopes the nudge without calling `ao status` (the env reaches the runner), an interactive one reads `machine`, and the test passes.
 
 **Related:** TD-159 (the ADR), TD-118 (agentorc's scoping), dev-cadence TD-077 (the branch).
+
+## TD-455: The Inbox rail's disabled Clear filters and held find-count line are pinned by source-text greps: a dead-coded line passes both
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (test-audit-ao-1, auditing #1305–#1308)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_inbox.py::test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked` (the last five lines, the `app.js` and `app.css` asserts); `src/agentorc/ui/static/app.js` (the recount's `$("#railclear").disabled = !c.filtered;`); `src/agentorc/ui/static/app.css` (`.rail #findn { min-height: 1lh; }`)
+
+**Why:** #1307 and #1308 pin the page's recount and the find count's held line with `assert '<the source line>' in js` / `in css`. Evidence, run in this audit's worktree against `origin/main`: prefixing the recount line with `if (false) ` (so the button never changes after the first render) leaves `pytest tests/test_ui_inbox.py` at 107 passed; wrapping the CSS rule in `/* … */` (so the find count holds no line) also leaves it at 107 passed. A plain revert of either line is caught, so the pins are not empty, but they pass for a page whose behaviour is gone. The test's name and docstring also say nothing of the find count, which #1308 added as a trailing assert to the *Clear filters* test, so a failure there reads as a Clear-filters failure. The file already runs the rail's JS in node (`RAIL_PROBE`, line 2796), which is where the recount's `disabled` belongs; for the CSS, the PR's own UI check is the only layout evidence.
+
+**Fix:** extend `RAIL_PROBE` to call the recount with `filtered` true and false and assert the stub button's `disabled` each time; move the find-count CSS assert to its own test named for TD-427 and match the rule as a parsed declaration outside comments, not a substring.
+
+**Done when** both mutations above fail the suite, and the find count has its own named test.
