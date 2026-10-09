@@ -47,8 +47,9 @@ its creator from birth (§4.8), which is what the brief's restart rule relies on
 
 Two briefs are written but **not launchable yet**, so that their rules are decided before the day
 they are needed: `guardians-orchestrator.md` (blocked — the repos are not on this host, and the
-devcontainer question in design §10 is open) and `director.md` (needs two leads before
-it is worth running). Both carry the restart ceiling and `one_for_one` scope from TD-036.
+devcontainer question in design §10 is open) and `director.md` (needs two managers before
+it is worth running). Both carry the restart ceiling and `one_for_one` scope from TD-036; the
+director's round reads them as marks the tick's restarts leave and ends in `ao wait`, as a manager's does.
 
 `techlead-context.md` is the techlead's **primer** (design §4.9b): its first read on every fill —
 the team definition's `techlead: {…, context: docs/briefs/techlead-context.md}` names it and the
