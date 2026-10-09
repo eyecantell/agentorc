@@ -6915,3 +6915,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-08 (PR #1293) — the clause cannot be caught: `_msg` strips `text` first, so a text that is the answer, a blank line and only whitespace arrives as the answer alone, a valid pick, and words after a blank line are never blank. The test now pins that (`"hold it\n\n  "` goes through as `"hold it"`; removing the strip fails it), and the unreachable clause is gone. The **Fix** below asked for a refusal the home never makes.
 
 **Fix:** add `{"text": "hold it\n\n  ", "answer": 1}` to the refused list in that test. **Done when** reverting the `.strip()` condition fails it.
+
+## TD-417: Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/`
+
+**Why:** `tests/test_ui_focus_rail.py` (#1286, TD-412) opens with a docstring that says *«* and every glyph bring the panel back, *a glyph opening its card*, and *the choice is this browser's (`focus.side`)*. Its four tests call `AO.railGlyphs` (the pure glyph list), assert strings in `app.css` (`.focus .side.rail { width: 28px; }`) and in the rendered template, and `AO.keyEntry("focus","s")`. None runs `putAway`, the `#sideaway`, `#sideback` and `#railglyphs` click handlers, `renderRail` or the `store.set("focus.side", …)` write, so deleting the handler body, the `store.set` call, or `d.open = true` in `src/agentorc/ui/static/app.js` keeps every test green (read from the diff; the handlers live inside `AO.focus`, which the node probe never calls). (This one is read from the diff, not shown by a revert.) The inline script in `focus.html` reads `ao.focus.side` and `store.set("focus.side")` writes it (`store` prefixes `ao.`); no test pins that the two agree.
+
+**Fix:** a Playwright run (the repo's `~/ao-shots/pwlib`, headless-screenshots memory) or a probe of `AO.focus` against a stubbed DOM: press `#sideaway` (`#side` gains `rail`, localStorage `ao.focus.side` is `"away"`), reload (the class is there before the first paint), press a glyph (`rail` leaves, its `details.side[data-side]` is `open`), press `#sideback`. Skip like the existing probe where the tool is absent. **Done when** removing each handler in `app.js` fails a test.
+
+**Resolved:** 2026-10-08 (PR #1296, grinder-ao-2) — the rail's wiring moved from inside `AO.focus` to `AO.wireRail` in `app.js`, unchanged in behaviour; `tests/test_ui_focus_rail.py` presses it in a node probe (put away, bring back, a glyph opening its card, needs-you's glyph, a press between glyphs) and runs `focus.html`'s inline script against what the presses stored. Removing any handler, the `store.set` or `d.open = true` fails a test. UI check on a scratch home in the PR body.

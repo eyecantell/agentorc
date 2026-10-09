@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-417 | Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested | Low | Open |
 
 ---
 
@@ -1182,18 +1181,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane and its members' `controllers` name the manager's id; the manager is filled the first time one of its readings is due, a Start with a question kept in its mail filling on the first tick; a fill's prompt ends with the cause line; `docs/briefs/manager-ao-1.md` names no first reads of its own; the tests above pin each; `pdm run test` and `pdm run lint` pass. The live check, once this is live: a week's host-agent journal shows no *a seat with nothing due* close of a manager that was never filled for a cause, and `ao team start ao-grind`'s output names the manager *on call*. TD-410 is archived with this entry.
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
-
-
-## TD-417: Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/`
-
-**Why:** `tests/test_ui_focus_rail.py` (#1286, TD-412) opens with a docstring that says *«* and every glyph bring the panel back, *a glyph opening its card*, and *the choice is this browser's (`focus.side`)*. Its four tests call `AO.railGlyphs` (the pure glyph list), assert strings in `app.css` (`.focus .side.rail { width: 28px; }`) and in the rendered template, and `AO.keyEntry("focus","s")`. None runs `putAway`, the `#sideaway`, `#sideback` and `#railglyphs` click handlers, `renderRail` or the `store.set("focus.side", …)` write, so deleting the handler body, the `store.set` call, or `d.open = true` in `src/agentorc/ui/static/app.js` keeps every test green (read from the diff; the handlers live inside `AO.focus`, which the node probe never calls). (This one is read from the diff, not shown by a revert.) The inline script in `focus.html` reads `ao.focus.side` and `store.set("focus.side")` writes it (`store` prefixes `ao.`); no test pins that the two agree.
-
-**Fix:** a Playwright run (the repo's `~/ao-shots/pwlib`, headless-screenshots memory) or a probe of `AO.focus` against a stubbed DOM: press `#sideaway` (`#side` gains `rail`, localStorage `ao.focus.side` is `"away"`), reload (the class is there before the first paint), press a glyph (`rail` leaves, its `details.side[data-side]` is `open`), press `#sideback`. Skip like the existing probe where the tool is absent. **Done when** removing each handler in `app.js` fails a test.
