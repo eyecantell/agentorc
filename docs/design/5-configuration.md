@@ -44,7 +44,7 @@ teams:                                        # per team, by the name org.yml or
     schedule: {start: reset, profile: grind, window: week}   # §6 *Schedule* (TD-133)
     until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
     reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
-    on_work: ask                              # §6 rule 8 (TD-214): ask | start | off, when a wound-down team's lanes gain work
+    on_work: start                            # §6 rule 8 (TD-214; TD-457): start | ask | off, when a wound-down team's lanes, or a finished member's lane, gain work; start when absent
     flow: build-review                        # §4.9c (TD-307; read since TD-309 slice 4): which of the team's flows: it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance* (TD-177; built — TD-239): over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
@@ -61,7 +61,7 @@ notify:                                       # §4.10 *Told on Telegram when no
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it (the gate reads amounts since TD-151 slice 3; `set_settings`, `ao gate` and the Settings page take them since slice 5). A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
-  no schedule, no stop time and no priority, and asks when work appears (`on_work: ask`); a repo absent under `repos:` promotes by hand and is pulled (§6 *Pull*: `pull: false` is the opt-out).
+  no schedule, no stop time and no priority, and starts the team, or the member, when work appears (`on_work: start`, TD-457); a repo absent under `repos:` promotes by hand and is pulled (§6 *Pull*: `pull: false` is the opt-out).
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
   reads that, offline included — *policies that stop run on the node, from its replica* — so the

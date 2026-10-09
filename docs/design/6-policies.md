@@ -82,7 +82,7 @@ code and needs no grant; a session doing the same work does.
   `manager: person` team's members are supervised exactly as a manager's are. An interactive
   session is never supervised (§9 invariant 5: **Take over** on Focus takes a member out of these
   rules on the next tick, and **Hand back** returns it); a suspended record never is (§4.8a).
-  **A restart is not a start.** The host agent still starts nothing *new* by itself, and what it starts again without a press at the time is a person's standing word — a schedule, or rule 8's `on_work: start` (TD-026: a
+  **A restart is not a start.** The host agent still starts nothing *new* by itself, and what it starts again without a press at the time is a person's standing word — a schedule, or rule 8's `on_work: start` — the team, or one member of a team that runs on (TD-457) — (TD-026: a
   run window that starts workers, or a start at the weekly reset, is a schedule a person turns on
   and it is off by default). A restart re-creates a session the person or `ao team start` already
   chose to run — same name, directory, worktree, profile, brief, lane, role, badges and
@@ -530,7 +530,7 @@ code and needs no grant; a session doing the same work does.
      is not told while that lease holds — the entry is its holder's; an entry that came off the
      board is *has become pickable*, above, already. **An exited
      or closed member is not written to**, and its `lane_seen` is kept all the same: what its
-     lane gains while it is gone is rule 8's once its team has wound down. A finished member its manager closed while the team runs on is told by neither rule: its lane's new work waits for the team's next wind-down. The ledger read is the checkout's file
+     lane gains while it is gone is rule 8's once its team has wound down. A finished member closed while the team runs on — by rule 9's pass, by its manager, or by itself — is rule 8's *A member that finished while its team runs on* (TD-457): told nothing where it sits, it is started again alone for what its lane gained. The ledger read is the checkout's file
      at the home, so an entry counts from the moment that checkout holds it.
   7. **Brief changed** (TD-199; designed 2026-09-28; `prompt_from` handed and kept — TD-217 slice 1;
      the replay and the record's `brief` — slice 2; the mark and the chip — slice 3; the two tellings — slice 4). A member reads its
@@ -611,16 +611,17 @@ code and needs no grant; a session doing the same work does.
      entries filed together are one event — the home writes **`work_waiting: {at, repo,
      members: {<name>: [ids]}}`**, `repo` being the ledger's, since two repos may hold one id, on its own
      `host` record under the team's name — for the first registry root, in sort order, where the
-     team's news is in two, the other's waiting for the next wind-down. It is removed when the team is no longer
-     wound down (a crew session live again), when no id is new, and under `off`; a member's
+     team's news is in two, the other's waiting for the next wind-down. It is removed when every member it
+     names is live again (a wound-down team's: any crew session live again), when no id is new, and under `off`; a member's
      ledger that cannot be read removes nothing, since *could not look* is not *no id new*: what
      stands stands, its `at` and the settle's memory kept; while more ids
      settle, what stands stands, its `at` kept, its ids possibly stale until the settle ends. What follows is the team's setting,
      **`teams.<team>.on_work`** (§5 `settings.yml`), a person's alone:
-     - **`ask`**, and what a team with no key has: the **Inbox row: team start** (§4.5a) under
+     - **`ask`**: the **Inbox row: team start** (§4.5a) under
        *Needs you* — *ao-grind · wound down 00:56 · its lanes gained 3 entries: TD-213, TD-214,
        TD-223* — whose **Start** is the team card's. Nothing starts until the press.
-     - **`start`**: a person's standing press, as a schedule is. The home replays the team: the
+     - **`start`**, and what a team with no key has (Paul, 2026-10-08, TD-457; `ask` was, until then):
+       a person's standing press, as a schedule is. The home replays the team: the
        launch record of every record carrying the badge that ended by the team's own ending, as
        §6 *Schedule* replays at the reset and under its rules (seats included, no launch record
        no start, a suspended record or one at its ceiling left out — a seat's fills, which rule 3
@@ -671,6 +672,37 @@ code and needs no grant; a session doing the same work does.
      written only by `set_settings`, which a session cannot call. Not on a node yet, as rule 4
      is not; a team with no lane that matches by header (a lane of references) never has work
      waiting by this rule.
+     **A member that finished while its team runs on** (TD-457; Paul, 2026-10-08: *restarting a full
+     team (and waiting for a stop) seems clumsy vs just telling a member when new work arrives*;
+     designed 2026-10-09, built by TD-466). A team is not wound down while a seat or a member is
+     live, and a closed member is written to by no rule: on 2026-10-09 rule 9 closed ao-grind's
+     grinders and designer two minutes after TD-428 merged into the grinders' lane, the anchor seat
+     was at work, so the team read *1 live* and the entry waited for a wind-down a long seat never
+     gives — and the road back was a Start of every member and seat. So this rule reads **member by
+     member** as well. A crew member — not a seat, not the manager — that is `closed` or `exited`
+     after declaring `out_of_work` (closed by rule 9's pass, by its manager, or by itself; one a
+     person killed or closed is *stopped* and left alone, as a stopped team is), whose lane holds a
+     matching id its `lane_seen` lacks while its team is not wound down, is this rule's news as a
+     wound-down team's member is: after `WORK_SETTLE` the home writes the same `work_waiting` mark,
+     `members` naming it, and the team's `on_work` follows. **What a start replays is read at the
+     start**: a wound-down team is replayed whole, as above; a team that runs on has only the
+     members the mark names replayed, each alone — its launch record, `why: work` with its `ids`,
+     `start` and `of` counting the members replayed, its mail kept — under the same five bounds,
+     the usage line read for its profile, one such start counting as one of the team's
+     `WORK_STARTS_DAY`; a named member at its ceiling, suspended, sat out, or without a launch
+     record is left, and a mark naming only such members holds as `nothing`. Under `ask` the row
+     reads *ao-grind · grinder-ao-1 finished 00:56 · its lane gained TD-428* (§4.5a **Inbox row:
+     team start**), and its **Start** replays the named members and not the team, which is running
+     — `work_start {team}`, a person's own RPC and the home's alone (`modes.HOME_EDITS`), the same
+     replay under the same bounds, refused in the row's words when one holds; `off` writes
+     nothing. The member started again reads the ledger at its start and finds the entry, as any
+     start does: nothing is typed at it, and rule 6 tells it nothing it has not read. **A seat
+     still holds a wind-down**, and rightly: a team whose anchor is at work is running; what
+     changed is that a member's lane no longer waits for that reading. **Rule 9's race** — a member
+     closed as finished on the tick before the checkout's reading held the entry merged into its
+     lane (TD-428 at 03:30Z, the close at 03:32Z) — needs no hold on the finished pass (TD-407
+     stands, and a hold would make rule 9 a second reader of the lane): the closed member is this
+     reading's on the next tick, and the miss costs one restart rather than a day.
      **A question's end is work** (TD-271; designed 2026-10-02; built 2026-10-02 — the home's half
      TD-274 slice 4, `_question_end`; the Inbox row's clause and the card note's count TD-274's Inbox
      half, `work_questions`). A member
