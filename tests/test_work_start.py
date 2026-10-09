@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from sessionorc import paths
+from sessionorc import paths, work
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import WORK_EARLY, WORK_SETTLE
 from sessionorc.client import LocalClient
@@ -461,3 +461,36 @@ async def test_a_killed_member_and_a_stopped_team_are_not_read_member_by_member(
     recs[1].state, recs[1].out_of_work, recs[3].state = "exited", None, "closed"
     await agent._work_marks(later + WORK_SETTLE + timedelta(seconds=3))
     assert "work_waiting" not in _team_rec(agent)
+
+
+@pytest.mark.parametrize(
+    ("guard", "odd"),
+    [
+        ("a seat", {"seat": {"trigger": "work"}}),
+        ("the manager", None),
+        ("one its flow sat out", {"closed_for": {"why": "sit_out", "at": "x"}}),
+        ("a record a successor took over", {"superseded_by": "ao-t-successor"}),
+    ],
+)
+async def test_finished_alone_passes_over_each_record_that_is_not_a_finished_member(
+    agent, tmp_path, monkeypatch, guard, odd
+):
+    """Each of `finished_alone`'s exclusions (TD-475): a record otherwise finished — closed after
+    declaring, its lane gaining TD-002 — that is a seat, the manager, sat out or superseded is neither
+    read as finished nor named by the mark, while the team's finished grinder beside it is."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "ask"}}})
+    recs = list(_running(agent, tmp_path))
+    recs[1].lane_seen = {"at": "x", "ids": ["TD-001", "TD-002"]}
+    manager = recs[2]
+    manager.capabilities = ["control"]
+    if odd is None:
+        manager.lane, odd_rec = ["free-pick"], manager  # its lane gains TD-002 as the grinder's does
+    else:
+        odd_rec = _rec("grinder-ao-3", controllers=["ao-t-manager-ao"], **odd)
+        recs.append(odd_rec)
+    later = await _settled(agent, tmp_path, *recs)
+    assert work.manager_of(recs) is manager
+    assert [r.name for r in work.finished_alone(recs)] == ["grinder-ao-1", "grinder-ao-2"], guard
+    await agent._work_marks(later)
+    assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}, guard
