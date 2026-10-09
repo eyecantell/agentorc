@@ -57,12 +57,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 | TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
-| TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Open |
+| TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Open |
 | TD-476 | PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets | Medium | Open |
 | TD-477 | PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere | Medium | Open |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
+| TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 
 ---
 
@@ -890,7 +891,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (ao-paul, Paul asked why a screenshot pastes into the composer and not the terminal)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-09 (the designer) — §4.5a's *Copy / Paste* row says a paste carrying a file and no text takes the attachment road and its path is pasted into the terminal as a bracketed paste, whether or not the composer is open, under the Attach row's bounds; the *Attach* row and §4.4 *Attachment drop* name the terminal beside the composer. Built by TD-479. Was: Open.
+**Blocked by:** TD-479
 **Location:** design §4.5a (the *Copy / Paste* row and the *Attach / drop / paste* row), §4.4 *Attachment drop*; `src/agentorc/ui/` (the terminal's paste handler beside the composer's)
 
 **Why:** the terminal's Paste sends the clipboard's text through the terminal as keys (§4.5a *Copy / Paste*); a clipboard holding only an image has no text, so the paste sends nothing and says nothing. Claude Code's own image paste reads the clipboard of the machine it runs on, never the browser's, so tmux is not the gap. A file *dropped* on the terminal already takes the attachment road; a *pasted* one is the one way in that does not, and the terminal is where a person's eyes are.
@@ -979,4 +981,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §4.4 *Attachment drop* says. (1) `paths.ATTACH_PIECE_BYTES = 2 * 1024 * 1024` replaces `ATTACH_BYTES_MAX`. (2) `settings.py`: `attach` joins `PERSON_KEYS`; `max` parses `<n>M` | `<n>G` within `1M`–`4G`, default `256M`, a bad value dropped and named as the other person keys are; `set_settings` writes it. (3) `rpc_attach` gains `upload`, `offset`, `total`, `cancel`: a first piece (no `upload`) with `total` past the bound is refused before any write, in the words §4.4 gives; one whose `total` fits and is no more than one piece is written whole as today; otherwise the agent mints an `upload` id, appends to `<safe name>.<upload>.part` under `attachments/<session>/`, refuses an `offset` that is not the bytes written so far (and deletes the `.part`), and at `total` picks the final name by the `-2`, `-3`… rule with `os.link` (never over a file), unlinks the `.part` and answers `{path, bytes}`; a middle piece answers `{upload, bytes}`; `cancel: true` with the `upload` deletes the `.part`; still a person's act and this host only. (4) `_prune_runs` unlinks any `*.part` under `attachments_dir()` whose mtime is older than an hour, whatever `runs_keep_days`. (5) `attach_file` takes the piece and the form fields `upload`, `offset`, `total`, `cancel`, reads one piece at most, base64s it and calls `attach`; no whole-file read remains. (6) `AO.wireAttach`: the file is sliced by `ATTACH_PIECE_BYTES` (the page learns the piece size from the first answer or a served constant), pieces sent in order, one upload at a time as today; past one piece the label reads *Attaching <name> · n%* with a ✕ that sends the cancel and stops; a refusal `fail`s in the RPC's words; the path is inserted at the caret on the last answer. (7) The Settings page's You card gains the **attachment bound** field, drawn as the terminal size field is, the default beside it. Tests: a 5-piece upload lands whole and named; an out-of-order offset is refused and leaves no `.part`; a first piece past the bound is refused with nothing written; a cancel removes the `.part`; the sweep removes an hour-old `.part` with `runs_keep_days: 0`; the name rule holds at link time; the settings parse accepts `1G` and drops `9G`. **Done when** the tests pass, the design's §4.4 line reads *built*, and a 50 MB PDF dropped on a Focus composer of an interactive Claude Code session on this host comes back as a path the tool reads.
 
 **Related:** TD-473 (the design), TD-002 (the attach), TD-469 (the attachment's life), TD-472 (paste on the terminal).
+
+## TD-479: Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-472's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Copy / Paste* and *Attach / drop / paste*, §4.4 *Attachment drop*; `src/agentorc/ui/static/app.js` (`pasteClip` ~L3266 — the one road every terminal paste takes: Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click, the header's Paste; `AO.wireAttach` ~L152 and its `shut()` rule; `AO.attachName` ~L131; the Focus wiring ~L3353)
+
+**Why:** TD-472: `pasteClip` reads `navigator.clipboard.readText()`, so a clipboard holding only an image pastes nothing and says nothing, while the same screenshot pasted into the composer is attached; the terminal is where a person's eyes are.
+
+**Fix:** as §4.5a *Copy / Paste* says. (1) `pasteClip` reads `navigator.clipboard.read()`: an item carrying `text/plain` is pasted as text, as today; one carrying no text and a file type (`image/png` first) is turned into a `File` named by `AO.attachName` and handed to the attach road's `attach([file])`, and the path it answers is written with `term.paste(path)` (xterm wraps it in bracketed-paste marks when the tool has mode 2004 on, which Claude Code has, so it lands in the prompt and is not sent); nothing else is typed. (2) `AO.wireAttach` gains a way to attach for the terminal that does not need the composer open (`shut()` guards the composer's own paste and drop alone — today it also blocks a file dropped on the terminal while the composer is closed, which the Attach row says works: a terminal drop takes the same open road, its path pasted into the terminal as a terminal paste's is), and inserts nothing at the composer's caret for a terminal paste or drop — the caller takes the path. (3) Read-only Focus: the existing *watching: paste is off — Take over to type* toast, before the clipboard is read. (4) A refusal — past `person.attach.max`, a node's session, `read()` denied (no secure context, or a browser without `clipboard.read`, which falls back to `readText()` and toasts *this browser pastes text only*) — is a toast in the RPC's or the browser's words. (5) Desktop only, as the Attach row is. Tests (under node, as `tests/test_attach.py`'s `_node` harness runs the page's functions, TD-370): a file-only clipboard goes to `attach` and the answered path to `term.paste`; a text clipboard still goes to `term.paste` as text and never to `attach`; a read-only Focus toasts and reads nothing; the composer closed still attaches from the terminal. **Done when** the tests pass and a screenshot pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its path in the prompt, unsent.
+
+**Related:** TD-472 (the design), TD-002 (the attach), TD-473/TD-478 (the road in pieces and the bound), TD-096 (read-only Focus).
 
