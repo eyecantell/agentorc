@@ -57,6 +57,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 | TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
+| TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Open |
+| TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Open |
+| TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Open |
 
 ---
 
@@ -876,3 +879,51 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** (1) `agent_mail`: `--kind conflict` refused with *a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)*; `--cites` accepted on an `ask` whose `to` names two or more sessions and refused otherwise with the same words; the gate *an `ask` to two or more never names the person* in place of the conflict's; the first-reply close on every copy unchanged; an entry whose stored `kind` is `conflict` read as `ask` wherever a kind is tested (`MailEntry.open`, the open-question counts, the rows); (2) the lists: `cli.py`'s choices and kind tuples, `inbox.py`'s `PERSON_ASK_KINDS` and `OWING_KINDS`, `app.js` L854 — each drops `conflict`; (3) the words: `grinder.md`'s bullet says `--kind ask --cites`, `skill.md`'s kinds line (L47) drops `conflict` and says `--cites` goes on an `ask` to two or more, `techlead-context.md` L116 likewise (a held path: the techlead reads the PR; `director.md`'s *open conflict* is §10's question, not the kind); (4) tests: an `ask` to two controllers with `--cites` lands in both and closes on the first reply; `--cites` on an `ask` to one refused; `--kind conflict` refused; the person gate on an `ask` to two. **Done when** no file under `src/` or `docs/briefs/` names the `conflict` kind, the four tests pass, and `ao msg --kind conflict` is refused naming §4.10.
 
 **Related:** TD-462 (the design), TD-039 (the conflict), TD-105 (archived; the evaluation), TD-052 (mail).
+
+## TD-472: An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul asked why a screenshot pastes into the composer and not the terminal)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a (the *Copy / Paste* row and the *Attach / drop / paste* row), §4.4 *Attachment drop*; `src/agentorc/ui/` (the terminal's paste handler beside the composer's)
+
+**Why:** the terminal's Paste sends the clipboard's text through the terminal as keys (§4.5a *Copy / Paste*); a clipboard holding only an image has no text, so the paste sends nothing and says nothing. Claude Code's own image paste reads the clipboard of the machine it runs on, never the browser's, so tmux is not the gap. A file *dropped* on the terminal already takes the attachment road; a *pasted* one is the one way in that does not, and the terminal is where a person's eyes are.
+
+**Fix:** design first: a paste on the terminal that carries a file and no text takes the composer's road — `attach`, named `paste-<date>-<time>.<ext>` — and the returned path goes into the terminal as a bracketed paste, so it lands in the tool's own input (not sent; Enter stays the person's). Inert where Paste already is (a read-only Focus); a paste that carries text stays the text's; the same bounds as the composer (desktop, a session on this host, `ATTACH_BYTES_MAX`); a refusal toasts, never silence. **Done when** §4.5a's two rows say it, the build lands, and a screenshot pasted on the terminal of an interactive Claude Code session puts its path in the prompt.
+
+**Related:** TD-002 (the attach), TD-096 (read-only Focus), TD-469 (the attachment's life).
+
+## TD-473: An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul: someone will need to post a large PowerPoint, Word or PDF file)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.4 *Attachment drop*, §4.5a *Attach / drop / paste*; `src/sessionorc/paths.py` (`ATTACH_BYTES_MAX`), `src/sessionorc/client.py` (`LINE_LIMIT`, 8 MiB), `src/sessionorc/agent.py` (`rpc_attach`, `_write_attachment`), `src/agentorc/ui/app.py` (`POST /api/sessions/<id>/attach`)
+
+**Why:** the page hands the file to the `attach` RPC base64-encoded on the RPC's one line, and a line is at most 8 MiB, so a file is at most 4 MiB (§4.4). That was a limit of the transport, not a choice about what a person may attach: a screenshot fits (300–550 KB seen), but a deck, a Word document or a scanned PDF commonly does not, and the refusal leaves the person to copy the file onto the host by hand.
+
+**Fix:** design first: split a file larger than one chunk into pieces on the page — an upload id, each piece's offset, one `attach` call per piece well under the line — written by the host agent to a `.part` beside the final name and renamed into place only when the last piece lands and the size matches, so a dropped upload never leaves a file a prompt could name; a `.part` left behind is swept (TD-469's sweep, or its own age bound). The new bound is a setting, not a constant (§5, the Settings page), with a default the designer picks against disk, the RPC's memory and what Claude Code can read (it reads a PDF or a document by path; an image it resizes). The page shows progress for an upload that takes more than a moment and can cancel it. The bounds that stay: a session on this host only until the copy over the link is designed (§4.4 *does not cross the link*, phase 2), desktop only. **Done when** the design says the chunked road and the bound, the build lands, and a 50 MB PDF dropped on a Focus composer comes back as a path Claude Code reads.
+
+**Related:** TD-002 (the attach), TD-469 (the attachment's life), TD-472 (paste on the terminal), TD-003 (the phone's share sheet).
+
+## TD-474: The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul: the terminal sometimes freezes or gets jittery — is it the connection, and should the page say so?)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.6 *Reconnect contract* and *Attach behaviour with another client present*, §4.5 *Browser mechanics* (the host agent's down banner, TD-372); `src/agentorc/ui/static/app.js` (the terminal socket's reconnect, ~L3263: the only sign today is a grey `[agentorc] terminal … — retrying in Ns` line written into the terminal)
+
+**Why:** a frozen or jittery Focus terminal has three likely causes the person cannot tell apart: (1) another client on the same tmux session — tmux's `window-size latest` makes a second tab or a VS Code attach resize the pane each time either is used, and Claude Code repaints in full (§4.6 accepts this and names `window-size manual` as the fallback); (2) the terminal socket dropped and is reconnecting with backoff — a node's session crosses one more hop than a local one; (3) the socket is open and no pane output arrives. The Org's down banner covers the host agent's event socket only; the terminal's own socket has no mark on the page, and (3) has none anywhere.
+
+**Fix:** design first: a quiet mark in the Focus header beside the state pill, drawn after a grace as TD-372's banner is (no flicker on a navigation or a promote's restart): *reconnecting…* while the terminal socket is down, *no output for Ns* while it is open, the session reads `working` and no byte has come — never on an idle session, where silence is the normal case — and *resized by another client* when the pane's size changes under a Focus that did not ask for it (the count of attached clients is tmux's `#{session_attached}`). Hover says what each means and what to do. Record each kind of event with its time in the browser's console, so the next freeze names its cause. **Done when** the design says the marks and their graces, the build lands, and each of the three is drawn on a scratch home by forcing it (kill the socket, a silent `working` pane, a second `tmux attach` resizing).
+
+**Related:** TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-022 (scrollback through tmux).
