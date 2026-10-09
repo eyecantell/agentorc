@@ -208,8 +208,9 @@ class WakeMixin:
             # which is how a refilled budget rings for mail that landed while it was spent
             bell = self._bells[sid] = {"rev": rev, "rung": False, "failures": 0}
             if await self._cache_restart(s, datetime.now(UTC)):
-                # a lapsed cache (§4.10, TD-467): the restart is the ring — the wake decided and charged, one
-                # per stretch, nothing typed and no ring to judge at a Stop; the new run reads its mail first
+                # a lapsed cache (§4.10, TD-467): the restart is the ring — the wake decided and charged, nothing
+                # typed and no ring to judge at a Stop. The replay's create scrubs this bell and the new record is
+                # a new stretch, its wakes and watermark carried; the mark holds only if the replay failed
                 bell["rung"] = True
                 await self._push_changes()
                 return
