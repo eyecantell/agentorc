@@ -7904,3 +7904,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (PR #1379) — `tests/test_ui_waiting_wiring.py`: the events stream's group head and rollup (`heads`) and the Inbox's *idle · open work* row (`person_states`) read *waiting* for a PR wait and a person-inbox wait; the Repo page draws no member pill, so its call shape is pinned by a spy on `view`. Each of the three mutations fails a test.
 
 **Related:** PR #1354, TD-428.
+
+## TD-468: Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start`
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-110's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.9a *The home's note says more*, §6 rule 9 *The announcement the manager did not make*, §4.10 *How a message to a person is written*; `src/sessionorc/agent_tick.py` (`_finished_tell`: the two lines today; the team's start instant it already computes), `src/sessionorc/work.py` (`waiting_of`, the open questions by asker), `src/sessionorc/agent_identity.py` (`identity_alarms` on records), `src/agentorc/teamrun.py` and `src/sessionorc/agent_tick.py` (`_work_start`, the schedule's start: where `usage_at_start` is written), the host record's `teams.<team>` (beside `work_waiting`), `src/sessionorc/agent_settings.py` (`rpc_usage`, `self._usage[profile]["windows"]`: the raw per-window readings)
+
+**Why:** TD-110: what a person reads in the morning is rule 9's note, and it says only the PRs and each member's why; the records hold the rest.
+
+**Resolved:** 2026-10-09 (PR #1386) — `_finished_tell` and `_finished_more` (`src/sessionorc/agent_tick.py`) write the five lines, each only when non-empty; `_mark_team_start` keeps `teams.<team>.usage_at_start` at the home for `ao team start`'s creates (`team_start`), a schedule's start and rule 8's; `tests/test_finished_note.py` pins them. Design §4.9a *The home's note says more*.
+
+**Related:** TD-110 (the design), TD-240 / TD-241 (rule 9's note), TD-271 (open questions outlive their asker), TD-087 (usage readings), TD-410 (the manager seat seldom live).
