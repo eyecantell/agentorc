@@ -82,7 +82,7 @@ code and needs no grant; a session doing the same work does.
   `manager: person` team's members are supervised exactly as a manager's are. An interactive
   session is never supervised (§9 invariant 5: **Take over** on Focus takes a member out of these
   rules on the next tick, and **Hand back** returns it); a suspended record never is (§4.8a).
-  **A restart is not a start.** The host agent still starts nothing *new* by itself, and what it starts again without a press at the time is a person's standing word — a schedule, or rule 8's `on_work: start` — the team, or one member of a team that runs on (TD-457) — (TD-026: a
+  **A restart is not a start.** The host agent still starts nothing *new* by itself, and what it starts again without a press at the time is a person's standing word — a schedule, or rule 8's `on_work: start`, which starts the team, or one member of a team that runs on (TD-457) (TD-026: a
   run window that starts workers, or a start at the weekly reset, is a schedule a person turns on
   and it is off by default). A restart re-creates a session the person or `ao team start` already
   chose to run — same name, directory, worktree, profile, brief, lane, role, badges and
@@ -681,7 +681,7 @@ code and needs no grant; a session doing the same work does.
      gives — and the road back was a Start of every member and seat. So this rule reads **member by
      member** as well. A crew member — not a seat, not the manager — that is `closed` or `exited`
      after declaring `out_of_work` (closed by rule 9's pass, by its manager, or by itself; one a
-     person killed or closed is *stopped* and left alone, as a stopped team is), whose lane holds a
+     person killed or closed — its `closer` names the person, §4.7 — is *stopped* and left alone, as a stopped team is), whose lane holds a
      matching id its `lane_seen` lacks while its team is not wound down, is this rule's news as a
      wound-down team's member is: after `WORK_SETTLE` the home writes the same `work_waiting` mark,
      `members` naming it, and the team's `on_work` follows. **What a start replays is read at the
