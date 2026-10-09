@@ -17,7 +17,7 @@
     {% else %}{% set r = m.repo %}
     <div class="fhead"><span class="kind">Repo</span> <a class="strong" href="{{ r.url }}">{{ r.name }}</a><span class="grow"></span><a class="meta" href="{{ r.url }}">open →</a></div>
     {% set led = r.ledger %}
-    <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span>
+    <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span>{% if led.lanes %}<span class="tipmark" tabindex="0" role="img" aria-label="{{ led.lanes.text }}" title="{{ led.lanes.text }}">i</span>{% endif %}
       <button class="btn sm ghost" type="button" data-addentry="{{ r.name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button><span class="grow"></span>
       <span class="seg" data-pick="led">{% for w in ('open', 'day', 'week', 'month') %}<button type="button" data-v="{{ w }}"{% if w != 'open' and not led.windows %} disabled title="the ledger's history could not be read{% if led.history_error %}: {{ led.history_error }}{% endif %}"{% endif %}>{{ w }}</button>{% endfor %}</span></div>
     {% if led.n is none %}
@@ -27,7 +27,6 @@
       <div class="bar" role="img" aria-label="open entries by priority">{% for b in led.priority %}<a class="bseg p-{{ b.key }}" href="{{ r.url }}#debt" style="flex-basis: {{ b.pct }}%;" title="{{ b.n }} {{ b.label }}">{{ b.n }} {{ b.label }}</a>{% else %}<span class="meta">no open entries</span>{% endfor %}</div>
       <div class="bar" role="img" aria-label="open entries by kind">{% for b in led.kind %}<a class="bseg k-{{ b.key }}" href="{{ r.url }}#debt-{{ b.key }}" style="flex-basis: {{ b.pct }}%;" title="{{ (led.lanes.titles[b.key] if led.lanes and b.key in led.lanes.titles) or (b.n ~ ' ' ~ b.label) }}">{{ b.n }}</a>{% endfor %}</div>
       <div class="legend">{% for k, label in (('pickable', 'pickable'), ('design-first', 'design-first'), ('for-you', 'for you'), ('other', 'other')) %}<span><i class="k-{{ k }}"></i>{{ label }}</span>{% endfor %}</div>
-      {% if led.lanes %}{% with ln = led.lanes, url = r.url %}{% include "lanes_line.html" %}{% endwith %}{% endif %}
     </div>
     {% if led.windows %}{% for w in ('day', 'week', 'month') %}{% set b = led.windows[w] %}
     <div class="lv" data-lv="{{ w }}" hidden>

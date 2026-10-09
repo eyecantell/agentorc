@@ -251,8 +251,12 @@ def in_lanes(
     references a live record of the repo holds claimed. Returns `pickable` and `design_first`, the
     ids in the lanes; `rest`, the *pickable* entries no lane takes, by `Owner:` (`UNOWNED` for none)
     as `[{owner, n, ids}]` in falling count then name; `design_first_rest`, the ids that wait on a
-    build; and `out_of_work`, each record carrying `out_of_work` whose own lane takes an entry nobody
-    holds, `[{id, name, ids}]`. None where no record carries a lane: nothing is drawn."""
+    build; `members`, **each record's own count** (TD-418, built by TD-428): `[{id, name, ids, k}]`
+    for every record with a lane — what `lane_matches` takes for its own lane that `held` does not
+    hold, rule 6's view whatever the page kind, and `k`, how many live records (not ended) carry the
+    identical lane, the same set of words; and `out_of_work`, each record carrying `out_of_work`
+    whose own count is above 0, `[{id, name, ids}]`, read from `members`. None where no record
+    carries a lane: nothing is drawn."""
     lanes = [list(r["lane"]) for r in records if r.get("lane")]
     if not lanes:
         return None
@@ -265,18 +269,26 @@ def in_lanes(
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
     rest.sort(key=lambda r: (-r["n"], r["owner"]))
-    idle = []
+    alive = [frozenset(r["lane"]) for r in records if r.get("lane") and r.get("state") not in ("exited", "closed")]
+    members = []
     for r in records:
-        if not r.get("out_of_work") or not r.get("lane"):
+        if not r.get("lane"):
             continue
-        ids = [e["id"] for e in open_ if e["id"] not in held and lane_matches(list(r["lane"]), e)]
-        if ids:
-            idle.append({"id": r.get("id"), "name": r.get("name") or r.get("id"), "ids": ids})
+        ids = [e["id"] for e in entries if e["id"] not in held and lane_matches(list(r["lane"]), e)]
+        name = r.get("name") or r.get("id")
+        members.append({"id": r.get("id"), "name": name, "ids": ids, "k": alive.count(frozenset(r["lane"]))})
+    by_id = {str(r.get("id")): r for r in records}
+    idle = [
+        {"id": m["id"], "name": m["name"], "ids": m["ids"]}
+        for m in members
+        if m["ids"] and by_id.get(str(m["id"]), {}).get("out_of_work")
+    ]
     return {
         "pickable": [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == "pickable"],
         "design_first": [e["id"] for e in open_ if e["id"] in taken and e["for_page"] == "design-first"],
         "rest": rest,
         "design_first_rest": [e["id"] for e in open_ if e["id"] not in taken and e["for_page"] == "design-first"],
+        "members": members,
         "out_of_work": idle,
     }
 

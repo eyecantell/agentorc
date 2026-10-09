@@ -749,3 +749,74 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
     reading[str(repo)].pop("lanes")  # the fake hands back the dict the last call filled; the home's is fresh
     assert cli.main(["repo", "--all"]) == 0
     assert "(ao-grind" not in capsys.readouterr().out
+
+
+def _own_counts():
+    """A ledger and a team for each member's own count (TD-418, built by TD-428): grinder builds, one
+    held; a live check whose build is live and one whose build is not; an anchor evaluation; a
+    designer's design-first entry."""
+
+    def e(i, owner, kind="build", **kw):
+        return {"id": i, "title": i, "for_page": "pickable", "owner": owner, "kind": kind, "pickable": "yes", **kw}
+
+    entries = [e("TD-355", "grinder"), e("TD-358", "grinder"), e("TD-360", "grinder", "live-check", live="yes")]
+    entries += [e("TD-361", "grinder", "live-check", live="no"), e("TD-370", "anchor", "evaluation")]
+    entries += [{**e("TD-300", "designer", "design-first"), "for_page": "design-first"}]
+    grind = ["free-pick", "owner:grinder"]
+    out = {"at": "2026-10-09T09:00:00Z", "why": "nothing pickable"}
+    records = [
+        {"id": "g1", "name": "grinder-ao-1", "team": "ao-grind", "lane": grind, "state": "idle"},
+        {"id": "g2", "name": "grinder-ao-2", "team": "ao-grind", "lane": list(reversed(grind)), "state": "working"},
+        {"id": "d1", "name": "designer-ao-1", "team": "ao-grind", "lane": ["design-first"], "state": "idle"},
+        {"id": "a1", "name": "anchor-ao-1", "team": "ao-grind", "lane": ["anchor"], "state": "closed",
+         "out_of_work": out},
+        {"id": "m", "name": "manager-ao-1", "team": "ao-grind", "state": "idle"},
+    ]  # fmt: skip
+    return entries, records
+
+
+def test_in_lanes_gives_each_member_its_own_count_and_reads_out_of_work_from_it():
+    """§4.4 *A member's own count* (TD-418, built by TD-428): each record with a lane gets what
+    `lane_matches` takes for its own lane that `held` does not hold — a held entry left out, a live
+    check whose build is live counted by a `free-pick` lane and one not live by none, an `anchor` lane
+    counting its pickable `Owner: anchor` evaluation, whatever the page kind — and `k`, the live records
+    carrying the identical lane, word order aside; `out_of_work` is a declared member whose count is
+    above 0, an ended anchor seat among them; no lane, no row."""
+    from sessionorc import ledger
+
+    entries, records = _own_counts()
+    got = ledger.in_lanes(entries, records, held={"TD-358"})
+    own = {m["id"]: (m["ids"], m["k"]) for m in got["members"]}
+    assert own == {
+        "g1": (["TD-355", "TD-360"], 2),  # shared by two live records: 2/2 on each card
+        "g2": (["TD-355", "TD-360"], 2),
+        "d1": (["TD-300"], 1),  # a lone lane
+        "a1": (["TD-370"], 0),  # ended: counted for its declaration, never for `k`
+    }
+    assert [(m["name"], m["ids"]) for m in got["out_of_work"]] == [("anchor-ao-1", ["TD-370"])]
+    records[0]["out_of_work"] = {"at": "2026-10-09T09:00:00Z", "why": "x"}
+    got = ledger.in_lanes(entries, records, held={"TD-355", "TD-358", "TD-360"})
+    assert [m["name"] for m in got["out_of_work"]] == ["anchor-ao-1"]  # its own count is 0 once all are held
+
+
+def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch, capsys):
+    """§4.7 `ao repo` (TD-428): the *is out of work with n* line reads the per-member count — an
+    out-of-work anchor seat with an unheld evaluation, which the pickable and design-first kinds alone
+    never named, and a member that declared and is waiting on you, whatever its pill reads."""
+    from agentorc import cli
+
+    entries, records = _own_counts()
+    records[1]["out_of_work"] = {"at": "2026-10-09T09:00:00Z", "why": "x"}
+    records[1]["state"] = "idle"  # *waiting* on you on the page: the line names it all the same
+    by = {"pickable": 5, "design-first": 1, "for-you": 0, "other": 0}
+    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []},
+                           "ledger": {"entries": entries, "by_kind": by}}}  # fmt: skip
+    fleet = [{**r, "repo": str(repo)} for r in records]
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+    )
+    monkeypatch.chdir(repo)
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "  anchor-ao-1 is out of work with 1 in its lane: TD-370" in out
+    assert "  grinder-ao-2 is out of work with 3 in its lane: TD-355, TD-358, TD-360" in out

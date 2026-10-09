@@ -719,10 +719,11 @@ def test_only_an_open_ask_from_the_team_is_on_the_line():
 
 
 def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
-    """§4.5a *team card: Repo facet*'s lanes line (§4.4 *In a team's lanes*, TD-361): under the
-    legend, what the team's lanes take and the rest by owner, each count a link; the two segments'
-    hovers say the same; a member out of work with unheld work in its lane tinted, its ids on hover,
-    its name a Focus link; a team with no lane on any record draws the bars alone."""
+    """§4.5a *team card: Repo facet*'s lanes line (§4.4 *In a team's lanes*, TD-361): what the team's
+    lanes take and the rest by owner — on the team card an *i* beside *Technical debt* whose tooltip is
+    the line (TD-418, built by TD-428), on the Repo page the line whole, each count a link; the two
+    segments' hovers say the same; a member out of work with unheld work in its lane named, untinted, its
+    ids on hover, its name a Focus link; a team with no lane on any record draws the bars alone."""
     from agentorc.ui import app as ui
 
     def e(i, page, owner, kind="build"):
@@ -743,7 +744,15 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     ]
     s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    line = html[html.index('class="meta laneline"') :].split("</div>")[0]
+    text = "in grind&#39;s lanes: 0 pickable, 1 design-first · the other 24 pickable: anchor 20, dev-cadence 4"
+    assert f'<span class="tipmark" tabindex="0" role="img" aria-label="{text}" title="{text}">i</span>' in html
+    assert "laneline" not in html  # the card carries the *i*, the Repo page the line
+
+    def whole(s):
+        ln = s["repo"]["ledger"]["lanes"]
+        return ui.templates.get_template("lanes_line.html").render(ln=ln, url="/repo/samscrape")
+
+    line = whole(s)
     assert "in grind's lanes: " in line and ">0 pickable</a>, " in line and ">1 design-first</a>" in line
     assert "· the other 24 pickable: " in line and ">anchor 20</a>, " in line and ">dev-cadence 4</a>" in line
     assert 'href="/repo/samscrape#debt-pickable"' in line and "lanewarn" not in line
@@ -751,9 +760,9 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     assert 'title="2 design-first · 1 in grind&#39;s lanes · 1 wait on a build"' in html
     entries.append(e("TD-355", "pickable", "grinder"))
     s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
-    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    warn = '<span class="lanewarn" title="TD-355 — in its lane, held by nobody">· '
-    assert warn + '<a class="strong" href="/focus/g1">grinder-ao-1</a> out of work with 1 in its lane</span>' in html
+    oow = '<span title="TD-355 — in its lane, held by nobody">· '
+    assert oow + '<a class="strong" href="/focus/g1">grinder-ao-1</a> out of work with 1 in its lane</span>' in whole(s)
+    assert s["repo"]["ledger"]["lanes"]["text"].endswith(" · grinder-ao-1 out of work with 1 in its lane")
     # a kind the Repo page draws no list for (none of it open): its count is not a link to nothing
     lanes = {"pickable": [], "design_first": [], "rest": [], "design_first_rest": [], "out_of_work": []}
     ln = ui.lanes_line("grind", lanes, {"pickable": 0, "design-first": 2})
@@ -763,7 +772,7 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     # a team with no lane on any record: the bars alone
     s = ui.team_summary("grind", [member("g1"), member("g2")], {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    assert "laneline" not in html and 'title="24 pickable"' in html
+    assert "tipmark" not in html and 'title="24 pickable"' in html
 
 
 def _script_ages(stamps: list[str]) -> list[str]:
@@ -800,3 +809,56 @@ def _script_ages(stamps: list[str]) -> list[str]:
     out = subprocess.run([node, str(probe), str(app), json.dumps(moved)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
+
+
+def test_each_member_card_draws_its_own_lane_count_in_its_pill():
+    """§4.5a *card: compact* (TD-418, built by TD-428): inside the pill after the word, how many
+    entries the member's own lane takes that nobody holds — `n`, or `n/k` where `k` > 1 live records
+    carry the same lane, its hover saying so — purple for a `design-first` lane, the pickable blue
+    otherwise, soft, and solid while the record carries `out_of_work` and its pill reads *idle*; a
+    member out of work that waits on you stays soft; nothing at 0, with no lane, or once ended. The
+    team's grouping draws it, and so does a single card's delta (`compact_in` with the repo facts)."""
+    from agentorc.ui import app as ui
+
+    def e(i, owner, kind="build"):
+        return {"id": i, "title": i, "for_page": "pickable", "owner": owner, "kind": kind, "pickable": "yes"}
+
+    grind = ["free-pick", "owner:grinder"]
+    oow = {"at": _iso(NOW), "why": "nothing"}
+    r = reading("/r/samscrape")
+    r["ledger"].update(entries=[e(f"TD-{400 + i}", "grinder") for i in range(14)] + [e("TD-300", "x", "design-first")])
+    repos = {"/r/samscrape": r}
+    fleet = [
+        member("g1", "idle", lane=grind, out_of_work=oow),
+        member("g2", "working", lane=grind),
+        member("d1", "idle", lane=["design-first"]),
+        member("m1", "idle"),
+        member("g0", "closed", lane=grind),
+    ]
+    views = [ui.view(s, fleet) for s in fleet]
+    groups = ui.team_groups(views, (), repos)
+    counts = {m["id"]: m.get("lane_count") for g in groups for m in g["members"]}
+    assert counts["g1"] == {
+        "text": "14/2",
+        "title": "14 entries in its lane, shared by 2 sessions",
+        "kind": "pickable",
+        "solid": True,  # out of work and idle: the case to act on
+    }
+    assert counts["g2"]["text"] == "14/2" and not counts["g2"]["solid"]
+    assert counts["d1"] == {"text": "1", "title": "1 entry in its lane", "kind": "design", "solid": False}
+    assert counts["m1"] is None and counts["g0"] is None  # no lane; ended
+    # a held entry is left out of every count; the delta's card reads the same reading
+    fleet[1]["progress"] = [claim("TD-400")]
+    v = ui.compact_in(ui.view(fleet[0], fleet), fleet, repos)
+    assert v["lane_count"]["text"] == "13/2"
+    html = ui.templates.get_template("card.html").render(s=v)
+    pill = html[html.index('<span class="pill nog') :].split("</span></span>")[0]
+    assert '<span class="lanecount k-pickable solid" title="13 entries in its lane, shared by 2 sessions">13/2' in pill
+    # out of work but waiting on you: *waiting*, and the count stays soft
+    ask = {"id": "m-a", "from": "g1", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?"}
+    v = ui.compact_in(ui.view(fleet[0], fleet, waits=ui.waits_of([ask])), fleet, repos)
+    assert v["pill_word"] == "waiting" and v["lane_count"]["solid"] is False
+    # nothing at 0
+    lanes = {"members": {"g1": {"n": 0, "k": 2}}}
+    assert ui.lane_count({"id": "g1", "lane": grind, "state": "idle"}, lanes) is None
+    assert ui.lane_count({"id": "g1", "lane": grind, "state": "idle"}, None) is None
