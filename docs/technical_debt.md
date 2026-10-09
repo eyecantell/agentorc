@@ -60,6 +60,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 | TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Open |
+| TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Open |
 
 ---
 
@@ -930,3 +931,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first: a paste on the terminal that carries a file and no text takes the composer's road — `attach`, named `paste-<date>-<time>.<ext>` — and the returned path goes into the terminal as a bracketed paste, so it lands in the tool's own input (not sent; Enter stays the person's). Inert where Paste already is (a read-only Focus); a paste that carries text stays the text's; the same bounds as the composer (desktop, a session on this host, `ATTACH_BYTES_MAX`); a refusal toasts, never silence. **Done when** §4.5a's two rows say it, the build lands, and a screenshot pasted on the terminal of an interactive Claude Code session puts its path in the prompt.
 
 **Related:** TD-002 (the attach), TD-096 (read-only Focus), TD-469 (the attachment's life).
+
+## TD-473: An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul: someone will need to post a large PowerPoint, Word or PDF file)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.4 *Attachment drop*, §4.5a *Attach / drop / paste*; `src/sessionorc/paths.py` (`ATTACH_BYTES_MAX`), `src/sessionorc/client.py` (`LINE_LIMIT`, 8 MiB), `src/sessionorc/agent.py` (`rpc_attach`, `_write_attachment`), `src/agentorc/ui/app.py` (`POST /api/sessions/<id>/attach`)
+
+**Why:** the page hands the file to the `attach` RPC base64-encoded on the RPC's one line, and a line is at most 8 MiB, so a file is at most 4 MiB (§4.4). That was a limit of the transport, not a choice about what a person may attach: a screenshot fits (300–550 KB seen), but a deck, a Word document or a scanned PDF commonly does not, and the refusal leaves the person to copy the file onto the host by hand.
+
+**Fix:** design first: split a file larger than one chunk into pieces on the page — an upload id, each piece's offset, one `attach` call per piece well under the line — written by the host agent to a `.part` beside the final name and renamed into place only when the last piece lands and the size matches, so a dropped upload never leaves a file a prompt could name; a `.part` left behind is swept (TD-469's sweep, or its own age bound). The new bound is a setting, not a constant (§5, the Settings page), with a default the designer picks against disk, the RPC's memory and what Claude Code can read (it reads a PDF or a document by path; an image it resizes). The page shows progress for an upload that takes more than a moment and can cancel it. The bounds that stay: a session on this host only until the copy over the link is designed (§4.4 *does not cross the link*, phase 2), desktop only. **Done when** the design says the chunked road and the bound, the build lands, and a 50 MB PDF dropped on a Focus composer comes back as a path Claude Code reads.
+
+**Related:** TD-002 (the attach), TD-469 (the attachment's life), TD-472 (paste on the terminal), TD-003 (the phone's share sheet).
