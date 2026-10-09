@@ -68,6 +68,11 @@ OWED_NAMED = 3  # rule 4's owed clause names this many owed outcomes, then *and 
 # Rule 8 (§6, TD-227): a wound-down team's lanes' news is written as `work_waiting` once this long has
 # passed since the home first read the newest of its entries, so entries filed together are one event
 WORK_SETTLE = timedelta(minutes=10)
+# §4.10 *A lapsed cache is started again, not rung* (TD-459, built by TD-467): the tool's prompt-cache
+# lifetime, and the context (tokens) over which a start on the brief writes less than a ring that
+# re-writes the whole context (the ADR's break-even). Neither is a setting until a reading says one should be
+CACHE_LIFETIME = timedelta(hours=1)
+CACHE_FLOOR = 100_000
 # Rule 9 (§6, TD-241): the home winds a team down once its reading of *finished* has held this long —
 # a finished member may claim again on rule 6's news, and a manager's round may have the wind-down in hand
 FINISHED_SETTLE = timedelta(minutes=10)
@@ -917,6 +922,60 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
 
 def _parse(iso: str) -> datetime:
     return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+
+
+def cache_lapsed(s: Session, now: datetime) -> dict[str, Any] | None:
+    """A member whose ring would re-write a lapsed cache (design §4.10 *A lapsed cache is started
+    again, not rung*, TD-459): hook-confirmed `idle` for longer than `CACHE_LIFETIME`, its context
+    reading over `CACHE_FLOOR`. Returns the `restarts` entry's `{idle, context}` — the hours idle,
+    rounded, and the tokens — or None. Only the cache's half: rule 7's precondition is `tick_ready`."""
+    if s.state != "idle" or s.confidence != "hook":
+        return None
+    tokens = (s.context or {}).get("tokens")
+    if not isinstance(tokens, int) or tokens <= CACHE_FLOOR:
+        return None
+    try:
+        idle = now - _parse(s.since)
+    except (TypeError, ValueError):
+        return None
+    if idle <= CACHE_LIFETIME:
+        return None
+    return {"idle": round(idle.total_seconds() / 3600, 1), "context": tokens}
+
+
+def cache_restarts(s: Session, now: datetime) -> bool:
+    """Whether the doorbell would restart `s` rather than ring it (§4.10, TD-467), as far as the record
+    says: its cache lapsed and rule 7's precondition holds. `read_when`'s `cache`, for a record of the
+    caller's own host — a node's member is rung."""
+    return cache_lapsed(s, now) is not None and tick_ready(s, now)
+
+
+def tick_ready(s: Session, now: datetime) -> bool:
+    """Rule 7's precondition for the tick's own restart of an idle member, as the record holds it (design
+    §6 rule 7, rule 5's): supervised and unattended, not a seat or sat out, not superseded, suspended or
+    gated, hook-confirmed `idle` with nothing pending, no claim in progress, nothing declared, its git
+    fields known and showing nothing uncommitted or unpushed, not past its stop or in a wrap-up. The
+    home's own halves — the profile's gate, *just restarted*, the host — are the caller's."""
+    git = s.git or {}
+    return bool(
+        s.supervised
+        and s.unattended
+        and s.seat is None
+        and not s.sit_out
+        and not s.superseded_by
+        and not s.suspended
+        and not s.gated
+        and s.state == "idle"
+        and s.confidence == "hook"
+        and not s.pending
+        and not s.out_of_work
+        and not s.restart_wanted
+        and not any(e.status == "claimed" and e.source == "declared" for e in s.progress)
+        and not (s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)))
+        and all(isinstance(git.get(k), int) for k in ("dirty", "unpushed"))
+        and git.get("dirty") == 0
+        and git.get("unpushed") == 0
+    )
 
 
 def _usage_key(adapter: Any, name: str, profile: str) -> tuple[str, str]:
