@@ -69,6 +69,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-421 | A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser | Medium | Designed — TD-422 builds it |
 | TD-422 | Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab | Medium | Open |
+| TD-424 | §4.5a's *Done* row still ends *TD-338 — designed 2026-10-05, not built*; TD-340 built it (#1144) and the *pending* row two above says so | Low | Open |
 
 ---
 
@@ -1209,3 +1210,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a `https://` URL printed in a Focus pane underlines on hover and Ctrl+click (Cmd+click on a Mac) opens it in a new tab with `noopener`; a plain click and a drag over it select as before and open nothing; the same on a read-only Focus; `vendor/README.md` has the row and the licence file is in place; the help paragraph is there; tests pin the script tag, the `loadAddon` call with the handler and the scheme guard, and the help key; `pdm run test` and `pdm run lint` pass; TD-421 is archived with this entry.
 
 **Related:** TD-421 (the design), TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the WebGL addon's vendoring), TD-071 (the constraint).
+
+## TD-424: §4.5a's *Done* row says the pending mark is *not built*; TD-340 built it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (docs-audit-ao-1, auditing the last ten merged PRs against §4.5a; found beside #1296's rail row)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.5a-controls.md` (the *Due strip / Inbox board row* · **Done** row)
+
+**Why:** The row reads *the row leaves on the press and the toast waits for the landing (**pending**, TD-338 — designed 2026-10-05, not built)*. The rows for the same work say the opposite: *a control's look* (*designed 2026-10-05 (TD-338; built — TD-340 …)*) and *Inbox row: pending* (*built — TD-340*), and the archived TD-340 and TD-338 entries both record PR #1144 as the build, with *checking off…* in the pending table for Done. §4.5a is the table a control is read from, and this row still says *designed* for what was built.
+
+**Done when** the row reads *built — TD-340* where it now reads *not built*, in the form the neighbouring rows use, and no other line of `docs/design/4.5a-controls.md` says TD-338's pending mark is unbuilt; the doc-bound tests pass.
+
+**Related:** TD-338 (the design), TD-340 (the build, #1144).
