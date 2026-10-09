@@ -57,6 +57,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     BACKUP_MEMBERS,  # noqa: F401
     BRIEF_CLAUSE,  # noqa: F401
     BRIEF_SETTLE,  # noqa: F401
+    CACHE_FLOOR,  # noqa: F401
+    CACHE_LIFETIME,  # noqa: F401
     CLOSED_KEEP,  # noqa: F401
     COMPOSER_LINES,  # noqa: F401
     CONTEXT_AGAIN,  # noqa: F401
@@ -164,12 +166,15 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _usage_key,  # noqa: F401
     _Wait,  # noqa: F401
     backup_store,  # noqa: F401
+    cache_lapsed,  # noqa: F401
+    cache_restarts,  # noqa: F401
     closer_of,
     launch_params,  # noqa: F401
     log,  # noqa: F401
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
     stat_dir,  # noqa: F401
+    tick_ready,  # noqa: F401
 )
 from sessionorc.agent_hook import HookMixin
 from sessionorc.agent_identity import IdentityMixin

@@ -444,6 +444,7 @@ def read_when(
     rings: bool = True,
     refills: bool = False,
     lapses: bool = True,
+    cache: bool = False,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -457,7 +458,9 @@ def read_when(
     `refills` is a person's `reply` on a handed entry's thread (TD-218): to a seat on call it
     closes the seat's question and the entry counts toward the seat again, so it fills it as an
     `ask` does. `lapses` False is an `ask` that carries no bound — a handed entry, which never lapses
-    (§4.10 *An entry handed to a seat*) — so the sentence names none. Advice, never a refusal."""
+    (§4.10 *An entry handed to a seat*) — so the sentence names none. `cache` is the home's word that a
+    ring would be a restart instead (§4.10 *A lapsed cache is started again, not rung*, TD-467:
+    `agent_common.cache_restarts` on a record of its own host). Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask and lapses else ""
     if s is not None and not mail_wakes(s):
@@ -507,6 +510,8 @@ def read_when(
         # (review of PR #583)
         if not person and wake_budget_spent(s, now):
             return "lands without waking it: its wake budget is spent, read on its next look" + tail
+        if cache:
+            return "started again on its brief within a tick, and reads it first" + tail
         return 'rung within a tick: the doorbell types "you have n unread" into its pane' + tail
     return (
         "lands; its idle is a guess from the screen, so nothing is typed into it"

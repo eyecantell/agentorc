@@ -705,6 +705,8 @@ class MailMixin:
                 bound=span,
                 unreachable=sid in away,
                 rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
+                # a lapsed cache is restarted, not rung (§4.10, TD-467): the home's own records alone
+                cache=records[sid].host == self.host and agent_common.cache_restarts(records[sid], now),
                 # a person's answer on a handed entry's thread fills a seat on call (TD-218)
                 # — a reply that closes the seat's own question on the thread of an entry it still owes
                 # (review of #760: an outcome note or a seat's FYI on the thread refills nothing)

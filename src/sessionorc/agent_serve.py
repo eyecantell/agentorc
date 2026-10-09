@@ -15,6 +15,7 @@ from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
     identity,
     link,
     mail,
@@ -63,7 +64,10 @@ class ServeMixin:
         now = datetime.now(UTC)
         down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
         rings = getattr(adapters.get(s.adapter), "composer", None) is not None
-        v["read_when"] = {k: mail.read_when(s, k, now, unreachable=down, rings=rings) for k in ("ask", "note")}
+        cache = s.host == self.host and agent_common.cache_restarts(s, now)  # a lapsed cache (TD-467)
+        v["read_when"] = {
+            k: mail.read_when(s, k, now, unreachable=down, rings=rings, cache=cache) for k in ("ask", "note")
+        }
         # the Reply composer's line for a person's answer on a handed entry's thread (TD-218)
         v["read_when"]["refill"] = mail.read_when(s, "reply", now, unreachable=down, rings=rings, refills=True)
         if s.host == self.host:

@@ -794,8 +794,13 @@ class TickMixin:
         Its second trigger (§4.9c *Switching*, TD-309 slice 5): a record a person's Apply relaunched
         carries `relaunch`, and is restarted the same way under `why: flow` — the replay reads the
         launch record the relaunch wrote — whether or not the member declared out of work, since the run
-        that declared is the one the Apply replaces (TD-358)."""
-        why = "brief" if s.brief_changed else "flow" if s.relaunch else ""
+        that declared is the one the Apply replaces (TD-358).
+
+        Its third (§4.10 *A lapsed cache is started again, not rung*, TD-467) is the doorbell's, which
+        closes and replays the member itself (`_cache_restart`); what reaches here is a `cache` restart
+        whose replay failed, retried as the other two are, with the hours and tokens its first try read."""
+        cache = self._closed_by_tick(s, "cache")
+        why = "brief" if s.brief_changed else "flow" if s.relaunch else "cache" if cache else ""
         if not (why and s.supervised and s.unattended) or s.seat is not None or s.sit_out or work_mod.sat_out(s):
             return
         if s.superseded_by or s.suspended or s.gated or s.host != self.host:
@@ -806,7 +811,7 @@ class TickMixin:
             return
         # either trigger's failed restart is retried under the one that stands now: a person's Apply on a
         # record a `brief` restart left closed clears `brief_changed`, and the mark it left is `brief` (TD-334)
-        closed_by_tick = self._closed_by_tick(s, "brief") or self._closed_by_tick(s, "flow")
+        closed_by_tick = self._closed_by_tick(s, "brief") or self._closed_by_tick(s, "flow") or cache
         if not closed_by_tick:
             if s.state != "idle" or s.confidence != "hook" or s.pending:
                 return
@@ -849,7 +854,34 @@ class TickMixin:
             # a retry taken from the other trigger's mark: the mark follows the trigger it is replayed under,
             # just before the replay, so a replay that fails again is taken again next tick (TD-334)
             self._mark_closed(s, why)
-        await self._replay(s, why, keep_mail=True)
+        last = s.restarts[-1] if why == "cache" else {}
+        await self._replay(s, why, mark={k: last[k] for k in ("idle", "context") if k in last}, keep_mail=True)
+
+    async def _cache_restart(self, s: Session, now: datetime) -> bool:
+        """§4.10 *A lapsed cache is started again, not rung* (TD-459, built by TD-467): the doorbell has
+        decided and charged a ring for `s`; a member idle past `CACHE_LIFETIME` with a context over
+        `CACHE_FLOOR` that meets rule 7's precondition is closed and replayed on its brief instead, `why:
+        cache` with its `idle` hours and `context` tokens, under the ceiling as every replay is, its mail
+        kept. True when the restart took the ring — the close was made, so a replay that fails is the
+        tick's to retry (`_brief_restart`); False rings as today: the precondition fails, the window is
+        full, a node's member (rule 7 reaches no node yet), or the close failed (its entry counts)."""
+        lapsed = agent_common.cache_lapsed(s, now)
+        if lapsed is None or s.host != self.host or not agent_common.tick_ready(s, now):
+            return False
+        if self._profile_gated(s.profile, now, s.team) or self._just_restarted(s, now) or self._window_full(s, now):
+            return False
+        log.info("%s: idle %sh with %d tokens: restarting it on its brief rather than ringing", s.id, *lapsed.values())
+        try:
+            await self.rpc_close(s.id, closer={"by": "tick", "why": "cache"})
+        except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
+            if s.state != "closed":
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": "cache", **lapsed, "error": f"close: {e}"}]
+                log.warning("%s: the close before a cache restart failed, ringing instead: %s", s.id, e)
+                self._save(s)
+                return False
+        self._mark_closed(s, "cache")
+        await self._replay(s, "cache", mark=lapsed, keep_mail=True)
+        return True
 
     @staticmethod
     def _mark_closed(s: Session, why: str) -> None:

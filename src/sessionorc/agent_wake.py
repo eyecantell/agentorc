@@ -207,6 +207,13 @@ class WakeMixin:
             # only a decided ring has a stretch to keep: an undecided tick is taken again next tick,
             # which is how a refilled budget rings for mail that landed while it was spent
             bell = self._bells[sid] = {"rev": rev, "rung": False, "failures": 0}
+            if await self._cache_restart(s, datetime.now(UTC)):
+                # a lapsed cache (§4.10, TD-467): the restart is the ring — the wake decided and charged, nothing
+                # typed and no ring to judge at a Stop. The replay's create scrubs this bell and the new record is
+                # a new stretch, its wakes and watermark carried; the mark holds only if the replay failed
+                bell["rung"] = True
+                await self._push_changes()
+                return
         # judged at its turn's Stop (TD-347); set before typing, since the tool's UserPromptSubmit can
         # land before the submit confirmation does
         self._rang[sid] = {"count": s.unread(), "turned": False}

@@ -52,7 +52,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1 (§4.5a) and 2 (§6) 2026-10-09 |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Partly done — slice 1 PR #1340 |
-| TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | Open |
+| TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | In progress |
 | TD-468 | Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start` | Low | Open |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
@@ -807,7 +807,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (the designer, TD-459's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** In progress — slice 1 (parts (1)–(4) and (6): the constants, the doorbell's branch, the retry under `cache`, `read_when`'s sentence, `tests/test_cache_restart.py`) is PR #1346 (grinder-ao-1, 2026-10-09). **Left, as one page slice:** (5) the card's restart note and `ao status -v`'s *cache lapsed · idle 5h · 191k* from the newest `restarts` entry `why: cache` (its `idle` hours, `context` tokens). Neither surface draws a per-restart note today, and it touches grinder-ao-2's files (`cards.py`, `cli.py`).
 **Location:** design §4.10 *A lapsed cache is started again, not rung*, the `read_when` table's `idle` from a hook row; §6 rule 7 (the tick restart's third trigger); `src/sessionorc/agent_wake.py` (`_ring_typing`: after `_decide_wake` says ring, before `_type`), `src/sessionorc/agent_tick.py` (`_brief_restart`: the precondition and the close-and-replay, to share; `_just_restarted`; the `restarts` entry), `src/sessionorc/agent_common.py` (`CACHE_LIFETIME`, `CACHE_FLOOR` beside `WORK_SETTLE`), `src/sessionorc/mail.py` (`read_when`), `src/agentorc/ui/cards.py` and `src/agentorc/cli.py` (the restart note's words, *cache lapsed · idle 5h · 191k*)
 
 **Why:** TD-459: 23 of the week's 44 whole-context re-writes after a lapsed cache were doorbell rings of a grinder idle a median 5.4 h, each re-writing a median 191k tokens at the write price; a start on the brief writes about 23k ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, Paul's decision).
