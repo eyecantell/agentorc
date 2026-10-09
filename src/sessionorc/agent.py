@@ -261,18 +261,20 @@ def _start_part(part: Path, raw: bytes) -> None:
 def _append_part(part: Path, offset: int, raw: bytes, total: int) -> tuple[int, str]:
     """One later piece of an upload appended to its `.part`: `(written, why)`, `why` empty when it
     went on, else the refusal — the `.part` deleted with it, since an upload out of order is no
-    longer the file. A missing `.part` was cancelled or swept."""
+    longer the file. A missing `.part` was cancelled or swept, and is never made again here: it is
+    opened without `O_CREAT`, so a cancel between two pieces cannot leave a new one behind."""
     try:
-        have = part.stat().st_size
+        fd = os.open(part, os.O_WRONLY | os.O_APPEND)
     except FileNotFoundError:
         return 0, "is gone (cancelled, or nothing written to it for an hour)"
-    if offset != have:
-        part.unlink(missing_ok=True)
-        return have, f"sent a piece at {offset} bytes, but {have} are written: the upload is dropped"
-    if have + len(raw) > total:
-        part.unlink(missing_ok=True)
-        return have, f"sent {have + len(raw)} bytes of a {total}-byte file: the upload is dropped"
-    with part.open("ab") as f:
+    with os.fdopen(fd, "ab") as f:
+        have = os.fstat(fd).st_size
+        if offset != have:
+            part.unlink(missing_ok=True)
+            return have, f"sent a piece at {offset} bytes, but {have} are written: the upload is dropped"
+        if have + len(raw) > total:
+            part.unlink(missing_ok=True)
+            return have, f"sent {have + len(raw)} bytes of a {total}-byte file: the upload is dropped"
         f.write(raw)
     return have + len(raw), ""
 
@@ -280,7 +282,11 @@ def _append_part(part: Path, offset: int, raw: bytes, total: int) -> tuple[int, 
 def _finish_part(part: Path, name: str) -> Path:
     """A whole `.part` linked into its final name — the `-2`, `-3`… rule applied now, `os.link`
     never over a file — and unlinked, so no prompt can name a file that is not whole."""
-    path = _place_attachment(part.parent, name, lambda p: os.link(part, p))
+    try:
+        path = _place_attachment(part.parent, name, lambda p: os.link(part, p))
+    except BaseException:
+        part.unlink(missing_ok=True)  # the upload is spent either way: nothing names this `.part`
+        raise
     part.unlink(missing_ok=True)
     return path
 
@@ -2128,6 +2134,9 @@ class HostAgent(
             raise RpcError("attach: the file did not arrive as base64") from None
         if upload:
             written, why = await asyncio.to_thread(_append_part, up["part"], offset, raw, up["total"])
+            if not why and upload not in self._uploads:  # cancelled while this piece was written
+                await asyncio.to_thread(up["part"].unlink, missing_ok=True)
+                why = "was cancelled"
             if why:
                 self._uploads.pop(upload, None)
                 raise RpcError(f"attach: upload {upload} {why}")

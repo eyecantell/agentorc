@@ -102,6 +102,12 @@ async def test_attach_in_pieces_links_the_whole_file_into_place(agent, tmp_path)
         assert not list(where.glob("*.part"))
         with pytest.raises(AgentError, match=f"no upload {up}"):
             await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
+        # a piece sent again, behind what is written: refused the same way
+        up = (await c.call("attach", id=s.id, name="r.bin", data=_b64(b"0123"), total=12))["upload"]
+        await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
+        with pytest.raises(AgentError, match="sent a piece at 4 bytes, but 8 are written"):
+            await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
+        assert not list(where.glob("*.part"))
         # past the total: refused the same way
         up = (await c.call("attach", id=s.id, name="c.bin", data=_b64(b"0123"), total=6))["upload"]
         with pytest.raises(AgentError, match="sent 8 bytes of a 6-byte file"):
@@ -120,6 +126,8 @@ async def test_attach_in_pieces_links_the_whole_file_into_place(agent, tmp_path)
         with pytest.raises(AgentError, match="deck.pptx is 612 MiB, past the 1 MiB a file may be"):
             await c.call("attach", id=s.id, name="deck.pptx", data=_b64(b"0123"), total=612 << 20)
         assert not list(where.glob("deck*")) and not agent._uploads
+        exact = await c.call("attach", id=s.id, name="exact.bin", data=_b64(b"\0" * (1 << 20)))
+        assert exact["bytes"] == 1 << 20  # the bound itself fits
         with pytest.raises(AgentError, match="total is the file's whole size"):
             await c.call("attach", id=s.id, name="e.bin", data=_b64(b"0123"), total=2)
 
@@ -135,14 +143,15 @@ async def test_the_sweep_takes_an_hour_idle_part_whatever_runs_keep_days(agent, 
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
     where = paths.attachments_dir() / "ao-att-4"
     where.mkdir(parents=True)
-    idle, fresh, done = where / "a.bin.1.part", where / "b.bin.2.part", where / "c.bin"
-    for f in (idle, fresh, done):
+    idle, fresh = where / "a.bin.0123456789abcdef.part", where / "b.bin.fedcba9876543210.part"
+    done, named = where / "c.bin", where / "notes.part"  # finished: a person may name a file `.part`
+    for f in (idle, fresh, done, named):
         f.write_bytes(b"x")
     old = datetime.now(UTC).timestamp() - paths.ATTACH_PART_IDLE_S - 60
-    for f in (idle, done):
+    for f in (idle, done, named):
         os.utime(f, (old, old))
     await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), set())
-    assert not idle.exists() and fresh.exists() and done.exists()
+    assert not idle.exists() and fresh.exists() and done.exists() and named.exists()
 
 
 @pytest.mark.unit
@@ -352,3 +361,26 @@ def test_the_composers_drop_and_paste_handlers_run_as_themselves(tmp_path):
         "uploaded": ["one.png", "two.png", "shot.png"],
     }
     assert got["shut"] == {"prevented": False, "uploaded": ["one.png", "two.png", "shot.png"], "input_value": ""}
+
+
+@pytest.mark.integration
+async def test_a_link_that_fails_leaves_no_part(agent, tmp_path, monkeypatch):
+    """TD-478: the last piece's link into place failing spends the upload and deletes its `.part`,
+    rather than leaving it for the sweep with nothing able to name it."""
+    import os
+
+    from sessionorc.models import Session
+
+    s = Session(id="ao-att-5", name="att", kind="interactive", adapter="shell", dir=str(tmp_path))
+    agent.sessions[s.id] = s
+    where = paths.attachments_dir() / s.id
+
+    def refuse(src, dst):
+        raise PermissionError("no links here")
+
+    async with LocalClient() as c:
+        up = (await c.call("attach", id=s.id, name="f.bin", data=_b64(b"0123"), total=8))["upload"]
+        monkeypatch.setattr(os, "link", refuse)
+        with pytest.raises(AgentError):
+            await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
+        assert not list(where.iterdir()) and not agent._uploads

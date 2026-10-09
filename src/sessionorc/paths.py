@@ -43,6 +43,8 @@ ATTACH_PIECE_BYTES = 2 * 1024 * 1024
 ATTACH_BYTES_MAX = 4 * 1024 * 1024
 # A `.part` nothing has written to for this long goes on the hourly sweep (§4.6 *Run-log retention*).
 ATTACH_PART_IDLE_S = 3600
+# An upload's `.part`, `<safe name>.<upload>.part`, the upload id `secrets.token_hex(8)`.
+UPLOAD_PART = re.compile(r".+\.[0-9a-f]{16}\.part")
 
 
 def attachment_name(name: str) -> str:

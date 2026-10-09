@@ -2803,7 +2803,9 @@ class TickMixin:
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
-                if f.stat().st_mtime < idle:
+                # an upload's `.part` alone (`<name>.<16 hex>.part`): a finished file a person named
+                # `notes.part` is an attachment, kept as any other is
+                if paths.UPLOAD_PART.fullmatch(f.name) and f.stat().st_mtime < idle:
                     f.unlink()
                     log.info("pruned attachment upload %s (nothing written for an hour)", f)
             except OSError:
