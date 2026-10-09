@@ -54,7 +54,7 @@ code.claude.com/docs/en/hooks, support.claude.com/en/articles/8324991.
 
 Of the writes:
 - **16.8%** is each turn's new content, written once and read afterwards. That cost is unavoidable.
-- **6.3%** is a whole context written again after the cache lapsed: a gap over an hour, 44 times.
+- **6.0%** is a whole context written again after the cache lapsed: a gap over an hour, 44 times.
   Of those, 23 were grinders rung by the doorbell after a median 5.4 h idle, re-writing a median
   191k tokens each. Most of the rest were the person's own sessions picked up again.
 - **2.8%** is the first request of each of the 144 sessions. Its median context is 50k, of which
@@ -79,16 +79,19 @@ which rule 5 does not bound.
    every write and saves a full re-write at each 5–60-minute gap. On this week's traffic that
    trade is lopsided in the 1h lifetime's favour, as above. Cost: one env key on the metered
    profile's layer (TD-151's build carries the profile).
-3. **Restart rather than ring a member whose cache has lapsed.** When rule 6 is about to ring a
+3. **Restart rather than ring a member whose cache has lapsed.** The 23 grinder re-writes followed
+   §4.10's doorbell: mail landed for a member idle for hours. When the doorbell is about to ring a
    member that has been idle longer than the lifetime (an hour) and holds a context over about
-   100k, it restarts it on its brief instead, as rule 5's restart does. The restart writes about
-   23k new tokens rather than about 190k at 2×. Saving: roughly 2% of the week's cost at this
+   100k, the host agent restarts it on its brief instead. The new run reads the mail, since its
+   brief reads the inbox first. The restart writes about
+   23k new tokens rather than about 190k at 2×. Saving: roughly 2–2.5% of the week's cost at this
    week's rate. It grows with the number of overnight rings. Cost: the member loses its
-   conversation. Rule 5's precondition already guarantees it is idle, holds no claim, and has
-   pushed its work.
+   conversation. The restart takes rule 5's precondition (§6) by analogy: the member is idle,
+   holds no claim in progress, and has pushed its work. Without it, the doorbell rings as
+   today.
 4. **Lower the context bound from 300k to 200k, as a trial.** Over a restart cycle the mean context
    falls from about 175k to about 125k, so reads fall by about 29% a request. Against that, each
-   cycle is about a third shorter, and every restart pays its first write and a re-orientation:
+   cycle is about two-fifths shorter (150k of growth rather than 250k), and every restart pays its first write and a re-orientation:
    reading the ledger, the files and the design again. Nobody can net these on paper: the
    re-orientation's size is the unknown. Cost: one number in the repo's `.agentorc.yml` (§4.8
    *The bound has two layers*), and a week's comparison of usage per merged PR.
@@ -109,8 +112,8 @@ counts, and these API-price shares only rank the levers.
 
 - Option 2 is a build entry: the metered profile's layer sets the main conversation's lifetime,
   and design §4.2a says so.
-- Option 3 is a design-first entry: §6 rule 6 gains a branch that restarts, and the brief's
-  restart line names the cause.
+- Option 3 is a design-first entry: §4.10's doorbell gains a branch that restarts a lapsed
+  member, with the precondition above, and the restart's `why` names the cause.
 - Option 4 changes `.agentorc.yml`'s bound for the trial. The anchor reads the windows after a
   week, and the bound stays or goes back.
 - A member that is restarted more often loses more of its conversation. That is acceptable only
