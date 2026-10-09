@@ -48,6 +48,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.1 Session substrate: tmux, one session per conversation
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 13): §4.1 cut to the substrate's rules — what left: the suspension exception's TD-077 (a2); the *show command runs* box retired by TD-418; *No prose in the argv* designed 2026-10-05, built by TD-339 slices 2 and 1, and its incident — on 2026-10-05 a repo script a member was told to run ended with `pkill -f chromium`, matched the word in the brief riding in that member's own argv, and killed the session running it; *The brief is the person's word* designed 2026-10-06, built by TD-347 slices 1 and 2, after a seat on 2026-10-06 answered its brief that it held only pasted text and held a PR ask ten hours, its *Done when* on a scratch home on Opus and on Fable; *A brief whose first hook is lost* designed 2026-10-06, built by TD-348, after one sat at an empty composer 7.5 hours; 2,600 → 2,521 words.
 - undated (PR #17): Resume's supersede — closes the exited record and keeps it a day. The create-time supersede (below) extends it to a fresh start under the same name and goes one step further by forgetting rather than keeping.
 - undated: `pipe-pane` continuous streaming to `~/.agentorc/runs/<session>-<created>.log` replaced tdgrind's per-tick snapshot.
 - 2026-09-10 (§10 decision, §9 invariant 12): a name identifies one session within its scope (the repo, or the directory for a repo-less session).
@@ -100,6 +101,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 13): §4.2a cut to what a profile is — what left: the stale *not built — TD-233* on the reported reading (built, §4.4 *Usage*); *How a profile is billed* designed 2026-09-25 by the designer (#547) and reconciled the same day in a cloud session with Paul, built 2026-09-27 by TD-151 slices 1, 3, 5 and 4; the `config_dir` refusal's TD-151; the week's numbers behind the prompt-cache pin (2026-10-01–08: 4% of requests came 5–60 minutes after the one before, about 60% more than the week cost — the ADR keeps them); the pace's TD-151 decided 2026-10-07; 1,365 → 1,281 words.
 - 2026-10-09 (TD-458, the designer): **a metered profile's prompt cache lives an hour** — the adapter's launch sets `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` for a `metered` profile unless the host agent's environment carries the key; no profile field. ADR 2026-10-08 option 2, Paul's decision. Built by TD-470.
 - 2026-10-07 (TD-151, grinder-ao-1): built — `spend.sums` keeps the rows' `turns` and each window's `begins`, and `spend.reading` gives each window `turns` and `pace` (`{per_hour, unit, at}`); a pace that moves with the clock alone is kept current at the host agent and pushed with the next move of the spend.
 - 2026-10-07 (TD-151, the designer): a metered reading's windows carry `turns` and `pace` beside `spent`.
@@ -112,6 +114,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.3 Adapter contract
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 13): §4.3 cut to the contract — what left: `start_context` TD-283 part 2 built 2026-10-04; `--append-system-prompt-file`'s provenance (TD-336, built by TD-339 slice 1; the flag's own Remote Control carrier uses it, only `--bare`'s help text names it); `context` TD-188 built by TD-190 slice 1 and TD-295; the transcript's TD-154/TD-165; `usage`'s TD-073 and TD-122; `usage_report` TD-231/TD-233; `title` TD-074; the start-hooks rule decided with Paul 2026-09-12 and written 2026-09-24, `CADENCE_ATTENTION_SCOPE` TD-425; *Spend per turn* designed and reconciled 2026-09-25, built 2026-09-27 by TD-151 slices 2–3; 2,121 → 2,048 words.
 - 2026-10-08 (TD-425, grinder-ao-1): every launch sets `CADENCE_ATTENTION_SCOPE` beside `AGENTORC_SESSION` — `own` for an unattended session, `machine` for an interactive one, from the record's mode at that launch. Until then dev-cadence's start hook found the scope by running `ao status --json` itself, a synced file calling `ao` against §8's rule (TD-159's ADR); the script already read the variable first.
 - 2026-09-13: the word *turn* was taken from OpenAI's Agents API (ADR decisions/2026-09-13-openai-agents-api.md) because it named a split agentorc already had and could not say in a sentence: session durable, turn one piece of work. Send to `idle` starts a turn, to `working` steers it — one control, not two, because the difference is what the person is doing, not what the code does.
 - 2026-09-14 (§4.10): `mail()` added to the adapter protocol; when an adapter has no native delivery path the core falls back to a pane write (a `send`), and §4.10's message/control line becomes a convention the adapter's brief keeps rather than a gate the host agent enforces.
@@ -1023,6 +1026,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 13): §5 cut to what each file holds — the build record left for this record: `settings.yml` one file since 2026-09-25 (TD-100; the four keys, their readers and `set_settings`/`settings` built by TD-146 slice 1, which also retired `ui.yml`; the stop time slice 2; the replica TD-147; the page TD-148 on 2026-09-27; `usage:` the fifth key since TD-233 slice 4, `notify:` the sixth designed with TD-092 and read since TD-319 slice 1; amounts read by the gate since TD-151 slice 3 and taken by the writers since slice 5; `max_age` TD-230/TD-233; `on_work` TD-214/TD-457; `flow` read since TD-309 slice 4; `balance` TD-177 built by TD-239; `pull` TD-222; `copy_on_select` TD-164; `board_show` TD-207 built by TD-220; the hosts parser TD-004; the restart-pending line TD-149; the scratch home's registry TD-298; `{path}` percent-encoded TD-011; Cursor's refusal TD-095; `held:` read since TD-309 slice 1; the aggregate TD-210 built by TD-229 slice 5; `promote:` TD-120 step 2 designed 2026-09-24, read by the home since TD-132 slice 1, carried by this repo since slice 4, `auto` in `settings.yml` since 2026-09-25, the rollback TD-212; TD-149's accepted-ahead keys and `AGENTORC_TICK`; TD-026 and TD-100 on the `unattended:` block; TD-128 on the amounts, TD-307 on `flow:` and `held:`, and *the CLI is TD-146's rest*); 2,788 → 2,582 words.
 - 2026-10-09 (TD-473, the designer): `person.attach.max` — the most a Focus attachment may be, `256M` by default, `1M` to `4G` — joins `person:`; a setting the person turns, so `settings.yml` and the You card, never a constant. Built by TD-478.
 - 2026-10-09 (TD-457, the designer): `teams.<team>.on_work` defaults to `start`, and covers a finished member's lane as well as a wound-down team's.
 - 2026-09-10 (TD-004): the shared `sessionorc.hosts` parser landed; in phase 1 the UI and the host agent run on one machine and read the same `local` entry (`name`, `vscode_host`, `local`, `volatile`, `repos_registry`, `runs_keep_days`); the env-var overrides were removed. The ssh entries stayed phase 2 work, becoming the node→home link of §4.4a.
@@ -1217,6 +1221,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 9. Invariants
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 13): §9 keeps every invariant; the TD markers hung on invariants 2, 5, 11 and 14 (TD-381, TD-041, TD-036, TD-083, TD-103) left for this record; 1,364 → 1,359 words.
 - 2026-10-07 (TD-381, the designer): invariant 2 names the anchor seat as the checkout's one agent only while no person's session holds it.
 - 2026-10-06 (TD-345, the designer): invariant 9 extended to flows — the host agent never reads a flow, the record gains no flow or stage field, no rule keys on a flow or a stage's `name`, and `relaunch`, `sit_out` and `closed_for: {why: sit_out}` are marks a person's act writes and the tick reads as marks. §4.9c had stated the load-bearing rule (*the host agent never sees a flow, and the record gains no flow field*) and §9 did not.
 - 2026-09-12: invariant 11's membership half (`controllers` on the target) proposed (§4.8, TD-036); the grant was named `orchestrate` until TD-055 step 3 renamed it `control`.
@@ -1228,6 +1233,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 10. Open questions
 
+- 2026-10-09 (TD-464, the designer; the second pass, slice 13): §10 is the dated log by design and is left as it is, one line corrected — the devcontainer entry's *Build list: TD-057 step 3c* reads *Built*, since step 3c is in git.
 - 2026-09-25 (TD-177, Paul): *what may a manager do with the repo's numbers* — a balance line (open PRs above n, the oldest past d, the reader's queue past its bound) on which the manager stops handing out claims and asks the techlead to read; the numbers made visible first (TD-176), the rule after.
 - 2026-09-04 morning: name chosen `sessionherd`; 2026-09-04 evening: renamed `agentorc` to sit beside cmdorc — free on PyPI, one empty GitHub repo of that name, no dashboards among the neighbours.
 - 2026-09-04: Tailscale-only chosen over a password for the UI in phase 1; superseded 2026-09-06.

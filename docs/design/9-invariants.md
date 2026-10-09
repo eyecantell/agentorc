@@ -3,14 +3,14 @@
 1. Only the host agent creates, kills, or sends keys to an `ao-*` tmux session.
 2. A directory has at most one agent session (`kind: interactive`, adapter other than `shell`;
    main checkout, worktree, or plain directory). Shells and command sessions are exempt. The
-   anchor seat (§4.9b *The anchor seat*, TD-381) is that one agent in a main checkout only while
+   anchor seat (§4.9b *The anchor seat*) is that one agent in a main checkout only while
    no person's session holds it: its fill is refused by occupancy as any `create` is.
 3. Every session has a run log from its first byte.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
    sent to by a policy, and never acted on by another session: an acting RPC from a session onto
    one — `set_controllers` included — is refused whatever the caller's grant and membership
-   (§4.8, TD-041). Only a person acts on an interactive session, and only a person hands one to
+   (§4.8). Only a person acts on an interactive session, and only a person hands one to
    unattended mode or to a controller. Flipping a session to interactive takes it out of every
    controller's reach on their next call; its `controllers` entries stay, inert. A **message** is
    not an act of control and is not refused by this invariant: it lands in the target's inbox
@@ -40,7 +40,7 @@
     derived entry is shown as such, like a scraped state.
 11. A session **acts on** another session only through the host agent, only with the `control`
     grant on its record, and only when the caller is in the target's `controllers` list (an
-    empty list means nobody may act on it; §4.8, TD-036) — and never when the target is
+    empty list means nobody may act on it; §4.8) — and never when the target is
     interactive, whatever the list says (invariant 5). Grant and membership are both read from
     the records on every call, so a revoke or a membership edit takes effect on the session's
     next call and neither is cached. Reads are never gated, and a person at a terminal or the
@@ -71,9 +71,9 @@
     `out_of_work` is written only by the session it is about, through the ungated `progress`
     channel, and is never derived — alone among what the channels carry, it has no derived form,
     because every clause of the test is a judgement over prose the core cannot read. A worker
-    that exits without declaring it is a crash and is restarted. `restart_wanted` (TD-083,
-    §4.9a) is the same kind of word under the same rule: the session's own, never derived, and acted on by its controller or, for a supervised member,
-    by the host agent's tick under §6 *Keeping a team running* rule 2 (TD-103), never inferred by the core.
+    that exits without declaring it is a crash and is restarted. `restart_wanted`
+    (§4.9a) is the same kind of word under the same rule: the session's own, never derived, and acted on by its controller or, for a supervised member,
+    by the host agent's tick under §6 *Keeping a team running* rule 2, never inferred by the core.
 15. The org's **graph, intent and mail have one writer, the home host agent**; a session's
     **observed state has one writer, its node** (§4.4a). `controllers`, grants, team,
     `unattended`, `supervised` and the supervision marks (§6), stop time, reports, inboxes, `sends`,
