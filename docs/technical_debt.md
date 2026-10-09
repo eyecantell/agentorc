@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-415 | Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words | Low | Open |
 | TD-416 | Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282) | Low | Open |
 | TD-417 | Tests do not pin the Focus rail's behaviour (#1286): put away, bring back, a glyph opening its card, the remembered choice — only the pure glyph list, CSS strings and template text are tested | Low | Open |
 
@@ -1185,19 +1184,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
 
-## TD-415: Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/`
-
-**Why:** #1282 (TD-070) lets `ao msg --reply-to <id> --pick <n> "text"` send the picked answer, a blank line and the replier's words. `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins only the one case `--pick 2 "rebase it first"`. Three changed lines survive being reverted, each with the whole of `tests/test_cli.py` and `tests/test_mail.py` passing (153 passed, run on `origin/main` 5a2f4441): (a) `_picked_text` in `src/agentorc/cli.py` — `return text.split("\n", 1)[0] if isinstance(idx, int) else text` replaced by `return text` (the line that makes `ao inbox` show a picked reply as the answer alone and not the words after it: the test reads `answered 2:` only from the closed *question*, which takes the `answers[idx]` branch above it, never from the reply entry); (b) `if more.strip():` replaced by `if more:` (a whitespace-only word then sends `"off develop\n\n "`, which the home accepts only because of TD-416); (c) `*to, more = words or [""]` replaced by `to, more = [], (words or [""])[-1]` (the `to` addressees an `ao msg a b --pick` leaves in front of the words are dropped by the reply either way, and no test sends one). Revert each line in a worktree and run `pdm run pytest -q tests/test_cli.py tests/test_mail.py` to see it.
-
-**Fix:** extend that test: a reply entry with `answer` and `text` `"off develop\n\nrebase it first"` read by `ao inbox` as the sender prints `answered 2: "off develop"` and not the words; `--pick 2 "  "` sends the answer alone; `--pick 2` with an addressee word in front sends the same reply as without it, or is refused if that is the design. **Done when** reverting each of (a)–(b) fails a test.
 
 ## TD-416: Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282)
 

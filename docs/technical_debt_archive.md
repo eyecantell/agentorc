@@ -6883,3 +6883,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the sentence in rule 6 says the pruned id's `dropped` mark leaves with it, and no other line of §6 or `docs/design-history.md` says it is kept; the doc-bound tests pass.
 
 **Related:** TD-407 (the design), TD-411 (the build), TD-247 (`dropped: {id: at}`).
+
+## TD-415: Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/`
+
+**Why:** #1282 (TD-070) lets `ao msg --reply-to <id> --pick <n> "text"` send the picked answer, a blank line and the replier's words. `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins only the one case `--pick 2 "rebase it first"`. Three changed lines survive being reverted, each with the whole of `tests/test_cli.py` and `tests/test_mail.py` passing (153 passed, run on `origin/main` 5a2f4441): (a) `_picked_text` in `src/agentorc/cli.py` — `return text.split("\n", 1)[0] if isinstance(idx, int) else text` replaced by `return text` (the line that makes `ao inbox` show a picked reply as the answer alone and not the words after it: the test reads `answered 2:` only from the closed *question*, which takes the `answers[idx]` branch above it, never from the reply entry); (b) `if more.strip():` replaced by `if more:` (a whitespace-only word then sends `"off develop\n\n "`, which the home accepts only because of TD-416); (c) `*to, more = words or [""]` replaced by `to, more = [], (words or [""])[-1]` (the `to` addressees an `ao msg a b --pick` leaves in front of the words are dropped by the reply either way, and no test sends one). Revert each line in a worktree and run `pdm run pytest -q tests/test_cli.py tests/test_mail.py` to see it.
+
+**Fix:** extend that test: a reply entry with `answer` and `text` `"off develop\n\nrebase it first"` read by `ao inbox` as the sender prints `answered 2: "off develop"` and not the words; `--pick 2 "  "` sends the answer alone; `--pick 2` with an addressee word in front sends the same reply as without it, or is refused if that is the design. **Done when** reverting each of (a)–(b) fails a test.
+
+**Resolved:** 2026-10-08 (PR #1294, grinder-ao-2) — `tests/test_cli.py::test_msg_answer_and_pick_and_the_inbox_lines_that_show_them` pins (a) the sender's inbox reading a picked reply with words as `answered 2: "off develop"` alone, (b) `--pick 2 "   "` sending the answer alone, read from the `text` the CLI hands `call_sync` (the home strips a reply, so a round trip cannot see it), and (c) an addressee word in front sending the same reply to the same recipient. Reverting (a) or (b) fails the test; (c) is not observable by a revert, as the entry said.
