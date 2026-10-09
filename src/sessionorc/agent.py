@@ -788,7 +788,9 @@ class HostAgent(
         dirty, or off its default branch, as the fill reads it (`checkout_held`, TD-395) — so §6 rule 3
         fills it once the checkout is free. `held_reason` is that reading, `{by, why}`, written as the
         record's `seat_held` so its card says why before the first tick. Refused without `seat` and
-        `unattended`, and beside `start_at` or a resume; `held_reason` without `held`.
+        `unattended`, and beside `start_at` or a resume; `held_reason` without `held`. A manager on
+        call is written so by every Start (§6 rule 3 *A Start writes the seat and never fills it*,
+        TD-410), with no `held_reason`; with `keep_mail` the held record takes the mail as a fill does.
 
         `start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
         **record** now — the name taken, the worktree made, the launch record written, the slot held
@@ -1131,9 +1133,14 @@ class HostAgent(
             s.lane_seen = {"at": s.created, "ids": []}
             if given.get("held_reason"):
                 s.seat_held = {"by": str(given["held_reason"]["by"]), "why": str(given["held_reason"]["why"])}
+        # a held seat's record keeps the mail as its fill would (§6 rule 3, TD-410): a question to the
+        # last run's manager is in its inbox, so the first tick reads it as due and fills the seat
+        kept = state == "closed" and bool(given.get("keep_mail")) and isinstance(holder, Session)
         if isinstance(holder, Session):
-            s.supersedes = [{"id": holder.id, "mail": False, "at": s.created}]
+            s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
         self.sessions[sid] = s
+        if kept:
+            self._move_mail(holder, s)
         self.store.save(s)
         self._remember_dir(directory)
         if self.mode != "node":

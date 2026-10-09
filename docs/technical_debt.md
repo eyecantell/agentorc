@@ -67,7 +67,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-380 | A decided board line waits for whoever next reads the board: a Decide hands it to nobody, so 11 sat for a day or two in samscrape and contractmatch | High | Designed — TD-384 builds it |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
-| TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Open |
+| TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-414 | §6 rule 6 says a pruned `lane_seen` id keeps its `dropped` mark; `work.reread` and its test remove it | Low | Open |
 | TD-415 | Tests do not pin the CLI half of `ao msg --pick <n> "text"` (#1282): the inbox's first-line read of a picked reply, the blank-words guard, and extra addressee words | Low | Open |
 | TD-416 | Tests do not pin the home's blank-words refusal of a picked answer followed by whitespace only (#1282) | Low | Open |
@@ -1171,8 +1171,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** debt
 **Added:** 2026-10-08 (the designer, from TD-410's design)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1287
+**Status:** Built 2026-10-08 (grinder-ao-1, PR #1287), all three slices: `teamrun.start` and `apply` write a manager on call `held` (`on_call_gate`), the line *on call — comes when a member needs a reading*; the held create moves kept mail; a fill's prompt ends with *[agentorc] you are filled for: <by> — <member or question>* (`agent_tick.filled_for`, `restarts` `for: seat_due`); `docs/briefs/manager-ao-1.md`'s first reads under the readings. Tests in `test_anchor_seat.py`, `test_manager_on_call.py`. **The live check:** once #1287 is live (`ao promote status`), read with no press of yours: the next `ao team start` of an on-call team (its output, or `ao status -v`) shows the manager `closed` with `closer: {by: start, why: held}` and no pane; and from the promote on, a week of `journalctl --user -u agentorc-agent` (read only) holds no *a seat with nothing due* close of a manager that was never filled for a cause. TD-410 is archived with this entry.
 **Location:** `src/agentorc/teamrun.py` (`start`: `plan.lead`'s create; `apply`: the manager the run lacks; the Start's row words), `src/sessionorc/agent.py` (`rpc_create`'s `held` for a `team` seat, `_schedule(state="closed")`), `src/sessionorc/agent_tick.py` (`_fill` → `_replay`: the closing line on the prompt), `src/agentorc/briefs/manager_on_call.md` (the first paragraph reads the line), `docs/briefs/manager-ao-1.md` (first reads moved under the readings — a held path), `tests/test_teamrun*.py`, `tests/test_seats*.py` / `tests/test_manager_on_call*.py`
 
 **Why:** TD-410: `start` creates the manager live before every other record, so every Start fills a manager on call into nothing — fourteen fills since 2026-10-03, each closed as *a seat with nothing due*. Design §6 rule 3 *A Start writes the seat and never fills it*, §6 *What is left is judgement* (first reads), §4.9 `on_call`, §4.9c (Apply).

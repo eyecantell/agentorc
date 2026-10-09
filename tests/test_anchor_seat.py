@@ -160,8 +160,10 @@ def test_a_held_checkout_starts_the_team_and_writes_the_seat_alone_saying_who_ho
     _, out = teamrun.start(call, org, "t", HOST)
     made = [p for m, p in calls if m == "create"]
     assert [p["name"] for p in made] == ["lead", "tl", "t-anchor", "g"]
-    assert made[2].get("held") is True and not any(p.get("held") for p in made if p["name"] != "t-anchor")
+    assert made[2].get("held") is True and not any(p.get("held") for p in made if p["name"] in ("tl", "g"))
     assert made[2]["held_reason"] == held
+    # the manager on call is written held too, with nothing holding it (§6 rule 3, TD-410)
+    assert made[0].get("held") is True and "held_reason" not in made[0]
     (said,) = [n for n in out["notes"] if n.startswith("t-anchor")]
     assert "held by claude-1 (claude-code, outside agentorc)" in said and "filled once the checkout is free" in said
 
@@ -283,6 +285,71 @@ def test_apply_creates_the_anchor_a_team_lacks_held_with_why_while_its_checkout_
     got = teamrun.apply(call, org, "t", HOST)
     (made,) = [p for m, p in calls if m == "create"]
     assert "held" not in made and [r["line"] for r in got["applied"]] == ["t-anchor: starts"]
+
+
+def test_a_start_writes_the_manager_on_call_held_and_its_members_name_it(tmp_path, monkeypatch, capsys):
+    """TD-413 slice 1 (§6 rule 3 *A Start writes the seat and never fills it*, TD-410): the manager
+    on call is created with `held` and no reason, before the rest, and every other record names its id
+    in `controllers`; `ao team start` says *on call — comes when a member needs a reading* for it; a
+    standing manager (`on_call: false`) is created live as before."""
+    org = _org(
+        tmp_path,
+        monkeypatch,
+        {"t": _team(), "s": _team(manager={"role": "manager", "name": "boss", "on_call": False}, anchor=False)},
+    )
+    call, calls = _fake()
+    _, out = teamrun.start(call, org, "t", HOST)
+    made = [p for m, p in calls if m == "create"]
+    assert made[0]["name"] == "lead" and made[0]["held"] is True and "held_reason" not in made[0]
+    assert made[0]["seat"]["trigger"] == "team" and made[0]["unattended"] is True
+    assert all(p["controllers"] == ["ao-alpha-lead"] for p in made[1:]) and out["manager"] == "ao-alpha-lead"
+    calls.clear()
+    teamrun.start(call, org, "s", HOST)
+    (boss,) = [p for m, p in calls if m == "create" and p["name"] == "boss"]
+    assert "held" not in boss
+    # a manager on call the definition asks to be watched starts live: `create` writes a held seat unattended only
+    watched = _org(tmp_path, monkeypatch, {"w": _team(manager={"role": "manager", "name": "eye", "unattended": False})})
+    calls.clear()
+    teamrun.start(call, watched, "w", HOST)
+    (eye,) = [p for m, p in calls if m == "create" and p["name"] == "eye"]
+    assert eye["unattended"] is False and "held" not in eye
+    from agentorc import cli
+
+    org = _org(tmp_path, monkeypatch, {"t": _team()})
+    p = teams.plan(org, "t", HOST)
+    lead = {"id": "ao-alpha-lead", "name": "lead", "state": "closed", "dir": "/d"}
+    assert (
+        cli._team_line(lead, "t", p)
+        == "ao-alpha-lead  manager manager  /d  on call — comes when a member needs a reading"
+    )
+    assert cli._team_line({**lead, "state": "working"}, "t", p) == "ao-alpha-lead  manager manager  /d"
+
+
+def test_apply_creates_a_manager_on_call_the_run_lacks_held(tmp_path, monkeypatch):
+    """TD-413 slice 1 (§4.9c, TD-410): a live team whose run has no manager record reads it as a seat
+    to start, and Apply writes it held, as a Start does, the line saying when it comes; a member Apply
+    starts beside a manager closed on call names it as its controller."""
+    org, call, calls = _applying(tmp_path, monkeypatch, None)
+    p = teams.plan(org, "t", HOST)
+    live = [r for r in _running(p) if r["name"] != "lead"]
+    original = call
+
+    def without_lead(method, **params):
+        return live if method == "list" else original(method, **params)
+
+    got = teamrun.apply(without_lead, org, "t", HOST)
+    made = {p["name"]: p for m, p in calls if m == "create"}
+    assert made["lead"]["held"] is True and "held_reason" not in made["lead"] and made["lead"]["controllers"] == []
+    assert "lead: on call — comes when a member needs a reading" in [r["line"] for r in got["applied"]]
+    # the manager closed between fills: a seat Apply starts names it, as a live one is named
+    calls.clear()
+    closed = [
+        *live,
+        {"team": "t", "state": "closed", "id": "ao-alpha-lead", "name": "lead", "seat": {"trigger": "team"}},
+    ]
+    teamrun.apply(lambda method, **params: closed if method == "list" else original(method, **params), org, "t", HOST)
+    (anchor,) = [p for m, p in calls if m == "create"]
+    assert anchor["name"] == "t-anchor" and anchor["controllers"] == ["ao-alpha-lead"]
 
 
 def test_ao_team_list_and_flow_say_definition_changed_and_apply_says_the_definition(tmp_path, monkeypatch, capsys):

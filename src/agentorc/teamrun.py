@@ -137,6 +137,19 @@ def on_call(s: dict[str, Any]) -> bool:
     return bool(s.get("seat")) and s.get("state") in ("exited", "closed")
 
 
+# A Start's and an Apply's line for a manager on call, written held (§6 rule 3, TD-410): the card's words
+ON_CALL_LINE = f"on call — {orgmod.MANAGER_WHEN}"
+
+
+def on_call_gate(x: teams.Launch) -> dict[str, Any]:
+    """`create`'s `held` for a team's lead on call (§6 rule 3 *A Start writes the seat and never
+    fills it*, TD-410): the launch carries a seat's trigger only when its manager is on call, and a
+    standing one (`on_call: false`) starts live as before. No `held_reason`: nothing holds it. A
+    manager the definition asks to be watched (`unattended: false`) starts live too: a held record is
+    a seat's, which `create` writes only unattended."""
+    return {"held": True} if x.lead and x.trigger and x.unattended else {}
+
+
 def can_control(sessions: list[dict[str, Any]], sid: str) -> dict[str, Any] | None:
     """The record `sid` when it may stand as a new session's controller — live, or a seat on call
     (TD-269, built by TD-276) — else None."""
@@ -649,7 +662,11 @@ def start(
     lead_id = ""
     try:
         if plan.lead:
-            rec = call("create", **params(plan.lead, []))
+            # A manager on call (§6 rule 3 *A Start writes the seat and never fills it*, TD-410): its
+            # record written alone, closed with no pane, the launch record beside it — the tick fills
+            # it the first time a reading is due, a question in the mail kept here included. Its id
+            # is the name's either way, so every member's `controllers` and `{manager}` name it.
+            rec = call("create", **params(plan.lead, []), **on_call_gate(plan.lead))
             created.append(rec)
             lead_id = str(rec["id"])
             if plan.manager_id and lead_id != plan.manager_id:
@@ -830,12 +847,13 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     *Switching*), member by member: lane, `review`, the `{stage}` file's path, and who should be
     running — never `{flow}`'s text, which names no member, and nothing of a person's session but
     that the flow sits it out. A seat the definition names — the techlead, the anchor, a `seats:`
-    entry — with no record is a `start` on any live team (§4.9c, TD-399), and a team that runs no flow
-    is compared on its seats alone. Empty with nothing live."""
+    entry, a manager on call (§6 rule 3, TD-410) — with no record is a `start` on any live team (§4.9c,
+    TD-399), and a team that runs no flow is compared on its seats alone. Empty with nothing live."""
     mine = badged(plan.team, sessions)
     if not live(crew(plan.team, sessions)):
         return []
-    seats = {x.name for x in (plan.techlead, plan.anchor, *plan.seats) if x is not None}
+    on_call_lead = plan.lead if plan.lead is not None and on_call_gate(plan.lead) else None
+    seats = {x.name for x in (plan.techlead, plan.anchor, on_call_lead, *plan.seats) if x is not None}
     if plan.flow is None:
         return [
             Difference(x.name, "start", launch=x, seat=True)
@@ -1060,7 +1078,15 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays}
     plan = teams.plan(org, name, host, files=files_via(call))
     diffs = differences(plan, sessions)
-    lead = next((s for s in live(badged(name, sessions)) if plan.manager_id in (s.get("name"), s.get("id"))), None)
+    # a manager on call is the controller closed as live (TD-269): the members Apply starts name it
+    lead = next(
+        (
+            s
+            for s in badged(name, sessions)
+            if (s["state"] not in DEAD or on_call(s)) and plan.manager_id in (s.get("name"), s.get("id"))
+        ),
+        None,
+    )
     lead_id = str(lead["id"]) if lead else ""
     out: dict[str, Any] = {"team": name, "flow": plan.flow, "applied": [], "skipped": [], "stays": stays}
     for d in diffs:
@@ -1092,11 +1118,13 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
                     # the anchor seat, gated as `start` and the fill are (§6 rule 3, TD-395, TD-399): not
                     # free, its record is written alone with `seat_held`, and rule 3 fills it once it is
                     held = call("checkout_held", host=x.host, dir=str(x.dir)).get("held")
-                gate = {"held": True, "held_reason": held} if held else {}
+                gate = {"held": True, "held_reason": held} if held else on_call_gate(x) if x is plan.lead else {}
                 got = call("create", **x.create_params(ctl), **keep, **gate)
                 row["id"] = got.get("id")
                 if held:
                     row["line"] = f"{x.name}: waits — {held.get('why') or 'the checkout is not free'}"
+                elif gate:
+                    row["line"] = f"{x.name}: {ON_CALL_LINE}"
                 row["line"] += "".join(f" — {n}" for n in said)
         except (AgentError, teams.TeamError) as e:
             row["line"] = f"{d.name}: not applied — {e}"
