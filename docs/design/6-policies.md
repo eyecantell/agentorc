@@ -685,7 +685,7 @@ code and needs no grant; a session doing the same work does.
      gives — and the road back was a Start of every member and seat. So this rule reads **member by
      member** as well. A crew member — not a seat, not the manager — that is `closed` or `exited`
      after declaring `out_of_work` (closed by rule 9's pass, by its manager, or by itself; one a
-     person killed or closed — its `closer` names the person, §4.7 — is *stopped* and left alone, as a stopped team is), whose lane holds a
+     person closed — its `closer` names the person, §4.7 — or anyone killed — a kill writes no closer and destroys the pane, `pane: false` — is *stopped* and left alone, as a stopped team is), while a seat or a member of its team is live (nobody live and not wound down is *stopped*), whose lane holds a
      matching id its `lane_seen` lacks while its team is not wound down, is this rule's news as a
      wound-down team's member is: after `WORK_SETTLE` the home writes the same `work_waiting` mark,
      `members` naming it, and the team's `on_work` follows. **What a start replays is read at the

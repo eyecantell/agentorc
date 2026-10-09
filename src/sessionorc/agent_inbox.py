@@ -918,7 +918,8 @@ class InboxMixin:
         (`_work_start`), which reads at the start whether the team is wound down and replays it whole
         if it is. A person's own, and the home's alone (`modes.HOME_EDITS`). `{team, started, ids,
         held}`: `started` false and `held` the mark's `{why, …}` when a bound holds the start back,
-        which the page says in the row's words; false with no `held` when no work was waiting."""
+        which the page says in the row's words; false with no `held` when no work was waiting. Under
+        `on_work: off` the tick writes no mark, so there is nothing for it to start."""
         agent_common.person_only(caller, "start a team's waiting members", "§6 rule 8")
         if self.mode != "home":
             raise RpcError("work_start runs at the home (design §6 rule 8): this host is a node")

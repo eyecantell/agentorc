@@ -441,3 +441,23 @@ async def test_work_start_replays_the_named_members_and_a_bound_refuses_it(agent
         got = await person.call("work_start", team="g")
         assert got["started"] is False and got["held"]["why"] == "early" and replays.calls == []
         assert _team_rec(agent)["work_waiting"]["held"]["why"] == "early"
+
+
+async def test_a_killed_member_and_a_stopped_team_are_not_read_member_by_member(agent, tmp_path, monkeypatch):
+    """A kill destroys the pane and writes no closer: a killed member is never read as finished. A team
+    with nobody live that is not wound down (a member that never declared) is *stopped*, left alone."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "ask"}}})
+    recs = _running(agent, tmp_path, state="exited", pane=False)
+    recs[1].state = "idle"
+    later = await _settled(agent, tmp_path, *recs)
+    await agent._work_marks(later)
+    assert "work_waiting" not in _team_rec(agent), "killed, not finished"
+    recs[0].pane = True  # exited by itself after declaring: finished
+    await agent._work_marks(later + timedelta(seconds=1))
+    await agent._work_marks(later + WORK_SETTLE + timedelta(seconds=2))
+    assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}
+    # nobody live, grinder-ao-2 never declared: stopped, so the mark goes
+    recs[1].state, recs[1].out_of_work, recs[3].state = "exited", None, "closed"
+    await agent._work_marks(later + WORK_SETTLE + timedelta(seconds=3))
+    assert "work_waiting" not in _team_rec(agent)
