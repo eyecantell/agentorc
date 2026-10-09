@@ -765,8 +765,8 @@ def _entries(raw: Any, key: str) -> dict[str, str]:
 
 def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
     """`techlead: {name, home, profile, brief, context}` (design §4.9b). No `role:` — the seat is the role —
-    and no `grants:`: the preset holds none, and the one grant the design names for it (`alarms`)
-    is not built. `techlead: person` is refused as any non-mapping is."""
+    and no `grants:`: the preset holds none (identity alarms go to the person, §4.8a).
+    `techlead: person` is refused as any non-mapping is."""
     raw = _mapping(raw, key)
     _no_stray(raw, TECHLEAD_KEYS, key)
     return TechleadDef(
