@@ -1060,7 +1060,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Status:** Open
 **Location:** design §4.4 *In a team's lanes* and *A member's own count*; `src/sessionorc/ledger.py` (`in_lanes`, ~L253 and ~L279: the `design_first_rest` key), `src/agentorc/ui/org.py` (~L83: `waits`, drawn as *· n wait on a build* on the repo facet's design line)
 
-**Why:** TD-418 retired *what waits on a build* — *blocked* says it, and the page's kinds since TD-428 put a designed entry waiting on its build under *blocked* — and the design's §4.4 (slice 8 of TD-464) carries only the retirement in its history; the code still computes the list and draws the count, from a `for_page == "design-first"` test that the seven kinds no longer produce the same way, so the number is either stale or always zero.
+**Why:** TD-418 retired *what waits on a build* — *blocked* says it, and the page's kinds since TD-428 put a designed entry waiting on its build under *blocked* — and the design's §4.4 (slice 8 of TD-464) carries only the retirement in its history; the code still computes the list (every `design-first` entry outside the team's lanes, `kind_of` still answering that word) and draws it as *n wait on a build*, a meaning the design no longer gives it.
 
 **Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
 
