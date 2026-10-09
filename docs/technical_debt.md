@@ -64,8 +64,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
-| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Open |
+| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
+| TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 
 ---
 
@@ -1004,7 +1005,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (grinder-ao-2, TD-467 slice 2)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-09 (the designer) — §4.5a's **restarted** chip row: the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every `why` but `start` and `fill`, the window's entries and the ceiling count on hover, drawn as the *brief changed* chip is and never in the slot, gone at the window, never on a seat; §4.5's identity line, §4.10 and §6 name it. Built by TD-487. Was: Open.
+**Blocked by:** TD-487
 **Location:** design §4.5 *The card's anatomy* (row 5), §4.5a (the card rows), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the row-5 slot), `src/agentorc/ending.py` (`restart_words`, which `ao status -v` already uses)
 
 **Why:** TD-459's design said *the card's restart note and `ao status -v` say cache lapsed · idle 5h · 191k*, but no card surface draws any restart (the `restarts` field is read only by the ceiling, rule 8's *work started* header note and, since TD-467 slice 2, `ao status -v`'s `restarts:` line). A page change follows a §4.5a row, so the grinder built the CLI half and left the card to a design: where the note sits (row 5's slot, the report line's hover, or a chip as *brief changed* is), which `restarts` entries it names (the newest only, inside `RESTART_WINDOW`, every `why` or the tick's and the doorbell's alone), and how long it stays.
@@ -1028,3 +1030,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a unit test over `restart_words` and `restarts_line` with `idle` as `True`, `nan`, `inf` and `"5"`, `context` as `True` and `"191k"`, an entry that is not a dict, `restarts` as `None` or a string — each returns words (or "") and does not raise.
 
 **Related:** TD-467 (the build), PR #1371.
+
+## TD-487: Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-485's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a **restarted** chip, §4.5 *The Focus screen's anatomy* (the identity line), §6 *Keeping a team running* (the ceiling), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (~L187 `marks`, the `restart_wanted` chip ~L356; `brief_changed` is drawn in the slot ~L874, which this chip never is), `src/agentorc/ui/templates/card.html` (row 4, beside the report line — a new badge; the card has no *brief changed* chip to copy) and `focus.html` (the header chips beside *brief changed*, ~L61), `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`, the same words), `src/sessionorc/agent_common.py` (`RESTART_WINDOW`, `_counted`)
+
+**Why:** TD-485: a member the tick or the doorbell restarted reads like a fresh start on the card; `ao status -v` says it since TD-467 slice 2 and the page says nothing.
+
+**Fix:** as §4.5a says. (1) `cards.py`: from the record's `restarts`, the entries inside `RESTART_WINDOW` of now whose `why` is neither `start` nor `fill`; with any, `d["restarted"] = {"short": "restarted · " + <the why's words alone: cache lapsed, brief, wanted, person, …>, "text": "restarted · " + restart_words(newest), "hover": "<each entry, newest first, full words + age>\n<n> of 3 in 2 h"}`, the count from `agent_common._counted`'s rule so the chip agrees with the ceiling; none on a seat. (2) On the card a new `<span class="badge">` in row 4 beside the report line drawing `short`, on the Focus header a chip beside *brief changed* drawing `text`, each with the hover as its `title`, never pressable. (3) The view is pushed, so the chip appears with the restart and goes when the window passes — the page re-derives it from `restarts` on each render, no new field on the record. Tests: a record with a `cache` entry ten minutes old draws *restarted · cache lapsed · idle 5h · 191k*; one with a `start` entry alone draws none; one whose newest entry is three hours old draws none; a seat with a `fill` entry draws none; the hover lists two entries newest first with *2 of 3 in 2 h*; `cli.restarts_line` and the chip agree on the words (one table of cases). **Done when** the tests pass and, on a scratch home (`scripts/look_home.py`), a member the tick restarts for a changed brief shows *restarted · brief* on its card and its Focus header, with the entry and its age on hover, and the chip is gone two hours later.
+
+**Related:** TD-485 (the design), TD-467 (`ao status -v`'s line), TD-459 (the doorbell's restart), TD-217 (rule 7's restart), TD-103 (the ceiling).
+

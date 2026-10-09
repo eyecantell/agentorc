@@ -250,6 +250,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-09 (TD-485, the designer): the Focus identity line's marks gain *restarted · <why>*. Built by TD-487.
 - 2026-10-09 (TD-474, the designer): the Focus identity line's marks gain the terminal mark (§4.6 *Reconnect contract*). Built by TD-480.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 4): §4.5 cut to what each screen shows and does — every *designed/built — TD-NNN* clause, Paul's quotes, the incident stories, the *until TD-NNN* was-clauses and the *What it replaces* paragraphs left the text for this history, and what the code has since built reads as built. The section went from 18,406 to 16,799 words.
 - 2026-10-09 (TD-464, the designer): **Inbox: Needs you / Steering** — screen 6 said the answered board item's move to *Waiting on them* and the look rows were *designed, not built*; TD-305 (`BOARD_WAIT_DAYS`, `waiting_on` in `ui/inbox.py`) and TD-292 (`shots` on the rows) built them, and the text now reads them as built.
@@ -338,6 +339,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-485, the designer; filed by grinder-ao-2 from TD-467 slice 2, which built `ao status -v`'s `restarts:` line and found no card surface for a restart): the **restarted** chip — the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every entry in the window on hover with the count toward the ceiling, a new badge in the card's row 4 beside the report line in a short form and the full words on the Focus header beside *brief changed*, never in the slot; `start` and `fill` are not restarts. Built by TD-487.
 - 2026-10-09 (TD-474, the designer): the **terminal mark** row — three marks, their graces and hovers. Built by TD-480.
 - 2026-10-09 (TD-472, the designer; Paul asked why a screenshot pastes into the composer and not the terminal): a paste on the terminal that carries a file and no text takes the attachment road and its path is pasted into the terminal as a bracketed paste; until then the terminal's Paste read the clipboard's text alone, so an image paste sent nothing and said nothing. Built by TD-479.
 - 2026-10-09 (TD-473, the designer): the **Attach** row's bound reads `person.attach.max` (256 MiB by default) in place of 4 MiB, and an upload past one piece shows its progress with a ✕ that cancels it. Built by TD-478.
@@ -918,6 +920,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-09 (TD-485, the designer): *A lapsed cache is started again, not rung* names the card's **restarted** chip where it said the card draws no restart note. Built by TD-487.
 - 2026-10-09 (TD-467 slice 1, grinder-ao-1): *A lapsed cache is started again, not rung* built at the home — `agent_common.CACHE_LIFETIME` / `CACHE_FLOOR`, `cache_lapsed` (the `{idle, context}` of the entry) and `tick_ready` (rule 7's precondition as the record holds it); the doorbell's decided ring hands the member to `_cache_restart`, which closes and replays it `why: cache`, the bell marked rung and nothing typed; a replay that failed is retried by `_brief_restart` under the `cache` mark with the first try's hours and tokens; `read_when` takes `cache` for the *started again on its brief* sentence. Decided in the build: a close that fails, or a full restart window, rings as today (the failed close's entry counts) rather than marking the ceiling, since a ring is the cheaper fallback and a cache is no reason to hand a member to the person. The card's and `ao status -v`'s *cache lapsed · idle 5h · 191k* is left to a page slice.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 3): §4.10 cut to how mail works — what each kind is, what the host agent does with it, what is refused, what a person sees, every bound and number; every *designed/built — TD-NNN* clause, Paul's quotes, the incident counts and the restated reasons left the text for this history, and what the code has since built reads as built (the pending stop reads `gated`). The section went from 19,384 to 17,994 words.
 - 2026-10-09 (TD-464, the designer): **A pending stop beats mail** — §4.10 said the usage gate reaching the doorbell as a stop was not built (TD-026); `agent_wake` reads the record's `gated` and refuses the ring as *paused by the usage gate*, so the text says so; the run window itself is still not built (§6).
@@ -1058,6 +1061,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-09 (TD-485, the designer): the ceiling's paragraph names the **restarted** chip that draws `restarts` for `RESTART_WINDOW` (§4.5a). Built by TD-487.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 2): §6's policies cut to what each does, reads, writes, sends and refuses — every *designed/built — TD-NNN* clause, Paul's quotes, the incident stories and the restated reasons left the text for this history; what the code has since built reads as built. The section went from 22,961 to 20,849 words.
 - 2026-10-09 (TD-464, the designer): §6's intro and *Stop time* said *not built* of the mode toggle in the card's *more* (built by TD-095, PR #384, 2026-09-21), editing a stop time from the page (the Focus **stops** note's click-to-edit, 2026-09-14) and `start_at` with the `scheduled` state (built by TD-152, 2026-09-27); the text now reads them as built, and *not built* stays only on window overrides with an expiry and calendar-shaped schedules.
 - 2026-10-09 (TD-464, the designer): **Team's reserve priority** — §6 said `ao team reserve` was not built; TD-146 slice 3 built it on 2026-09-27 (#631), and the text now names it beside `ao team until`.
