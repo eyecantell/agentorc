@@ -307,8 +307,15 @@ def test_a_start_writes_the_manager_on_call_held_and_its_members_name_it(tmp_pat
     teamrun.start(call, org, "s", HOST)
     (boss,) = [p for m, p in calls if m == "create" and p["name"] == "boss"]
     assert "held" not in boss
+    # a manager on call the definition asks to be watched starts live: `create` writes a held seat unattended only
+    watched = _org(tmp_path, monkeypatch, {"w": _team(manager={"role": "manager", "name": "eye", "unattended": False})})
+    calls.clear()
+    teamrun.start(call, watched, "w", HOST)
+    (eye,) = [p for m, p in calls if m == "create" and p["name"] == "eye"]
+    assert eye["unattended"] is False and "held" not in eye
     from agentorc import cli
 
+    org = _org(tmp_path, monkeypatch, {"t": _team()})
     p = teams.plan(org, "t", HOST)
     lead = {"id": "ao-alpha-lead", "name": "lead", "state": "closed", "dir": "/d"}
     assert (

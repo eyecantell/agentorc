@@ -144,8 +144,10 @@ ON_CALL_LINE = f"on call — {orgmod.MANAGER_WHEN}"
 def on_call_gate(x: teams.Launch) -> dict[str, Any]:
     """`create`'s `held` for a team's lead on call (§6 rule 3 *A Start writes the seat and never
     fills it*, TD-410): the launch carries a seat's trigger only when its manager is on call, and a
-    standing one (`on_call: false`) starts live as before. No `held_reason`: nothing holds it."""
-    return {"held": True} if x.lead and x.trigger else {}
+    standing one (`on_call: false`) starts live as before. No `held_reason`: nothing holds it. A
+    manager the definition asks to be watched (`unattended: false`) starts live too: a held record is
+    a seat's, which `create` writes only unattended."""
+    return {"held": True} if x.lead and x.trigger and x.unattended else {}
 
 
 def can_control(sessions: list[dict[str, Any]], sid: str) -> dict[str, Any] | None:
