@@ -9,7 +9,7 @@
     .flowchip { text-decoration: none; cursor: pointer; }
     .tgroup .ghead .foldmail { display: inline-block !important; }
     .lanechip { margin-left: 6px; flex: none; } .sc .r2 .cline { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .facet .kind { white-space: nowrap; } .frepo .fhead > .seg { margin-left: auto; }
-    .lanechip { font-weight: 600; color: var(--fg); } .lanechip.k-pickable { background: color-mix(in srgb, var(--k-pickable) 22%, transparent); border-color: color-mix(in srgb, var(--k-pickable) 70%, transparent); } .lanechip.k-design { background: color-mix(in srgb, var(--k-design) 22%, transparent); border-color: color-mix(in srgb, var(--k-design) 70%, transparent); } .lanechip.solid.k-pickable { background: var(--k-pickable); color: var(--seg-fg); } .lanechip.solid.k-design { background: var(--k-design); color: var(--seg-fg); }
+    .lanecnt { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; border: 1px solid; font-weight: 700; color: var(--fg); } .lanecnt.k-pickable { background: color-mix(in srgb, var(--k-pickable) 25%, transparent); border-color: var(--k-pickable); } .lanecnt.k-design { background: color-mix(in srgb, var(--k-design) 25%, transparent); border-color: var(--k-design); } .lanecnt.solid.k-pickable { background: var(--k-pickable); color: var(--seg-fg); } .lanecnt.solid.k-design { background: var(--k-design); color: var(--seg-fg); }
     .tsum { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); }
     .rollup.lone { grid-template-columns: 2fr 1fr; }
     .defblock { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
@@ -67,10 +67,11 @@
     if (head) { const k = $('.kind', head); k.insertAdjacentHTML('afterend', imark(txt)); }
     ln.remove();
     $$(`.tgroup[data-team="${team}"] .card`).forEach((c) => {
-      const role = $('.cline', c)?.textContent || ''; const r2 = $('.r2', c); if (!r2) return;
-      const out = /out of work/.test(role);
-      if (/^Grinder/.test(role)) ($('.grow', r2) || r2).insertAdjacentHTML('afterend', (+pk ? `<span class="badge lanechip k-pickable${out ? ' solid' : ''}" title="${pk} pickable entries in its lane">${pk}</span>` : ''));
-      if (/^Designer/.test(role)) ($('.grow', r2) || r2).insertAdjacentHTML('afterend', (+df ? `<span class="badge lanechip k-design${out ? ' solid' : ''}" title="${df} design-first entries in its lane">${df}</span>` : ''));
+      const role = $('.cline', c)?.textContent || ''; const pill = $('.r1 .pill', c); if (!pill) return;
+      const n = /^Grinder/.test(role) ? +pk : /^Designer/.test(role) ? +df : 0; if (!n) return;
+      const k = /^Grinder/.test(role) ? 'k-pickable' : 'k-design';
+      const busy = !/out of work/.test(role);  // solid only when it says it has nothing, with entries waiting
+      pill.insertAdjacentHTML('beforeend', `<span class="lanecnt ${k}${busy ? '' : ' solid'}" title="${n} ${k === 'k-design' ? 'design-first' : 'pickable'} entries in its lane">${n}</span>`);
     });
   });
   // round 2: the + card says New session; Doing loses its gloss
