@@ -18,6 +18,7 @@ what needs a host agent, a session record or a second session.
   test and named in cadence §7's parity table.
 - A synced file never calls `ao`. Where it must behave differently in an agentorc session, it
   reads an environment variable that agentorc's launch sets. `CADENCE_ATTENTION_SCOPE` is the
-  first: the hook reads it, and agentorc's launch does not set it yet (TD-425). Until then the
-  hook's `ao status` branch is the one known exception.
+  first: the hook reads it, and every launch sets it, `own` unattended and `machine` interactive
+  (§4.3, TD-425). The hook's `ao status` branch is the one known exception until dev-cadence
+  drops it, which waits on TD-425's live check telling it the variable reaches the hook.
 

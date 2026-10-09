@@ -1107,6 +1107,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 8. Lessons carried in
 
+- 2026-10-08 (TD-425, grinder-ao-1): the synced-file rule's `CADENCE_ATTENTION_SCOPE` is set by every launch (§4.3); the hook's `ao status` branch stays the one exception until dev-cadence drops it on TD-425's live check.
 - 2026-10-08 (TD-159, the anchor): the rule for which side a thing lives on, agentorc or dev-cadence, added from the inventory in ADR 2026-10-08. A synced file never calls `ao`, and agentorc passes a difference in by an environment variable.
 - No dated facts removed.
 
