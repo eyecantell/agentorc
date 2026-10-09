@@ -880,7 +880,8 @@ def _instant(iso: Any) -> datetime | None:
 
 def _short_age(iso: Any, now: datetime) -> str:
     """An instant as a short age of one unit (§4.5a *team card: Answer needed / Doing*, **Ages and
-    columns**, TD-232): *just now* under a minute and for an instant ahead of the clock, then *5m*,
+    columns**, TD-232): *0m* under a minute and for an instant ahead of the clock (TD-418; *just now*
+    until then), then *5m*,
     *1h*, *2d* — the largest whole unit and nothing after it — or "" for anything this cannot read.
     `app.js`'s `fmtShortAge` spells it the same way, so the minute's tick changes nothing it lands on."""
     dt = _instant(iso)
@@ -888,7 +889,7 @@ def _short_age(iso: Any, now: datetime) -> str:
         return ""
     secs = int((now - dt).total_seconds())
     if secs < 60:
-        return "just now"
+        return "0m"
     if secs < 3600:
         return f"{secs // 60}m"
     if secs < 86400:

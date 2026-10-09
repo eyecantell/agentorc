@@ -14,7 +14,7 @@
     {# design §4.5a Org top bar **filter…** (TD-418, built by TD-428): words that compose — `team:`,
        `state:`, `mine` (the person's own, the interactive sessions) and `kind:command` (the command
        runs, hidden without it) — in place of the ***mine*** toggle and the *show command runs* box #}
-    <input class="input" id="filter" placeholder="filter… team: state: mine kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), kind:command (the command runs, hidden without it), or any text" style="width: 260px;">
+    <input class="input" id="filter" placeholder="filter… team: state: mine kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), kind:command (the command runs, hidden without it), or any text" style="width: 320px; max-width: 100%;">
   </div>
   {# design §4.5a *Org: rollup* (TD-176 slice 4): sums over every live team, re-sent with the groups #}
   <div id="rollup">{% with ro = rollup %}{% include "rollup.html" %}{% endwith %}</div>
@@ -53,7 +53,7 @@
     {% else %}{% for g in groups %}
     <section class="tgroup" data-team="{{ g.team }}" data-manager="{{ g.manager.id if g.manager else '' }}" data-live="{{ g.live }}">
       <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
-      {% if g.summary %}{% include "team_summary.html" %}{% endif %}
+      {% if g.summary and g.summary.drawn %}{% include "team_summary.html" %}{% endif %}
       <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}{% if g.team and g.defined %}{% include "plus_card.html" %}{% endif %}</div>
     </section>
     {% endfor %}{% endif %}

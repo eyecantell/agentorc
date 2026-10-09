@@ -1724,11 +1724,12 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js
 
 
-def test_a_team_winding_down_keeps_its_cards_compact_and_its_summary(client, tmp_path):
+def test_a_team_winding_down_keeps_its_cards_compact_and_draws_no_empty_summary(client, tmp_path):
     """§4.5a *card: compact*, *team card: summary* (TD-176 slice 3; TD-181, built by TD-192): a
     member of a team is a compact card, live or not, so a team whose last live session goes changes
-    no card's shape — the exit's own delta is compact, and the groups it carries still hold the
-    team's summary, now drawn behind the fold."""
+    no card's shape — the exit's own delta is compact. A team with nothing live draws only the facets
+    that hold something (TD-418): this one has no repo, no claim and no doing row, so its group carries
+    no summary."""
     from sessionorc.client import call_sync
 
     made = [
@@ -1746,7 +1747,7 @@ def test_a_team_winding_down_keeps_its_cards_compact_and_its_summary(client, tmp
                 break
         assert " compact" in ev["html"].split(">", 1)[0]
         (g,) = [g for g in ev["groups"] if g["team"] == "wind"]
-        assert g["live"] == 0 and 'class="tsum' in g["summary"]
+        assert g["live"] == 0 and g["summary"] == ""
     page = client.get("/").text
     for sid in made:
         assert " compact" in page.split(f'id="card-{sid}"')[0].rsplit("<div", 1)[-1]

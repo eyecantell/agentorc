@@ -23,7 +23,7 @@ from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
 from .common import _age, host_name
 from .inbox import work_note, work_started
-from .org import compact_line, team_summary
+from .org import compact_line, drawn_facets, team_summary
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
 
@@ -334,6 +334,8 @@ def team_groups(
         if summary:
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m)
+            if not live:  # a team with nothing live draws only the facets that hold something (TD-418)
+                summary["drawn"] = drawn_facets(summary)
         groups.append(
             {
                 "team": team,
