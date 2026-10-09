@@ -394,6 +394,7 @@ ROLLUP_STATES = (
     ("stalled", "stalled", "stalled?"),
     ("unreachable", "unreachable", "unreachable"),
     ("working", "working", "working"),
+    ("waiting", "waiting", "waiting"),
     ("unseen", "idle", "unseen"),
     ("idle", "idle", "idle"),
     ("on-call", "oncall", "on call"),

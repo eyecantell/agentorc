@@ -75,6 +75,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     next_act,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
+    review_wait,  # noqa: F401
     seat_held_words,  # noqa: F401
     seat_occupant,  # noqa: F401
     state_counts,  # noqa: F401
@@ -710,9 +711,9 @@ def create_app() -> FastAPI:
         """What every delta carries for the page's layout: the groups (`group_heads`) and the
         rollup's markup (§4.5a *Org: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
         fleet = list(known.values())
-        seats = await seats_of(fleet)
+        seats, waits = await seats_of(fleet), await person_waits()  # *waiting* (§4.2, TD-428)
         groups = team_groups(
-            [view(s, fleet, seats=seats, repos=repos) for s in fleet],
+            [view(s, fleet, seats=seats, repos=repos, waits=waits) for s in fleet],
             await team_rows(fleet),
             repos,
             doing,
@@ -831,7 +832,8 @@ def create_app() -> FastAPI:
         no more than a few seconds behind the Org."""
         icons = await role_icons(fleet)
         seats = await seats_of(fleet)
-        views = [view(s, fleet, icons=icons, seats=seats) for s in fleet]
+        waits = await person_waits()
+        views = [view(s, fleet, icons=icons, seats=seats, waits=waits) for s in fleet]
         info = await identity_info()
         rows = state_rows(
             views,
@@ -1190,7 +1192,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         sessions = await call("list")
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
-        vs = [view(s, sessions, icons=icons, seats=seats) for s in sessions]
+        waits = await h.person_waits()  # *waiting* (§4.2, TD-428)
+        vs = [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
         groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing, needs=h.needs_cache["rows"]) or []
         serving = [g for g in groups if g.get("summary") and (g["summary"].get("repo") or {}).get("name") == name]
         org, _ = await asyncio.to_thread(org_here)

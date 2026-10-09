@@ -20,6 +20,7 @@
   .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 12px; } .pill.s-stalled::before { content: "?"; font-size: 12px; }
   .pill.s-working::before { content: "∿"; font-size: 14px; } .pill.s-idle::before { content: "›_"; font-size: 12px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 12px; }
   .pill.s-closed::before { content: "✓"; font-size: 12px; } .pill.s-unreachable::before { content: "⌀"; font-size: 12px; } .pill.s-oncall::before { content: "◇"; font-size: 12px; }
+  .pill.s-waiting::before { content: "⋯"; font-size: 12px; }
   .pill.s-idle.unseen::before { content: "●"; font-size: 11px; letter-spacing: 0; }
   .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -29,6 +30,7 @@
   .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
   .s-idle { background: #dbeafe; color: #1e40af; }
+  .s-waiting { background: #ccfbf1; color: #115e59; }  /* idle on someone else's move (TD-418) */
   .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
   .s-exited, .s-closed, .s-oncall { background: #e5e7eb; color: #4b5563; }

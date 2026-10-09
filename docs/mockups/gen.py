@@ -18,6 +18,7 @@ CSS = """
   .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 12px; } .pill.s-stalled::before { content: "?"; font-size: 12px; }
   .pill.s-working::before { content: "∿"; font-size: 14px; } .pill.s-idle::before { content: "›_"; font-size: 12px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 12px; }
   .pill.s-closed::before { content: "✓"; font-size: 12px; } .pill.s-unreachable::before { content: "⌀"; font-size: 12px; } .pill.s-oncall::before { content: "◇"; font-size: 12px; }
+  .pill.s-waiting::before { content: "⋯"; font-size: 12px; }
   .pill.s-idle.unseen::before { content: "●"; font-size: 11px; letter-spacing: 0; }
   .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -27,6 +28,7 @@ CSS = """
   .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
   .s-idle { background: #dbeafe; color: #1e40af; }
+  .s-waiting { background: #ccfbf1; color: #115e59; }  /* idle on someone else's move (TD-418) */
   .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
   .s-exited, .s-closed, .s-oncall { background: #e5e7eb; color: #4b5563; }
@@ -204,7 +206,7 @@ def role_icon(role):
 # the card's left bar, the state token's strong colour: working green, idle blue, and one grey for
 # everything over or out of reach (§4.5 *The card's anatomy*, TD-095)
 BAR = {'needs': '#f59e0b', 'limited': '#7c3aed', 'stalled': '#dc2626', 'working': '#16a34a', 'idle': '#2563eb', 'exited': '#9ca3af', 'done': '#9ca3af', 'unreachable': '#9ca3af'}
-# §4.5 *One order*: … working → unseen idle → idle / unreachable on a volatile host → exited → closed
+# §4.5 *One order*: … working → waiting → unseen idle → idle / unreachable on a volatile host → exited → closed
 RANK = {"needs": 0, "limited": 1, "stalled": 2, "working": 3, "unseen": 3.5, "idle": 4, "exited": 5, "done": 6}
 VOLATILE = {"laptop"}
 def rank(host, state):
@@ -213,7 +215,7 @@ def rank(host, state):
     return RANK[state]
 
 def pill(state, label=None, scraped=False, unseen=False):
-    names = {"oncall": "on call", "working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited", "unreachable": "unreachable"}
+    names = {"oncall": "on call", "working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited", "unreachable": "unreachable", "waiting": "waiting"}
     cls = {"done": "closed"}.get(state, state)  # a closed session is grey; s-done is Focus's green tick
     return f'<span class="pill s-{cls}{" unseen" if unseen else ""}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
 
@@ -604,7 +606,7 @@ def team_desktop(team_first=False):
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
-                              pill("working"), pill("idle", "idle · unseen", unseen=True), pill("idle"), pill("exited"),
+                              pill("working"), pill("waiting"), pill("idle", "idle · unseen", unseen=True), pill("idle"), pill("exited"),
                               pill("done")])  # an on-call seat sorts as the `exited` / `closed` it is (TD-097)
     return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
