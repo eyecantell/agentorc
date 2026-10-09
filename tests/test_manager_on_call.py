@@ -6,6 +6,7 @@ it when it has acted."""
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -147,6 +148,105 @@ async def test_each_reading_of_a_member_fills_the_manager_once(agent, tmp_path):
         assert fifth is not fourth and fourth.seat_due["by"] == "open" and fourth.seat_due["member"] == b
         assert [(e["by"], e["member"]) for e in fifth.seat_filled] == [("open", b)]
         for sid in (mgr, a, b, other):
+            await person.call("kill", id=sid)
+
+
+async def test_a_held_manager_has_no_pane_and_its_first_reading_fills_it(agent, tmp_path):
+    """TD-413 slice 1 (§6 rule 3 *A Start writes the seat and never fills it*, TD-410): the Start's
+    `create` with `held` writes the manager on call closed with no pane and no `seat_held`, its launch
+    record beside it; its members name its id; nothing due, the tick neither fills nor closes it; a
+    member's permission fills it — a pane, from the launch record, never another held record."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        mgr = await _manager(person, tmp_path, held=True)
+        first = agent.sessions[mgr]
+        assert first.state == "closed" and first.closer == {"by": "start", "why": "held"}
+        assert first.seat == {"trigger": "team"} and first.seat_held is None
+        assert not await asyncio.to_thread(agent.tmux.has_session, mgr), "no pane"
+        assert agent._read_launch(mgr).get("seat") == {"trigger": "team"} and "held" not in agent._read_launch(mgr)
+        a = await _member(person, tmp_path, "a", mgr)
+        ra = agent.sessions[a]
+        assert ra.controllers == [mgr]
+        await agent._keep_running(now)
+        assert agent.sessions[mgr] is first and first.state == "closed" and first.seat_due is None
+        ra.state, ra.confidence, ra.pending = "needs-you", "hook", {"kind": "permission", "text": "Bash(rm)"}
+        await agent._keep_running(now)
+        second = agent.sessions[mgr]
+        assert second is not first and second.state not in ("exited", "closed")
+        assert [r["why"] for r in second.restarts] == ["fill"] and first.seat_due["by"] == "pending"
+        assert await asyncio.to_thread(agent.tmux.has_session, mgr)
+        for sid in (mgr, a):
+            await person.call("kill", id=sid)
+
+
+async def test_a_start_that_keeps_the_mail_fills_the_held_manager_on_the_first_tick(agent, tmp_path):
+    """TD-413 slice 1: a held create with `keep_mail` moves the last run's mail as a fill does — it
+    did not before, so a held record began with an empty inbox — and a question in it is due at
+    once: the first tick fills the seat for it."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        old = await _manager(person, tmp_path)
+        a = await _member(person, tmp_path, "a", old)
+        _end(agent, old)
+        async with LocalClient(caller=a) as me:
+            sent = await me.call("msg", to=[old], text="which entry next?", kind="ask")
+        ask = sent["entry"]["id"]
+        before = agent.sessions[old]
+        mgr = await _manager(person, tmp_path, held=True, keep_mail=True)
+        first = agent.sessions[mgr]
+        assert first is not before and first.state == "closed"
+        assert [e.id for e in first.inbox] == [ask] and before.inbox == []
+        assert first.supersedes[0]["mail"] is True and first.asks_ids() == [ask]
+        await agent._keep_running(now)
+        second = agent.sessions[mgr]
+        assert second is not first and first.seat_due["by"] == "asks" and first.seat_due["ask"] == ask
+        assert [e.id for e in second.inbox] == [ask], "the fill keeps it as it came"
+        for sid in (mgr, a):
+            await person.call("kill", id=sid)
+
+
+async def test_a_fill_prompt_ends_with_the_cause_it_came_for_and_no_other_replay_adds_one(agent, tmp_path):
+    """TD-413 slice 2 (§6 rule 3 *A fill says why it came*, TD-410): the prompt a fill hands `create`
+    ends with one line in fixed words from `seat_due`, for each of the four causes, and the `restarts`
+    entry says `for: seat_due`; the line never stacks on the last fill's, and a crash restart's
+    prompt carries none."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        mgr = await _manager(person, tmp_path)
+        a = await _member(person, tmp_path, "a", mgr)
+        ra = agent.sessions[a]
+
+        async def fill_for(at: datetime) -> str:
+            _end(agent, mgr)
+            before = agent.sessions[mgr]
+            await agent._keep_running(at)
+            assert agent.sessions[mgr] is not before, "filled"
+            return agent._read_launch(mgr)["prompt"]
+
+        agent.sessions[mgr].asks_ids = lambda **kw: ["m-1"]
+        assert await fill_for(now) == "the seat's brief\n\n[agentorc] you are filled for: asks — m-1"
+        assert agent.sessions[mgr].restarts[-1]["for"] == "seat_due"
+        ra.state, ra.confidence, ra.pending = "needs-you", "hook", {"kind": "permission", "text": "Bash(rm)"}
+        assert await fill_for(now) == f"the seat's brief\n\n[agentorc] you are filled for: pending — {a}"
+        ra.state, ra.pending = "stalled?", None
+        assert (
+            await fill_for(now + timedelta(minutes=1))
+            == f"the seat's brief\n\n[agentorc] you are filled for: stalled — {a}"
+        )
+        ra.state, ra.idle_open = "idle", {"at": _iso(now), "ref": "TD-9"}
+        assert (
+            await fill_for(now + timedelta(minutes=2))
+            == f"the seat's brief\n\n[agentorc] you are filled for: open — {a}"
+        )
+        # any other replay hands the brief alone, the last fill's line taken off
+        _end(agent, mgr)
+        await agent._replay(agent.sessions[mgr], "crash", keep_mail=True)
+        assert agent._read_launch(mgr)["prompt"] == "the seat's brief"
+        assert "for" not in agent.sessions[mgr].restarts[-1]
+        for sid in (mgr, a):
             await person.call("kill", id=sid)
 
 

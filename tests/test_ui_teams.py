@@ -988,7 +988,8 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
 
 def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(world, client, monkeypatch):
     """§4.9c, §4.5a (TD-399, built by TD-400): a live team that runs no flow is compared on its seats
-    alone — the anchor it lacks reads *definition changed* and **Apply** names the start."""
+    alone — the anchor it lacks reads *definition changed* and **Apply** names the start; so does the
+    manager on call it has no record of (§6 rule 3, TD-410, built by TD-413)."""
     from agentorc import org as orgmod
 
     monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", True)
@@ -996,8 +997,12 @@ def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(wor
     write_org(tmp_path, org_doc(tmp_path))
     fleet.sessions = [{**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     head = _head(client.get("/").text)
-    assert '<span class="meta flowchanged" title="ao-grind-anchor: starts">definition changed</span>' in head
-    assert 'data-confirm="Apply the definition to ao-grind? ao-grind-anchor: starts.">Apply</button>' in head
+    lines = "orc-ao: starts&#10;ao-grind-anchor: starts"
+    assert f'<span class="meta flowchanged" title="{lines}">definition changed</span>' in head
+    assert (
+        'data-confirm="Apply the definition to ao-grind? orc-ao: starts; ao-grind-anchor: starts.">Apply</button>'
+        in head
+    )
     assert "flow:" not in head and ">flow changed<" not in head
 
 

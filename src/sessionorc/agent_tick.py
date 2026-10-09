@@ -100,6 +100,19 @@ def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) ->
     return out
 
 
+FILLED_FOR = "[agentorc] you are filled for: "
+
+
+def filled_for(cause: dict[str, Any] | None) -> str | None:
+    """The closing line of a manager on call's fill prompt (§6 rule 3 *A fill says why it came*,
+    TD-410), in fixed words from its `seat_due`: *[agentorc] you are filled for: <by> — <member>*, the
+    question's id for `asks`. None for any other fill, which says nothing more."""
+    if not cause or not cause.get("by"):
+        return None
+    what = cause.get("ask") if cause["by"] == "asks" else cause.get("member")
+    return f"{FILLED_FOR}{cause['by']}" + (f" — {what}" if what else "")
+
+
 class TickMixin:
     # -- reconcile -------------------------------------------------------------------------------
     #
@@ -1945,11 +1958,15 @@ class TickMixin:
                 return False
         return True
 
-    async def _replay(self, s: Session, why: str, *, mark: dict[str, Any] | None = None, **extra: Any) -> None:
+    async def _replay(
+        self, s: Session, why: str, *, mark: dict[str, Any] | None = None, closing: str | None = None, **extra: Any
+    ) -> None:
         """One restart by the tick (§6): the record's launch record handed to `create` again — here,
         or at its node — the attempt appended to `restarts` and the list carried onto the new record,
         so the count survives the restart it counts. A replay that fails keeps its entry with `error`
         and counts all the same. `mark` adds to the entry (rule 8's `ids`, what a start was for).
+        `closing` is a line the prompt ends with, after it is filled again or stored (a manager on
+        call's cause, `filled_for`, TD-410); no other replay adds one.
         Every caller but a scheduled start (whose `start_of` moves the mail itself) passes `keep_mail`:
         the closed run's mail is the new record's, so a reply to its `ask` still has a thread (TD-352).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
@@ -1967,6 +1984,12 @@ class TickMixin:
         try:
             params = {**self._read_launch(address), **extra, "supervised": True}
             read = await self._refill_prompt(s, params, entry)
+            if params.get("prompt"):
+                # the launch record keeps the prompt as this create hands it, so a stored prompt carries
+                # the last fill's line: it goes, whatever replays now, and a fill's own is added
+                params["prompt"] = params["prompt"].split(f"\n\n{FILLED_FOR}", 1)[0]
+                if closing:
+                    params["prompt"] = f"{params['prompt']}\n\n{closing}"
             if s.host == self.host:
                 view = await self.rpc_create(**params)
             else:
@@ -2305,9 +2328,12 @@ class TickMixin:
             return
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
         cause = s.seat_due if (s.seat or {}).get("trigger") == "team" else None
+        # a manager on call says why it came (§6 rule 3 *A fill says why it came*, TD-410): its first
+        # act is the reading `seat_due` names, read back from the record, never `ao status` first
+        said = filled_for(cause)
         if cause and any(e.id == cause.get("ask") and e.handed_entry for e in s.inbox):
             cause = None  # an entry the person handed it fills the seat while it owes, as any seat's (TD-218)
-        await self._replay(s, "fill", keep_mail=True)
+        await self._replay(s, "fill", mark={"for": "seat_due"} if said else None, closing=said, keep_mail=True)
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if cause and new is not None and new is not s:
             # the fill was made: the cause is remembered on the record that took the seat

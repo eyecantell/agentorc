@@ -936,7 +936,9 @@ def _team_line(rec: dict[str, Any], team: str, p: teams.Plan) -> str:
     if launch and launch.seat:
         what = "techlead" if launch.role == "techlead" else "seat"  # a seat with a trigger (§4.9b, TD-098)
     role = f" {launch.role}" if launch and launch.role else ""
-    return f"{rec['id']}  {what}{role}  {rec.get('dir', '')}"
+    # a manager on call is written held, with no pane (§6 rule 3, TD-410): its line says when it comes
+    when = f"  {teamrun.ON_CALL_LINE}" if launch and launch.lead and rec.get("state") == "closed" else ""
+    return f"{rec['id']}  {what}{role}  {rec.get('dir', '')}{when}"
 
 
 def cmd_team_stop(args: argparse.Namespace) -> int:
