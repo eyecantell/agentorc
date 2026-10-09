@@ -2390,25 +2390,6 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await h.flow_views(await call("list"), org)
         return JSONResponse({"ok": True, **got})
 
-    @app.post("/api/teams/{name}/flow")
-    async def api_team_flow_pick(name: str, request: Request):
-        """The team card's **Flow** pick (§4.5a, §4.9c *Switching*; TD-309 slice 4b, TD-359): `{flow}`
-        written to `teams.<team>.flow` and nothing more, as `ao team flow <team> <flow>` does — the
-        running team moves on **Apply**, the one gate. The reply is `pick_flow`'s, which the toast reads.
-        A person's own, and not on a node, as Settings is not."""
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-        if hosts.is_node():
-            raise HTTPException(409, node_org_note())
-        org, _notes = org_here()
-        try:
-            got = await asyncio.to_thread(teamrun.pick_flow, rpc, org, name, host_name(), str(body.get("flow") or ""))
-        except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:
-            raise _team_http(e) from None
-        h.settings_at["at"] = 0.0  # the next page reads the person's settings again (TD-174)
-        with contextlib.suppress(HTTPException):  # written either way: a failed re-read is the next page load's
-            await h.flow_views(await call("list"))
-        return JSONResponse({"ok": True, **got})
-
     # design §4.9 *Add or remove a member from the team card*, §4.5a *team card: Members…* and the
     # *Members dialog* (TD-163, built by TD-172): the one control that edits a definition from the
     # page — `org.yml`, as text, through the UI process, never the host agent (§4.4a: the org file
@@ -2715,7 +2696,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await call("set_settings", teams={team: change})
             with contextlib.suppress(Exception):  # the header's stops note reads the new time on the next delta
                 uiconf.set_read(await call("settings"))
-        if flow is not None:  # …then written and nothing more, as the team card's Flow pick (§4.9c, TD-356)
+        if flow is not None:  # …then written and nothing more (§4.9c, TD-356)
             try:
                 picked = await asyncio.to_thread(teamrun.pick_flow, rpc, org, team, host_name(), flow)
             except (teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable) as e:

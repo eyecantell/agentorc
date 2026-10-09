@@ -218,7 +218,6 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
             "flow_lines": [],
             "flow_changed": diffs,
             "definition_changed": bool(diffs),
-            "flow_picks": [],
         }
     rows = list(fv.get("flows") or [])
     now = next((r for r in rows if r.get("current")), {})
@@ -235,8 +234,6 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
         "flow_lines": lines,
         "flow_changed": list(fv.get("differences") or []) if live else [],
         "definition_changed": teamrun.definition_changed(list(fv.get("differences") or []) if live else [], fv["flow"]),
-        # the **Flow** pick (§4.5a), on a team that lists more than one: each `{name, current, cannot}`
-        "flow_picks": [{k: r.get(k) for k in ("name", "current", "cannot")} for r in rows] if len(rows) > 1 else [],
     }
 
 
@@ -356,9 +353,11 @@ def team_groups(
                 # team's sessions are, once, and how many are in each state — never its manager's
                 # name, state or line, which are on the manager's card, the first in the group
                 "place": group_place(members),
-                # …and, on any team, how many wait for a person's Close (TD-156 (b): a concluded
-                # team's idle cards were folded away and read as already closed)
-                "counts": state_counts(members) + ([f"{ready} ready to close"] if ready else []),
+                # drawn only while folded (TD-418): unfolded, the member cards say it
+                "counts": state_counts(members),
+                # …and, on any team, folded or not, how many wait for a person's Close — a mark
+                # (TD-156 (b): a concluded team's idle cards were folded away and read as already closed)
+                "ready": ready,
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),

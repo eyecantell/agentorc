@@ -95,7 +95,7 @@
     <div class="row gap sechead"><span class="h2">Teams</span>{{ imark("teams", "Teams", info_teams) }}</div>
     {{ panel("teams", info_teams) }}
     {% for t in teams %}
-    <form class="card pad setcard" data-section="teams" data-team="{{ t.name }}">
+    <form class="card pad setcard" id="team-{{ t.name }}" data-section="teams" data-team="{{ t.name }}">
       <div class="row gap wrap"><span class="h2 mono">{{ t.name }}</span><span class="note">team</span>{% if t.source %}{{ filehead(t.source, "defined in") }}{% endif %}</div>
       <label class="setrow"><span class="setlabel">stop time</span>
         <input class="input setin" name="until" value="" placeholder="06:00, +8h or ISO" autocomplete="off" spellcheck="false">
@@ -126,8 +126,9 @@
         <span class="note setnow">{% if t.balance.mark %}<span class="setover">{{ t.balance.mark }}</span><br>{% endif %}{% if not t.balance.live %}no live member: a team with none is not read<br>{% endif %}now — {% for line in t.balance.now %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</span>
       </div>
       {# **flow** (§4.5a, §4.9c, TD-309 slice 4b): `teams.<team>.flow`, a pick of the team's `flows:`, each it
-         cannot follow disabled with the reason — written only when it moved, and nothing more, as the
-         team card's Flow pick (TD-356): Apply moves the team #}
+         cannot follow disabled with the reason — written only when it moved, and nothing more (TD-356):
+         Apply moves the team. The one pick since the team card's moved here (TD-418), whose flow chip
+         links to this card by its `id` #}
       {% if t.flows %}<label class="setrow"><span class="setlabel">flow</span>
         <select class="input setin" name="flow" data-was="{{ t.flow }}">{% for p in t.flows %}<option value="{{ p.name }}"{% if p.current %} selected{% endif %}{% if p.cannot %} disabled title="{{ p.cannot }}"{% endif %}>{{ p.name }}{% if p.cannot %} — cannot be followed{% endif %}</option>{% endfor %}</select>
         <span class="note">{{ t.flow_strip or "—" }} · written on Save and nothing more: the running team moves on its card's Apply</span></label>{% endif %}

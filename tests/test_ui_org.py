@@ -83,31 +83,36 @@ def test_a_stopped_team_offers_forget_all_but_never_on_a_card_with_unpushed_work
     assert [g["forget"] for g in groups if not g["team"]] == [[]]
 
 
-def test_a_folded_team_says_how_much_unread_mail_its_cards_hold():
-    """Design §4.5a team header **✉ n** (TD-071 item 2): the sum of the folded cards' unread chips,
-    nothing at zero, drawn on any team (TD-194) and shown only while it is folded (CSS)."""
+def test_every_team_header_says_how_much_unread_mail_its_cards_hold():
+    """Design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, nothing
+    at zero, drawn on any team (TD-194) and shown folded or not (TD-418: no fold-only class)."""
     head = templates.get_template("group_head.html")
     mailed = {**sess("ao-a", "a", team="t", state="exited"), "unread": 19}
     (g,) = team_groups([mailed, sess("ao-b", "b", team="t", state="exited")])
-    assert g["unread"] == 19 and 'class="badge unread foldmail"' in head.render(g=g) and "✉ 19" in head.render(g=g)
+    html = head.render(g=g)
+    assert g["unread"] == 19 and 'class="badge unread teammail"' in html and "✉ 19" in html
+    assert "foldmail" not in html and 'foldonly">✉' not in html
     (quiet,) = team_groups([sess("ao-a", "a", team="t", state="exited")])
-    assert "foldmail" not in head.render(g=quiet)
+    assert "teammail" not in head.render(g=quiet)
     (live,) = team_groups([{**sess("ao-a", "a", team="t", state="working"), "unread": 2}])
-    assert "✉ 2" in head.render(g=live)  # a folded live team hides its cards too
+    assert 'class="badge unread teammail"' in head.render(g=live)
 
 
 def test_a_folded_live_teams_header_carries_its_counts_by_state():
-    """Design §4.5a *team card: fold* (TD-194): a live team's header shows the session count while
-    its compact cards say the states, and the counts by state, *n ready to close* among them, for
-    when it is folded; CSS picks one by the fold. The needs-you pill is on the header either way."""
+    """Design §4.5a *team card: fold* (TD-194), *team groups* (TD-418): a live team's header carries
+    the session count once, on the fold, and the counts by state only for when it is folded (CSS);
+    *n ready to close* is a mark on every header, and so is the needs-you pill."""
     head = templates.get_template("group_head.html")
     members = [sess("ao-a", "a", team="t", state="needs-you"), sess("ao-b", "b", team="t", state="working")]
     (g,) = team_groups(members)
     assert g["summary"]
     html = head.render(g=g)
-    assert 'class="meta unfoldonly">· 2 sessions<' in html
+    assert "unfoldonly" not in html and html.count("2 sessions") == 1 and ">▾ 2 sessions</button>" in html
     assert 'class="meta counts foldonly">·' in html and "1 working" in html
     assert "1 needs you" in html and 'data-fold="t" data-n="2" aria-expanded="true"' in html
+    assert "ready to close" not in html
+    html = head.render(g={**g, "ready": 2})
+    assert '<span class="meta readymark"' in html and ">2 ready to close</span>" in html
 
 
 def test_two_teams_each_with_a_lead():
@@ -1091,7 +1096,7 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     head = templates.get_template("group_head.html").render(g=team)
     # a live team's header carries no state chips since TD-176: its compact cards say it — but
     # folded it does, so they are drawn for the fold alone and CSS shows them only then (TD-194)
-    assert "kmaster / agentorc" in head and "· 2 sessions" in head and " live<" not in head
+    assert "kmaster / agentorc" in head and "▾ 2 sessions" in head and " live<" not in head
     assert head.count("1 working") == 1 and 'class="meta counts foldonly">· 1 working · 1 idle<' in head
     nohead = templates.get_template("group_head.html").render(g=none)
     assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
@@ -1272,9 +1277,9 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
 
 
 def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
-    """§4.5a *team card: Members…* (TD-172): beside Start or Wind down on a team `org.yml` defines;
-    on a team a repo defines, drawn disabled with its reason and **Open file** (TD-229); never on *No
-    team*. The exited banner's *one member back* line and the team skill's say the same thing."""
+    """§4.5a *team card: Members…* (TD-172): on the *i* panel's Definition line (TD-418) of a team
+    `org.yml` defines; on a team a repo defines, drawn disabled with its reason and **Open file**
+    (TD-229); never on *No team*. The exited banner's *one member back* line and the team skill's say the same thing."""
     from agentorc.ui.app import templates
 
     head = templates.get_template("group_head.html")
@@ -1286,6 +1291,9 @@ def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     assert "data-members" not in repo and "defined in r&#39;s .agentorc.yml — changed by PR</span>" in repo
     assert '<button class="btn sm ghost" disabled title="defined in r&#39;s .agentorc.yml' in repo
     assert ">Open file</a>" in repo and "/r/.agentorc.yml" in repo
+    panel = repo[repo.index('class="note secinfo helppanel"') :]
+    assert panel.index('<div class="defline"><b>Definition</b>') < panel.index("Open file")
+    assert "Flow on Settings →" in panel and repo.index("helppanel") < repo.index("changed by PR")
     assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
     ui_dir = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
     js = (ui_dir / "static" / "app.js").read_text()

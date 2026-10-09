@@ -935,8 +935,8 @@ def flow_view(call: Call, org: orgmod.Org, name: str, here: str, sessions: list[
 
 
 def check_pick(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> orgmod.Org:
-    """A pick of `flow` checked before it is written (design §4.5a team card **Flow** pick, the
-    Settings page's **flow**; §4.9c *Switching*): refused, in `teams.TeamError`, for a flow the team
+    """A pick of `flow` checked before it is written (design §4.5a the Settings page's **flow**, where
+    the team card's **Flow** pick moved, TD-418; §4.9c *Switching*): refused, in `teams.TeamError`, for a flow the team
     does not list or one it cannot follow — the pick draws those disabled, with the reason. Returns
     the org as if picked."""
     t = teams.find(org, name)
@@ -950,7 +950,7 @@ def check_pick(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> 
 
 
 def pick_flow(call: Call, org: orgmod.Org, name: str, here: str, flow: str) -> dict[str, Any]:
-    """The **Flow** pick, the Settings page's **flow** on Save and `ao team flow <team> <flow>` (§4.5a,
+    """The Settings page's **flow** on Save and `ao team flow <team> <flow>` (§4.5a,
     §4.7, §4.9c *Switching*): checked (`check_pick`), written to `teams.<team>.flow` through
     `set_settings` — a person's own — and nothing more: Apply is the one gate that moves the running
     team (TD-356). Returns `{team, flow, differences, feature}` read against the written org — the
