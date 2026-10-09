@@ -66,7 +66,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-384 | Build TD-380: a decided board line as a work order `board:<key>` in the repo reading, the free-pick lane and rule 8; the Inbox row's words, the Repo page's rows, `ao repo`, and the grinder brief's four outcomes | High | Built (#1235, #1241, #1243); live check (anchor): waits for a Decide on a wound-down team's board |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Open |
+| TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Built (#1306); live check: an unattended session's env, then tell dev-cadence |
 
 ---
 
@@ -1153,8 +1153,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** debt
 **Added:** 2026-10-08 (the anchor, from TD-159's ADR)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1306
+**Status:** Built 2026-10-08 (grinder-ao-1, PR #1306): the launch env sets `CADENCE_ATTENTION_SCOPE` beside `AGENTORC_SESSION` — `own` unattended, `machine` interactive — on every launch (restart, relaunch and fill included, since they share the one line); design §4.3 says so; `tests/test_agent.py::test_a_launch_tells_the_start_hook_whose_board_to_nudge_from` pins both. **The live check:** once #1306 is live (`ao promote status`), read with no press of yours the environment of an unattended session started after the promote (`/proc/<pane pid>/environ`, the pid from `tmux display -p -t <id> '#{pane_pid}'`) for `CADENCE_ATTENTION_SCOPE=own`, and of an interactive one for `machine`; then tell dev-cadence that `attention_scope`'s `ao status` branch can go (its change, cadence §3 — an entry on its ledger or mail to its team) and archive this entry.
 **Location:** `src/sessionorc/agent.py` (the launch env beside `AGENTORC_SESSION`, about line 1001), design §4.3 (*A repo's start hooks*) and §8; `scripts/cadence_hooks.sh` (`attention_scope`, SYNCED, read only)
 
 **Why:** `cadence_hooks.sh`'s `attention_scope` scopes the session-start nudge to the session's own board for an unattended agentorc session. It finds out by running `ao status --json` with a five-second timeout and matching `AGENTORC_SESSION`, so a synced file calls `ao`. That breaks the rule in design §8 (ADR 2026-10-08). The script already reads `CADENCE_ATTENTION_SCOPE=own|machine` first, so the seam exists, but agentorc never sets it.
