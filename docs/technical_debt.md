@@ -65,6 +65,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
+| TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
+| TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 
 ---
 
@@ -1016,3 +1018,34 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-474 (the design), TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-096 (the read-only frame).
 
+## TD-481: PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1354)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` `heads` (`view(s, fleet, seats=seats, repos=repos, waits=waits)`), `person_states` (`view(..., repos=repos, waits=waits)`), `repo_page` (`view(..., repos=repos, waits=waits)`); `tests/test_ui_org.py` `test_an_idle_session_that_waits_on_someone_reads_waiting`
+
+**Why:** The PR's one test calls `view(...)` and `rollup(...)` directly with `repos=` and `waits=`; no test names `person_waits`, `person_states` or `review_wait` (`grep -rn` over `tests/`). Mutation probes on `origin/main` (9013f3ad), each over `tests/test_ui*.py` (536 passed at baseline): dropping `waits=waits` from the `heads` list comprehension — 536 passed; dropping `repos=repos, waits=waits` from `person_states`' `views = [...]` — 536 passed; dropping them from `repo_page`'s `vs = [...]` — `tests/test_ui_org.py tests/test_ui_repo_page.py tests/test_ui_team_summary.py` 83 passed (the same edit made the full-suite run hang past 4 minutes with no result, so it is no more reliable a catch). Each revert returns the old pill (*idle*) on the Org's group heads, the Agents pill's rows and the Repo page, while the Org card's own `view` still reads *waiting*: the very split the comment on `person_states` says the wiring prevents (*so a row's pill is the Org card's*).
+
+**Fix:** Add a test through the app (the fixtures `tests/test_ui_org.py` already uses to render `/org` and `/repo/<name>`) with an idle record holding a claim whose PR the stubbed repo reading holds open: the group's head counts, the Agents rollup and the Repo page each say *waiting*. Re-run the three mutations and see each fail.
+
+**Related:** PR #1354, TD-428.
+
+## TD-482: PR #1354's `review_pr` assertion is vacuous: dropping `review_pr` from `review_wait` fails nothing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1354)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/cards.py` `review_wait` (`p.get("pr") or p.get("review_pr") or by_branch.get(...)`); `tests/test_ui_org.py` `test_an_idle_session_that_waits_on_someone_reads_waiting`
+
+**Why:** The test says "the tick's `review_pr`, and an open PR whose head branch names the reference, are the same reading" and asserts `view(_card(progress=claim(review_pr=1302)), repos=repos)["pill_word"] == "waiting"`. But `claim()` carries `ref: "TD-009"` and the fixture's open PR 1302 has branch `td009-x`, so the branch fallback finds it with `review_pr` unread. Mutation probe: replacing `p.get("pr") or p.get("review_pr") or by_branch...` with `p.get("pr") or by_branch...` leaves `tests/test_ui_org.py tests/test_ui_repo_page.py tests/test_ui_team_summary.py` at 83 passed. The `review_pr` source (a claim whose PR is set by the tick, the docstring's second source) is therefore pinned by nothing.
+
+**Fix:** Build the `review_pr` case on a claim whose ref names no open branch (say `ref: "TD-1"`, `review_pr=1302`) and assert *waiting · review #1302*. Re-run the mutation and see it fail.
+
+**Related:** PR #1354, TD-428.
