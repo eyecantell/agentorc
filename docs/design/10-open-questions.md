@@ -150,8 +150,8 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       stopper in §6 is a clock or a cap. → **§4.9a**: the test for "no work" belongs to the role,
       quiet is not empty, exhaustion is **declared** on the record and never inferred by the core
       (invariant 14), one member's exhaustion is not the team's, and the lead's last act is a
-      board line. Built under TD-053; the three guards against a false stand-down carry no
-      numbers yet.
+      board line. Built under TD-053. The guards against a false stand-down were settled
+      2026-10-08: the reason, and the home's own reading (§6 rules 6, 8 and 9); no early bound.
 - [x] **How does an idle agent learn it has mail, and when is mail deleted?** (2026-09-16):
       §4.10's **doorbell** and **lifecycle**. The Claude Code adapter submits a fixed line
       carrying only an unread count into a hook-confirmed idle pane with an empty composer, and
