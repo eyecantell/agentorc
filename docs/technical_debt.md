@@ -49,7 +49,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
-| TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1 (§4.5a), 2 (§6) and 3 (§4.10) 2026-10-09 |
+| TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1–4 (§4.5a, §6, §4.10, §4.5) 2026-10-09 |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Partly done — slice 1 PR #1340 |
 | TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | In progress |
@@ -759,7 +759,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from TD-109 step (6))
 **Owner:** designer
 **Kind:** design-first
-**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,494 words. Slice 2, §6 (2026-10-09): the policies cut to what each does, reads, writes, sends and refuses; 22,961 → 20,849 words. Slice 3, §4.10 (2026-10-09): cut to how mail works, provenance and incident counts to the history; 19,384 → 17,994 words. Before the pass the design was 192,692 words across `docs/design/`. The rest of the sections, largest first (§4.5, §4.9c, §4.4a), each its own PR. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
+**Status:** In progress (the designer) — slice 1, §4.5a (2026-10-09): the table's cells cut to the control and its rule, provenance to the history; 37,684 → 33,494 words. Slice 2, §6 (2026-10-09): the policies cut to what each does, reads, writes, sends and refuses; 22,961 → 20,849 words. Slice 3, §4.10 (2026-10-09): cut to how mail works, provenance and incident counts to the history; 19,384 → 17,994 words. Slice 4, §4.5 (2026-10-09): cut to what each screen shows and does; 18,406 → 16,799 words. Before the pass the design was 192,692 words across `docs/design/`. The rest of the sections, largest first (§4.9c, §4.4a, §4.8, §4.4), each its own PR. Was: Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule.
 **Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
 
 **Why:**
