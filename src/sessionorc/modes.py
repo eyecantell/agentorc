@@ -35,7 +35,9 @@ from sessionorc.mail import self_decide_refusal
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
 # holds the replica the home last sent, which the next frame overwrites.
 # **`clear_work`** (§6 rule 8, TD-227): Dismiss writes the members' `lane_seen` and the home's own
-# `host` record, where `work_waiting` lives; at a node both would be the replica's.
+# `host` record, where `work_waiting` lives; at a node both would be the replica's. **`work_start`**
+# (§6 rule 8, TD-466): Start on a running team's row replays its finished members from the home's
+# launch records and writes the same `host` record.
 # **`commit_defs`** (§4.9 *What is left at the home has a history*, TD-229): the tracked files and
 # their work tree are the home's; a node's `settings.yml` is a replica nobody commits.
 # **`restart`** (§6 rule 2 *A person's restart*, TD-250): the launch record it replays and the marks it
@@ -61,6 +63,7 @@ HOME_EDITS = frozenset(
         "entry_add",
         "board_reply_hand",
         "clear_work",
+        "work_start",
         "clear_mark",
         "commit_defs",
         "restart",

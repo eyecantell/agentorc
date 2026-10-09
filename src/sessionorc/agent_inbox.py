@@ -20,6 +20,7 @@ from sessionorc import (
 from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
+from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     ENTRY_TYPES,
     LEASE_TTL,
@@ -909,6 +910,46 @@ class InboxMixin:
         ids = sorted({str(i) for v in named.values() if isinstance(v, list) for i in v})
         log.info("rule 8: %s's work waiting dismissed by the person: %s", team, ", ".join(ids))
         return {"team": team, "cleared": True, "ids": ids}
+
+    async def rpc_work_start(self, team: str = "", caller: Any = None) -> dict[str, Any]:
+        """Start's half of the **Inbox row: team start** for a team that runs on (design §6 rule 8 *A
+        member that finished while its team runs on*, §4.5a, TD-466): the members the team's
+        `work_waiting` names are replayed, each alone, under the five bounds — rule 8's own start
+        (`_work_start`), which reads at the start whether the team is wound down and replays it whole
+        if it is. A person's own, and the home's alone (`modes.HOME_EDITS`). `{team, started, ids,
+        held}`: `started` false and `held` the mark's `{why, …}` when a bound holds the start back,
+        which the page says in the row's words; false with no `held` when no work was waiting. Under
+        `on_work: off` the tick writes no mark, so there is nothing for it to start."""
+        agent_common.person_only(caller, "start a team's waiting members", "§6 rule 8")
+        if self.mode != "home":
+            raise RpcError("work_start runs at the home (design §6 rule 8): this host is a node")
+        team = str(team or "").strip()
+        if not team:
+            raise RpcError("work_start needs the team whose members to start")
+        teams = self._host_rec.setdefault("teams", {})
+        rec = teams.get(team) or {}
+        mark = rec.get("work_waiting")
+        if not isinstance(mark, dict):
+            return {"team": team, "started": False, "ids": [], "held": None}
+        ids = sorted({str(i) for v in (mark.get("members") or {}).values() if isinstance(v, list) for i in v})
+        records = [r for r in self._graph().values() if r.team == team]
+        conf = settings_mod.teams(settings_mod.load()).get(team) or {}
+        new = await self._work_start(team, mark, rec, records, conf, datetime.now(UTC))
+        if new is None:
+            rec.pop("work_waiting", None)
+        else:
+            rec["work_waiting"] = new
+        teams[team] = rec
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+        await self._push_changes()
+        held = (new or {}).get("held")
+        log.info(
+            "rule 8: %s's waiting members started by the person: %s%s", team, ", ".join(ids), " (held)" if held else ""
+        )
+        return {"team": team, "started": new is None, "ids": ids, "held": held}
 
     async def rpc_clear_mark(
         self, id: str, kind: str = "", pr: int | None = None, caller: Any = None

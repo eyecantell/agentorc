@@ -993,6 +993,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-09 (TD-466 slice 1, grinder-ao-1): rule 8 *A member that finished while its team runs on* built at the home — `work.finished_alone` (a crew member, not a seat or the manager, `closed` or `exited` after declaring, not closed by the person, not sat out) is read while the team is not wound down; `_work_start` replays only the named members of a running team; `work_start {team}` is a person's own RPC (`PERSON_ONLY`, §4.8) and a home edit, answering `held` when a bound holds. The default, the row and the help text are the next slice.
 - 2026-10-09 (TD-456, grinder-ao-1): *Usage gate* — a profile with no copy of the reading (no live session under it, TD-073) reads its account's at the gate (`_gate_reading`, behind `_gate_windows`) and in `ao gate`, which now carries the reading's `fetched` and `source`. Read live 2026-10-08: `ao gate` printed *no reading yet* for three grind profiles while the account they share had a reading a minute old, so a start under them was never gated.
 - 2026-10-09 (TD-110, the designer): rule 9's note carries §4.9a's added lines.
 - 2026-10-09 (TD-459, the designer): rule 7's tick restart also serves §4.10's lapsed-cache restart, `why: cache`.

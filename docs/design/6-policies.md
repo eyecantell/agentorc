@@ -677,14 +677,15 @@ code and needs no grant; a session doing the same work does.
      waiting by this rule.
      **A member that finished while its team runs on** (TD-457; Paul, 2026-10-08: *restarting a full
      team (and waiting for a stop) seems clumsy vs just telling a member when new work arrives*;
-     designed 2026-10-09, built by TD-466). A team is not wound down while a seat or a member is
+     designed 2026-10-09; the reading, the one-member start and `work_start` built — TD-466 slice 1, its
+     `on_work` default, the row and the help text to come). A team is not wound down while a seat or a member is
      live, and a closed member is written to by no rule: on 2026-10-09 rule 9 closed ao-grind's
      grinders and designer two minutes after TD-428 merged into the grinders' lane, the anchor seat
      was at work, so the team read *1 live* and the entry waited for a wind-down a long seat never
      gives — and the road back was a Start of every member and seat. So this rule reads **member by
      member** as well. A crew member — not a seat, not the manager — that is `closed` or `exited`
      after declaring `out_of_work` (closed by rule 9's pass, by its manager, or by itself; one a
-     person killed or closed — its `closer` names the person, §4.7 — is *stopped* and left alone, as a stopped team is), whose lane holds a
+     person closed — its `closer` names the person, §4.7 — or anyone killed — a kill writes no closer and destroys the pane, `pane: false` — is *stopped* and left alone, as a stopped team is), while a seat or a member of its team is live (nobody live and not wound down is *stopped*), whose lane holds a
      matching id its `lane_seen` lacks while its team is not wound down, is this rule's news as a
      wound-down team's member is: after `WORK_SETTLE` the home writes the same `work_waiting` mark,
      `members` naming it, and the team's `on_work` follows. **What a start replays is read at the

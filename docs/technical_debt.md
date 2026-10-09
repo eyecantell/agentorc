@@ -53,7 +53,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | Open |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
-| TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Open |
+| TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Partly done — slice 1 PR #1340 |
 | TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | Open |
 | TD-468 | Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start` | Low | Open |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
@@ -825,7 +825,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (the designer, TD-457's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Partly done — slice 1 (the fix's (1), (2), the `work_start` RPC of (3) and the home's tests of (6)) is PR #1340 (grinder-ao-1, 2026-10-09): `work.finished_alone`, `_work_mark` over a running team's finished members, `_work_start` replaying only the named members, and `work_start` in `PERSON_ONLY` and `HOME_EDITS`, answering `held` when a bound holds. **Left, as one page slice:** (3)'s row (`inbox.py`: the running team's wording; its **Start** posts `work_start` and says a `held` in the row's words, `work_held`); (4) the `start` default in `agent_tick.py` (two `.get("on_work", "ask")`), `agent_notify.py` L106/L109, `settings.py`'s comment, `settings_page.py` L304 and the picker's *(default)*; (5) the help text; the row's and the default's tests. It needs `scripts/look_home.py` and a UI check, and touches grinder-ao-2's files.
 **Location:** design §6 rule 8 *A member that finished while its team runs on*, rule 8's `on_work` listing, rule 6's closing sentence, rule 2 *A restart is not a start*; §5 `on_work`; §4.5a **Inbox row: team start** and the help paragraphs **when work appears** and **Start** (Inbox row: team start); `src/sessionorc/agent_tick.py` (`_work_marks`, `_work_mark`, `_work_start`, `_work_replays`, `_work_held`), `src/sessionorc/work.py` (`wound_down`, `crew`), `src/sessionorc/agent_notify.py` (the `on_work` default at L106 and L109), `src/sessionorc/settings.py` (`ON_WORK`'s comment), `src/sessionorc/modes.py` (`HOME_EDITS`), `src/agentorc/ui/settings_page.py` (L304), `src/agentorc/ui/templates/settings.html` (the picker's *(default)*), `src/agentorc/ui/inbox.py` (the row, ~L783), `src/agentorc/ui/help.py` (`on-work`, the row's Start)
 
 **Why:** TD-457: rule 9 closed ao-grind's grinders two minutes after TD-428 merged into their lane, the anchor seat kept the team from reading *wound down*, and nothing started until Paul asked; he decided the default and the shape on 2026-10-08.

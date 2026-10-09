@@ -76,6 +76,32 @@ def team_wound_down(records: Iterable[Session]) -> str | None:
     return wound_down(said, seats)
 
 
+def finished_alone(records: Iterable[Session]) -> list[Session]:
+    """The crew members that finished while their team runs on (design §6 rule 8 *A member that
+    finished while its team runs on*, TD-457): not a seat, not the manager, `closed` or `exited`
+    after declaring `out_of_work` — closed by rule 9's pass, by its manager or by itself — and not
+    one a person closed (its `closer` names the person: *stopped*, left alone) or that was killed (a
+    kill destroys the pane, `pane: False`, and writes no closer: never read as a finish), nor one its
+    flow sat out, nor a record a successor took over. Only for a team that **runs on** — a seat or a
+    member live: one with nobody live that is not wound down is *stopped*, which rule 8 leaves alone."""
+    mine = crew(records)
+    if not any(r.state not in DEAD for r in mine):
+        return []
+    manager = manager_of(mine)
+    return [
+        r
+        for r in mine
+        if r.seat is None
+        and not (r.state == "exited" and r.pane is False)
+        and r is not manager
+        and r.state in DEAD
+        and _said(r, "out_of_work")
+        and not r.superseded_by
+        and not sat_out(r)
+        and (r.closer or {}).get("by") != "person"
+    ]
+
+
 def _f(r: Any, key: str) -> Any:
     """A record's field, off the home's `Session` or off the view a client was given."""
     return r.get(key) if isinstance(r, Mapping) else getattr(r, key, None)
