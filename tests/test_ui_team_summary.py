@@ -484,6 +484,17 @@ def test_a_stopped_team_draws_only_the_facets_that_hold_something():
     assert live["summary"]["drawn"] == ["repo", "motion", "face"] and "no repo here" in render(g=live)
 
 
+def test_an_answer_or_an_ask_alone_draws_the_face_facet():
+    """TD-476 (TD-418, §4.5a *team card: summary*): on a team with nothing live the face facet holds
+    something with a Doing row, an answer needed or an open ask to the person — each alone draws it."""
+    from agentorc.ui.org import drawn_facets
+
+    assert drawn_facets({"answers": [{"id": "a"}]}) == ["face"]
+    assert drawn_facets({"asked": {"n": 1}}) == ["face"]
+    assert drawn_facets({"doing": [{"id": "a"}]}) == ["face"]
+    assert drawn_facets({"answers": [], "asked": None, "doing": []}) == []
+
+
 def test_the_facets_heads_and_bars_are_one_height_and_the_summary_is_sized_by_what_it_holds():
     """§4.5a *Org: rollup*, *team card: summary* and *Repo facet* (TD-418): every facet head one height
     (the window picker's), the bars and blocks one height so they line up, a label that never wraps

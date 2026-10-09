@@ -320,7 +320,8 @@ EXTRA = {
                   "doing": ("TD-296: waiting on CI for #437", "39m"), "kring": True},
     # no `doing` on tdgrind-3 on purpose: it is `limited`, and the slot shows the cap — what needs
     # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
-    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2},
+    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2,
+                  "restarted": "restarted · cache lapsed"},
     # declared itself out of work: plain `idle` — *unseen* is drawn only on an interactive session
     # (§4.2, TD-095 f), its manager read the result; the ending is said once, in the slot, and
     # *ready to close ✓* is its caption; it holds a steer to the person about #809, so the slot
@@ -418,6 +419,9 @@ def team_desktop(team_first=False):
         dashed = ' style="border-bottom: 1px dashed #d9a441;"' if e.get("derived") else ""  # derived, not declared
         rep_html = f'<span class="meta"{dashed}>{rep}</span>' if rep else ""
         found = f'<span class="meta">{e["findings"]}</span>' if e.get("findings") else ""
+        # §4.5a **restarted** chip (TD-485): the newest restart inside RESTART_WINDOW, drawn as *brief changed* is
+        restarted = (f'<span class="badge" title="the tick restarted this run 10m ago: cache lapsed · idle 5h · 191k — 1 of 3 in 2 h; '
+                     f'the chip goes two hours after the newest restart (§4.5a)">{e["restarted"]}</span>') if e.get("restarted") else ""
         # (5) the slot: one text, the first that applies, and a caption
         cls, text, cap = "", "", ""
         if state == "needs":
@@ -482,7 +486,7 @@ def team_desktop(team_first=False):
   <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
   <div class="r">{team}{role}{mode}{stops}{marks}<span class="grow"></span><span class="meta" title="in this state since">{age}</span></div>
   <div class="r"><span class="meta fill">{where_row(host, repo, name, where, in_team)}</span><span class="grow"></span>{flag_html}</div>
-  <div class="r"><span class="meta fill">{tool}</span><span class="grow"></span>{rep_html}{found}</div>
+  <div class="r"><span class="meta fill">{tool}</span><span class="grow"></span>{rep_html}{found}{restarted}</div>
   <div class="aslot {cls}"><div class="t">{text}</div>{f'<div class="cap">{cap}</div>' if cap else ""}</div>
   <div class="foot">{first}{rest}{editor}<span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;">{ICON["more"]}</span></div>
 </div>'''

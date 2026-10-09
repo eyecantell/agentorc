@@ -7820,3 +7820,71 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (PR #1360) — `tests/test_work_start.py` `test_finished_alone_passes_over_each_record_that_is_not_a_finished_member`, one case per guard (a seat, the manager, a sat-out member, a superseded record); each of the four mutations fails it.
 
 **Related:** PR #1340.
+
+## TD-467: Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (the designer, TD-459's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.10 *A lapsed cache is started again, not rung*, the `read_when` table's `idle` from a hook row; §6 rule 7 (the tick restart's third trigger); `src/sessionorc/agent_wake.py` (`_ring_typing`: after `_decide_wake` says ring, before `_type`), `src/sessionorc/agent_tick.py` (`_brief_restart`: the precondition and the close-and-replay, to share; `_just_restarted`; the `restarts` entry), `src/sessionorc/agent_common.py` (`CACHE_LIFETIME`, `CACHE_FLOOR` beside `WORK_SETTLE`), `src/sessionorc/mail.py` (`read_when`), `src/agentorc/ui/cards.py` and `src/agentorc/cli.py` (the restart note's words, *cache lapsed · idle 5h · 191k*)
+
+**Why:** TD-459: 23 of the week's 44 whole-context re-writes after a lapsed cache were doorbell rings of a grinder idle a median 5.4 h, each re-writing a median 191k tokens at the write price; a start on the brief writes about 23k ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, Paul's decision).
+
+**Resolved:** 2026-10-09 (PR #1346, PR #1371) — slice 1 (#1346, grinder-ao-1) built parts (1)–(4) and (6) at the home: `agent_common.CACHE_LIFETIME`/`CACHE_FLOOR`, `cache_lapsed`, `tick_ready`, the doorbell's hand-off to `_cache_restart`, `read_when`'s `cache` sentence, `tests/test_cache_restart.py`; slice 2 (#1371, grinder-ao-2) built part (5) in `ao status -v` — a `restarts:` line in `ending.restart_words`' words, *cache lapsed · idle 5h · 191k*, and *closed by the tick · cache lapsed* — design §4.7 and §4.10. The card's restart note has no §4.5a row and went to TD-485's design.
+
+**Related:** TD-459 (the design), TD-458 (the metered profile's lifetime), TD-460 (the context-bound trial; both change how often a grinder restarts), TD-217 (rule 7's tick restart), TD-347 (the bell).
+
+## TD-476: PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1342)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/org.py` `drawn_facets` (the `face` key), `src/agentorc/ui/app.py` (`summary = {**first["summary"], "drawn": list(FACETS)}`); `tests/test_ui_team_summary.py`, `tests/test_ui_org.py`
+
+**Why:** Mutation probes over `tests/test_ui.py tests/test_ui_org.py tests/test_ui_team_summary.py tests/test_ui_teams.py tests/test_ui_work_row.py` (195 pass at baseline): (a) `"face": bool(summary.get("doing"))` — dropping `or summary.get("answers") or summary.get("asked")` — still 195 passed, though the docstring says a stopped team draws the facet for "a Doing row (or an answer or an ask)"; (b) replacing the Repo page's `{**first["summary"], "drawn": list(FACETS)}` with `first["summary"]` still 195 passed, though the comment says "the Repo page draws all three facets, whatever a stopped team's card leaves out". The other changes of the PR (`lone`, `"repo"`, `if not live`, `"0m"`, the `drawn` gate in the render) each fail a test.
+
+**Resolved:** 2026-10-09 (PR #1374) — `tests/test_ui_team_summary.py::test_an_answer_or_an_ask_alone_draws_the_face_facet` and `tests/test_ui_repo_page.py::test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_nothing`; mutations (a) and (b) each fail one test.
+
+**Related:** PR #1342.
+
+## TD-477: PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1348)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/repo.py` (the team header's `"ready": ready` and `"counts": state_counts(members)`); `tests/test_ui_teams.py`, `tests/test_ui.py`, `tests/test_ui_org.py`
+
+**Why:** Mutation probes over the five UI test modules of PR #1342's probe (195 pass at baseline): `"ready": ready` → `"ready": 0` still 195 passed; restoring the old `"counts": state_counts(members) + ([f"{ready} ready to close"] if ready else [])` still 195 passed. The PR's comments say the count is "drawn only while folded" and the ready-to-close figure is, "on any team, folded or not, how many wait for a person's Close — a mark"; no test would notice either going back. The template half exists (`tests/test_ui_org.py::test_a_folded_live_teams_header_carries_its_counts_by_state` renders `group_head.html` with a hand-set `ready: 2`); what nothing asserts is the producer in `repo.py`.
+
+**Resolved:** 2026-10-09 (PR #1378) — `tests/test_ui_org.py::test_the_teams_ready_mark_is_counted_by_the_grouping_and_kept_out_of_its_counts` asserts `team_groups`' `ready` and its absence from `counts`, and the header's mark unfolded; both mutations each fail it.
+
+**Related:** PR #1348.
+
+## TD-464: The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from TD-109 step (6))
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Resolved:** 2026-10-09 (the designer) — every section has had its pass, each slice its own PR with a Sonnet fact-check (#1325 §4.5a, #1343 §6, #1351 §4.10, #1355 §4.5, #1357 §4.9c, #1362 §4.4a, #1365 §4.8, #1366 §4.4, #1367 §4.9b, #1368 §4.9, #1369 §4.7, #1372 §4.8a/§4.2/§4.6, #1373 §5/§4.1/§4.3/§4.2a/§9/§10, and the last PR for §4 and the sections under 900 words). **Before: 192,692 words across `docs/design/`; after: 180,089.** What the pass took is in the history, one dated line per section; no rule and no number left the design, and the fact-checks found four stale sentences on the way (the §4.9 container paragraph, §4.9b's reader *Not built* list, §4.2a's *not built — TD-233*, §10's *Build list*), each corrected, and one leftover in the code (TD-483). The sections are now mostly rules: a third pass would have to merge rules restated across sections (the second bullet of *Why*), which this pass did not attempt — file it when a reader's cost asks for it.
+**Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
+
+**Why:**
+- Every session that reads a section pays for it in context. TD-410 counts ~60k tokens of design read by a manager fill that found nothing to do, and TD-378's ADR shows reads are most of the week's cost.
+- A rule restated in several sections drifts apart, and every fact-check has to carry each copy.
+- Much of the growth is dated reasoning written in place (*until 2026-…*, *was:*, the review rounds), which by CLAUDE.md belongs in `docs/design-history.md`.
+
+**Fix:** a pass section by section, largest first, each section its own PR with a fact-check. Move dated reasons and *was* clauses to the history. Cut each reason to one sentence, and keep every rule and every number. Shorten the §4.5a cells to the control and its rule, with the rest in the section the cell points to. **Mind** the doc-bound tests (`tests/test_primer.py`, `help.py`'s bound text): a pass never rewords what they read without the same PR fixing them. **Done when** every section has had its pass, no rule lost, each PR fact-checked, and the total is written here before and after.
+
+**Related:** TD-109 (archived; step 6), TD-410 (what a fill reads), TD-378 (what reads cost).

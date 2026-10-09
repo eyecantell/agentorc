@@ -9,7 +9,7 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    Paul has open on kmaster shows the right state within 5 s of a change, and a permission
    prompt can be answered from the browser.
    **Built**, and the success test passes. Also built here, ahead of phase 5: the `ao --skill`
-   text (TD-019). Attachments came later (TD-002, 2026-10-07): Attach, drop and paste, for a
+   text (TD-019). Attachments (TD-002): Attach, drop and paste, for a
    session on this host. **Not built:** the phone layout (TD-003).
 2. **Second host.** `hosts.yml`, the **home and node** split (§4.4a; it replaces a hub-and-spoke
    ssh transport at about the same cost): the `host` field and `id@host` addresses, home and
