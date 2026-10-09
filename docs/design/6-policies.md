@@ -578,6 +578,9 @@ code and needs no grant; a session doing the same work does.
      tried again by the tick, while a Close by anyone else is never undone. That
      second case is the manager's: it sits idle between rounds, its round log is a file and not
      its context (§4.8 *A session's round log*), and nothing of a round is lost with the run.
+     The same tick restart, under the same precondition, serves §4.10 *A lapsed cache is started
+     again, not rung* (TD-459): the doorbell hands it a member idle past the cache lifetime with a
+     long context, and the entry reads `why: cache`.
      Never a seat (each fill is a replay and so reads the files anyway), never — for `brief_changed` —
      a member that declared `out_of_work` (its next start is the team's), never an interactive session, never
      past a stop time, into a wrap-up, a gate pause or a suspension, and not on a node yet, as
