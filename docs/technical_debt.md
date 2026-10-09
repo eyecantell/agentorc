@@ -48,7 +48,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-307 | Each repo wires a team's path by hand — lanes, the techlead's read, the feature entry's role — so a team gets the path it remembered: flows defined once, named by a team | Medium | Designed — the build is TD-309, the repos' move TD-310 |
 | TD-310 | Move the repos onto flows after TD-309 is promoted: each lists its flows, writes `held:`, deletes what its flow fills and cuts the path from its supplements | Low | Partly done — agentorc's half built (PR #1166); the other three repos' halves are the anchor's |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
-| TD-378 | Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away | Medium | Open |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Designed 2026-10-08 (five mockup rounds with Paul) — the build is TD-428 |
@@ -58,6 +57,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Open |
 | TD-456 | The gate reads a profile's own copy of its account's reading, so a profile with no live session reads *no reading yet* and a start under it is never gated | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Open |
+| TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Open |
+| TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Open |
+| TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 
 ---
 
@@ -763,33 +765,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-355 (the mark that outlives the Apply), TD-309 (archived: *Switching*), TD-334 (archived: rule 7's retry), TD-310 (the move that surfaced it).
 
-## TD-378: Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-07 (the anchor, from Paul)
-**Owner:** anchor
-**Kind:** evaluation
-**Status:** **Researched and measured 2026-10-08 (the anchor):** [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md), proposed. On the Oct 1–8 transcripts (Opus 5.5, 19,534 requests), cache reads are 58% of the weighted cost, one-hour writes 26% and output 16%. Re-writes after a lapsed cache are 6.0%, and cold starts 3%. Requests over 200k of context carry 35%. Claude Code already gives a subscription's main conversation the one-hour lifetime, and that saved a full re-write at each of 813 gaps of 5–60 minutes. Proposed: pin `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` on a metered profile; restart, rather than ring by the doorbell, a member idle past the hour with a context over ~100k; a one-week trial of a 200k bound on ao-grind's grinders. **Left:** Paul's decision on the board, then the build entries for the levers taken, and the ADR's Status.
-**Blocked by:** decision (Paul) — the board's *Which prompt-cache levers should agentorc take?* (2026-10-08)
-**Location:** design §4.2a (profiles and `prices:`, which already carry `cache_read` and `cache_write`), §6 (the tick: rule 3's idle close, restarts, wakes and rings), §4.9b (a techlead started per batch); `src/sessionorc/agent_tick.py`, `src/sessionorc/agent_wake.py`
-
-**Why:**
-- Paul, 2026-10-07: *do some (or have sonnet do some) research on how cached input works for claude and see if we could leverage it in ao to save token costs.*
-- On a coding agent most input tokens are cache reads, priced at about a tenth of fresh input (§4.2a). A cache write costs more than fresh input, and an entry expires after a few minutes unused unless a longer lifetime is paid for.
-- Several of agentorc's own acts could be costing a full re-read of a session's context: a member restarted onto a new brief, a seat closed when idle (§6 rule 3) and filled again, a wake or ring that reaches a session after its cache has lapsed, a resume after a team restart.
-- Nobody has measured how much of the week's spend these account for, or which are worth changing.
-
-**Fix (the research):**
-1. How caching works for Claude Code sessions: the cache lifetimes and their prices, what breaks a cached prefix (a changed system prompt, tools, CLAUDE.md, a hook's injected context), what `/clear`, `/compact` and `--resume` cost, and whether Claude Code sets anything a profile could choose. Sources: Anthropic's prompt-caching docs and Claude Code's docs and settings.
-2. Measure from agentorc's own records: the run logs' and usage ledger's cache-read, cache-write and fresh-input tokens, per role, around restarts, rings after idle, and seat fills.
-3. List the levers, each with the saving it would buy and what it costs: e.g. waking a session before its cache lapses versus letting it lapse, batching rings, keeping a seat's prefix stable, a brief or primer ordered so the shared part comes first, the order of injected context.
-4. A recommendation for Paul, and the build entries it implies.
-
-**Done when** the findings and the recommendation are written (an ADR under `docs/decisions/`), Paul has decided which levers to take, and each one taken has a build entry.
-
-**Related:** TD-128 / TD-151 (the metered account's spend and the `cache_read` / `cache_write` prices), TD-366 (archived: a seat closed mid-wait).
-
 ## TD-410: Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do*
 
 **Priority:** Medium
@@ -950,3 +925,59 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Decided by Paul, 2026-10-08:** the default of `on_work` becomes **`start`** (it is `ask` in §5, `agent_tick.py` and `agent_notify.py`); he switched ao-grind to `start` the same day.
 
 **Fix:** design, in §6, (1) **restart the one member**: when a finished member's lane gains work while its team runs on, the tick replays that member's record (rule 8's replay, `why: work`, under the team's `on_work` — `start` replays it, `ask` asks with a row naming the member, `off` does nothing), so the member that owns the lane comes back alone and is told what arrived; the sentence quoted above goes; weigh it against *a restart is not a start* (§6 — a replay under the person's standing word, as rule 8's is); (2) **seats do not hold a wind-down**: whether rule 8's *wound down* should read over members only, a live seat not counting — or whether (1) makes that unnecessary; (3) the `on_work: start` default in §5, its Settings picker's *(default)* label (`settings.html`), and the code defaults (`agent_tick.py`, `agent_notify.py`, `settings.py`'s `ON_WORK`, `ui/settings_page.py`); (4) the race: whether the finished pass should first read the lane against `origin/main` (or wait a settle after the checkout's pull) before closing a member as finished. Then a build entry. **Done when** the design says what happens to a finished member's lane gaining work while a seat runs, and the build entry is open.
+
+## TD-458: A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
+**Location:** design §4.2a (`billing: metered`, the profile's layer); `src/agentorc/profiles.py`; the claude-code adapter's launch environment
+
+**Why:**
+- Claude Code gives a subscription's main conversation the one-hour cache lifetime, but on an API key, a cloud provider or usage credits every request gets five minutes ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
+- On 2026-10-01–08, 813 requests (4%) came 5–60 minutes after the one before. Each was a cache hit. At five minutes each would have written its whole context again, about 60% more than the week cost in total.
+- A metered profile (TD-151, built) is exactly the one that would lose this. No team runs on one yet, so the cost is still to come.
+
+**Fix:** design §4.2a: a profile whose `billing` is `metered` launches its claude-code sessions with `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` (the subagents' `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL` left at its default), unless the profile's own environment sets one. Say whether the person can turn it off and where. Then build it in the adapter's launch environment, with a test that a metered profile's launch carries the key and a subscription's does not. **Done when** a metered profile's session starts with the one-hour lifetime and §4.2a says so.
+
+**Related:** TD-378 (archived; the research), TD-151 (metered profiles), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
+
+## TD-459: The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — decided by Paul 2026-10-08 (option 3 of the ADR); the design in §4.10 and §6 first, then its build entry.
+**Location:** design §4.10 (the doorbell), §6 (rule 5's precondition, restarts and their `why`); `src/sessionorc/agent_wake.py`, `src/sessionorc/agent_tick.py`
+
+**Why:**
+- From 2026-10-01 to 10-08, the doorbell (§4.10) caused 23 of the 44 whole-context re-writes after a lapsed cache. Each rang a grinder idle for a median 5.4 h and re-wrote a median 191k tokens at the one-hour write price, 2× base input ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
+- Re-writes after a lapse were 6.0% of the week's weighted cost. A restart on the brief writes about 23k new tokens rather than about 190k at 2×, which saves roughly 2–2.5% of the week's cost. The saving grows with the number of overnight rings.
+
+**Fix:** design: when the doorbell is about to ring a member that has been idle longer than the cache lifetime (an hour) and holds a context over about 100k, the host agent restarts it on its brief instead of ringing it. The new run reads the mail because its brief reads the inbox first. The restart takes rule 5's precondition (§6): the member is idle, holds no claim in progress, and has pushed its work. Without the precondition, the doorbell rings as today. The restart's `why` names the cause, so the card and `restarts` say it. Decide where the two numbers live (the lifetime, the context floor), whether a seat is covered, and how a person's own session is excluded. Then file the build entry and block this one by it. **Done when** a lapsed member is restarted rather than rung, and the design says when.
+
+**Related:** TD-378 (archived; the research), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, TD-460 (the context-bound trial; both change how often a grinder restarts).
+
+## TD-460: Read back the one-week trial of a 200k context bound on ao-grind's grinders
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
+**Owner:** anchor
+**Kind:** live-check
+**Status:** Open — the bound is set in `.agentorc.yml` (`roles.grinder.context: {bound: 200k}`) by the PR that filed this entry. Each grinder takes it at its next start, and the trial week runs from the first such start to about 2026-10-15. Until then the check waits on the calendar, which nobody can hurry.
+**Location:** `.agentorc.yml` (`roles: grinder: context:`); design §4.8 *The bound has two layers*; the usage ledger and the run logs under `~/.agentorc/` (read only)
+
+**Why:**
+- Requests over 200k tokens of context carried 35% of agentorc's weighted cost from 2026-10-01 to 10-08 ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
+- A 200k bound cuts the mean context per request by about 29%. Against that, each grinder run is about two-fifths shorter, and every restart pays its first write and a re-orientation (the ledger, the files and the design read again).
+- Nobody can net the two on paper. Paul decided to measure it on the weekly window for a week.
+
+**Fix:** after a week on 200k (from about 2026-10-15), compare ao-grind's grinders' usage-window percentage per merged PR against the week before (2026-10-01–08). Count their restarts per merged PR alongside. Write the reading into the ADR's Consequences. Then keep the line in `.agentorc.yml` (and design §4.8 says this repo's grinder number is measured), or take it out (the 300k default returns), in a PR. A result that is unclear goes to Paul as a `steer` with the reading. **Done when** the line stays or goes with a written reading behind it.
+
+**Related:** TD-378 (archived), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 4, TD-249 (the bound's last change), TD-459.

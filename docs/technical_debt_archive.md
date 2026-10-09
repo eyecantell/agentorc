@@ -7442,3 +7442,31 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** design §4.8, §4.5a, §5, §9 invariant 11, §10 (2026-09-12); [ADR 2026-09-12](decisions/2026-09-12-orchestrator-membership-prior-art.md); TD-028 (the grant this builds on), TD-026.
 
 **Resolved:** 2026-10-08 (this PR; steps (1)–(5) in the 2026-09-13 PRs and #116 (step 4), the director's round ending in #1289) — step (6), the hand-run migration in `docs/briefs/archive/td036-migration.md`, declared stale by Paul's answer of 2026-10-08 (*Declare step (6) stale, citing TD-040, and archive TD-036*): `ao team start` (TD-040) sets every member's `controllers` at create, and every team has started that way since 2026-09-13, so no running worker is left without a list for the migration to attach. The lasting content is design §4.8 (the gate's membership half), §4.5a, §5 and §9 invariant 11.
+
+## TD-378: Research how Claude's prompt cache prices cached input, and where agentorc's restarts, rings and idle closes throw the cache away
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-07 (the anchor, from Paul)
+**Owner:** anchor
+**Kind:** evaluation
+**Status:** Resolved — **Researched and measured 2026-10-08 (the anchor):** [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md), proposed. On the Oct 1–8 transcripts (Opus 5.5, 19,534 requests), cache reads are 58% of the weighted cost, one-hour writes 26% and output 16%. Re-writes after a lapsed cache are 6.0%, and cold starts 3%. Requests over 200k of context carry 35%. Claude Code already gives a subscription's main conversation the one-hour lifetime, and that saved a full re-write at each of 813 gaps of 5–60 minutes. Proposed: pin `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` on a metered profile; restart, rather than ring by the doorbell, a member idle past the hour with a context over ~100k; a one-week trial of a 200k bound on ao-grind's grinders. **Left:** Paul's decision on the board, then the build entries for the levers taken, and the ADR's Status.
+**Location:** design §4.2a (profiles and `prices:`, which already carry `cache_read` and `cache_write`), §6 (the tick: rule 3's idle close, restarts, wakes and rings), §4.9b (a techlead started per batch); `src/sessionorc/agent_tick.py`, `src/sessionorc/agent_wake.py`
+
+**Why:**
+- Paul, 2026-10-07: *do some (or have sonnet do some) research on how cached input works for claude and see if we could leverage it in ao to save token costs.*
+- On a coding agent most input tokens are cache reads, priced at about a tenth of fresh input (§4.2a). A cache write costs more than fresh input, and an entry expires after a few minutes unused unless a longer lifetime is paid for.
+- Several of agentorc's own acts could be costing a full re-read of a session's context: a member restarted onto a new brief, a seat closed when idle (§6 rule 3) and filled again, a wake or ring that reaches a session after its cache has lapsed, a resume after a team restart.
+- Nobody has measured how much of the week's spend these account for, or which are worth changing.
+
+**Fix (the research):**
+1. How caching works for Claude Code sessions: the cache lifetimes and their prices, what breaks a cached prefix (a changed system prompt, tools, CLAUDE.md, a hook's injected context), what `/clear`, `/compact` and `--resume` cost, and whether Claude Code sets anything a profile could choose. Sources: Anthropic's prompt-caching docs and Claude Code's docs and settings.
+2. Measure from agentorc's own records: the run logs' and usage ledger's cache-read, cache-write and fresh-input tokens, per role, around restarts, rings after idle, and seat fills.
+3. List the levers, each with the saving it would buy and what it costs: e.g. waking a session before its cache lapses versus letting it lapse, batching rings, keeping a seat's prefix stable, a brief or primer ordered so the shared part comes first, the order of injected context.
+4. A recommendation for Paul, and the build entries it implies.
+
+**Done when** the findings and the recommendation are written (an ADR under `docs/decisions/`), Paul has decided which levers to take, and each one taken has a build entry.
+
+**Related:** TD-128 / TD-151 (the metered account's spend and the `cache_read` / `cache_write` prices), TD-366 (archived: a seat closed mid-wait).
+
+**Resolved:** 2026-10-08 (this PR; the research and measurement in #1301) — Paul decided the board's *Which prompt-cache levers should agentorc take?* on 2026-10-08: **Pin 1h, restart lapsed, trial 200k**, the recommended answer. The [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) is accepted and carries the findings. Each lever has its entry: option 2, the one-hour lifetime pinned on a metered profile, is TD-458; option 3, restart rather than ring a member whose cache has lapsed, is TD-459; option 4, the 200k bound on ao-grind's grinders, is set in `.agentorc.yml` by this PR as a one-week trial (design §4.8 *The bound has two layers*), and TD-460 reads it back.
