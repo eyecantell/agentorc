@@ -1038,7 +1038,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** design §4.5a **restarted** chip, §4.5 *The Focus screen's anatomy* (the identity line), §6 *Keeping a team running* (the ceiling), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the marks beside the report line, where `brief_changed` is drawn — ~L187 `marks`, the `restart_wanted` chip ~L356), `src/agentorc/ui/templates/card.html` and `focus.html` (the chips), `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`, the same words), `src/sessionorc/agent_common.py` (`RESTART_WINDOW`, `_counted`)
+**Location:** design §4.5a **restarted** chip, §4.5 *The Focus screen's anatomy* (the identity line), §6 *Keeping a team running* (the ceiling), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (~L187 `marks`, the `restart_wanted` chip ~L356; `brief_changed` is drawn in the slot ~L874, which this chip never is), `src/agentorc/ui/templates/card.html` (row 4, beside the report line — a new badge; the card has no *brief changed* chip to copy) and `focus.html` (the header chips beside *brief changed*, ~L61), `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`, the same words), `src/sessionorc/agent_common.py` (`RESTART_WINDOW`, `_counted`)
 
 **Why:** TD-485: a member the tick or the doorbell restarted reads like a fresh start on the card; `ao status -v` says it since TD-467 slice 2 and the page says nothing.
 
