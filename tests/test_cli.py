@@ -1307,7 +1307,29 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     # the sender reads which answer it was, so it branches on the number and not on the text
     monkeypatch.setenv("AGENTORC_SESSION", sid)
     assert cli.main(["inbox"]) == 0
-    assert 'answered 2: "hold it"' in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert 'answered 2: "hold it"' in out
+    # a reply that picked one and said more reads as the answer alone, from the reply itself (TD-415)
+    assert 'answered 2: "off develop"' in out and 'answered 2: "off develop\n' not in out
+    # words that are blank send the answer alone; an addressee word in front changes nothing (TD-415)
+    # the home strips a reply's text, so what the CLI itself sends is read on its way out
+    said, real = [], cli.call_sync
+    monkeypatch.setattr(
+        cli, "call_sync", lambda m, **kw: (said.append(kw.get("text")) if m == "msg" else None) or real(m, **kw)
+    )
+    sent = {}
+    for name, extra in (("blank", ["   "]), ("bare", ["rebase it first"]), ("addressed", [sid, "rebase it first"])):
+        monkeypatch.setenv("AGENTORC_SESSION", sid)
+        assert cli.main([*ask_argv, "--answer", "merge it", "--answer", "hold it"]) == 0
+        q = json.loads(capsys.readouterr().out)["entry"]
+        monkeypatch.delenv("AGENTORC_SESSION")
+        assert cli.main(["--json", "msg", "--reply-to", q["id"], "--pick", "2", *extra]) == 0, name
+        got = json.loads(capsys.readouterr().out)
+        assert got["closed"] == q["id"], name
+        sent[name] = (said[-1], got["entry"]["text"], got["entry"]["answer"], got["delivered"])
+    assert sent["blank"] == ("hold it", "hold it", 1, [sid])
+    both = "hold it\n\nrebase it first"
+    assert sent["bare"] == sent["addressed"] == (both, both, 1, [sid])
     call_sync("kill", id=sid)
 
 
