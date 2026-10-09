@@ -115,6 +115,25 @@ def test_a_folded_live_teams_header_carries_its_counts_by_state():
     assert '<span class="meta readymark"' in html and ">2 ready to close</span>" in html
 
 
+def test_the_teams_ready_mark_is_counted_by_the_grouping_and_kept_out_of_its_counts():
+    """TD-477 (PR #1348, §4.5a *team groups*): `team_groups` counts an `idle` member whose slot reads
+    *ready to close* as the header's `ready`, never a working one or a ready slot not idle, and leaves
+    the figure out of the folded-only counts by state; the header draws the mark whether folded or not."""
+    head = templates.get_template("group_head.html")
+    ready = {**sess("ao-a", "a", team="t"), "slot": {"caption": "ready to close ✓", "ccls": "ready"}}
+    stale = {**sess("ao-b", "b", team="t", state="working"), "slot": {"ccls": "ready"}}
+    members = [ready, stale, sess("ao-c", "c", team="t")]
+    (g,) = team_groups(members)
+    assert g["ready"] == 1
+    assert not any("ready to close" in c for c in g["counts"])
+    html = head.render(g=g)
+    assert '<span class="meta readymark"' in html and ">1 ready to close</span>" in html  # not a foldonly span
+    counts = html[html.index('class="meta counts foldonly">') :].split("</")[0]
+    assert "ready to close" not in counts
+    (g,) = team_groups([{**ready, "state": "working"}, stale])
+    assert g["ready"] == 0 and "ready to close" not in head.render(g=g)
+
+
 def test_two_teams_each_with_a_lead():
     views = [
         sess("ao-orc", "orchestrator-ao-1", team="ao-grind", project="agentorc", caps=["control"]),

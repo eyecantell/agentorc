@@ -59,7 +59,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
-| TD-477 | PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere | Medium | Open |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
@@ -921,22 +920,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first: a quiet mark in the Focus header beside the state pill, drawn after a grace as TD-372's banner is (no flicker on a navigation or a promote's restart): *reconnecting…* while the terminal socket is down, *no output for Ns* while it is open, the session reads `working` and no byte has come — never on an idle session, where silence is the normal case — and *resized by another client* when the pane's size changes under a Focus that did not ask for it (the count of attached clients is tmux's `#{session_attached}`). Hover says what each means and what to do. Record each kind of event with its time in the browser's console, so the next freeze names its cause. **Done when** the design says the marks and their graces, the build lands, and each of the three is drawn on a scratch home by forcing it (kill the socket, a silent `working` pane, a second `tmux attach` resizing).
 
 **Related:** TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-022 (scrollback through tmux).
-
-## TD-477: PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1348)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/repo.py` (the team header's `"ready": ready` and `"counts": state_counts(members)`); `tests/test_ui_teams.py`, `tests/test_ui.py`, `tests/test_ui_org.py`
-
-**Why:** Mutation probes over the five UI test modules of PR #1342's probe (195 pass at baseline): `"ready": ready` → `"ready": 0` still 195 passed; restoring the old `"counts": state_counts(members) + ([f"{ready} ready to close"] if ready else [])` still 195 passed. The PR's comments say the count is "drawn only while folded" and the ready-to-close figure is, "on any team, folded or not, how many wait for a person's Close — a mark"; no test would notice either going back. The template half exists (`tests/test_ui_org.py::test_a_folded_live_teams_header_carries_its_counts_by_state` renders `group_head.html` with a hand-set `ready: 2`); what nothing asserts is the producer in `repo.py`.
-
-**Fix:** Add a `test_ui_teams.py` case (the template half is already covered) for a team with a card Ready to close: the header context built by `repo.py` carries `ready == 1`, its `counts` does not contain `ready to close`, and the rendered header shows the mark folded and unfolded. Re-run both mutations and see them fail.
-
-**Related:** PR #1348.
 
 ## TD-478: Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕
 
