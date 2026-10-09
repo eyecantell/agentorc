@@ -939,7 +939,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** design §4.9a *The home's note says more*, §6 rule 9 *The announcement the manager did not make*, §4.10 *How a message to a person is written*; `src/sessionorc/agent_tick.py` (`_finished_tell`: the two lines today; the team's start instant it already computes), `src/sessionorc/work.py` (`waiting_of`, the open questions by asker), `src/sessionorc/agent_identity.py` (`identity_alarms` on records), `src/agentorc/teamrun.py` and `src/sessionorc/agent_tick.py` (`_work_start`, the schedule's start: where `usage_at_start` is written), the host record's `teams.<team>` (beside `work_waiting`), `src/sessionorc/agent.py` (`rpc_usage`, `self._usage[profile]["windows"]`: the raw per-window readings)
+**Location:** design §4.9a *The home's note says more*, §6 rule 9 *The announcement the manager did not make*, §4.10 *How a message to a person is written*; `src/sessionorc/agent_tick.py` (`_finished_tell`: the two lines today; the team's start instant it already computes), `src/sessionorc/work.py` (`waiting_of`, the open questions by asker), `src/sessionorc/agent_identity.py` (`identity_alarms` on records), `src/agentorc/teamrun.py` and `src/sessionorc/agent_tick.py` (`_work_start`, the schedule's start: where `usage_at_start` is written), the host record's `teams.<team>` (beside `work_waiting`), `src/sessionorc/agent_settings.py` (`rpc_usage`, `self._usage[profile]["windows"]`: the raw per-window readings)
 
 **Why:** TD-110: what a person reads in the morning is rule 9's note, and it says only the PRs and each member's why; the records hold the rest.
 
