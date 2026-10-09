@@ -597,7 +597,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (ao-paul, the design of TD-418)
 **Owner:** grinder
 **Kind:** build
-**Status:** In progress — slice 1 (page chrome) merged in #1333, slice 2 (rollup and summary) in its PR (grinder-ao-2, 2026-10-09); slices 3–7 open
+**Status:** In progress — slice 1 (page chrome) merged in #1333, slice 2 (rollup and summary) in #1342, slice 3 (the team header and its *i* panel) in its PR (grinder-ao-2, 2026-10-09); slices 4–7 open
 **Location:** `src/agentorc/ui/templates/` (`base.html`, `org.html`, `rollup.html`, `group_head.html`, `team_summary.html`, `lanes_line.html`, `card.html`, `plus_card.html`, `help_mark.html`, `settings.html`, `repo.html`, `repo_part.html`), `static/app.css`, `static/app.js`, `ui/org.py` (`lanes_line`'s *wait on a build*), `ui/cards.py`, `ui/repo.py` (`LEDGER_LISTS`), `ui/app.py`, `ui/help.py`; `sessionorc/ledger.py` (`kind_of`, `KINDS`, `in_lanes`, `design_first_rest`), `agentorc/teamrun.py` (`lane_kinds`, `repo_lanes`), `agentorc/cli.py` (`ao repo`, the `design-first` key near line 1454)
 
 **Why:** TD-418 is designed (§4.1, §4.2 *Waiting*, §4.4 *Repo facts*, §4.5 screen 1 and *The card's anatomy*, §4.5a, §4.7, §4.9c *What is shown*, each marked *built by TD-428*). The mockup and the scripts that made it are in `docs/mockups/reviews/2026-10-08-org-declutter*` and `org-declutter-src/` — `after.js` is the change list applied to a captured page, a guide to the DOM, not code to copy.

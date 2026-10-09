@@ -351,7 +351,7 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     head = sec[: sec.index('<div class="grid">')]
     assert "concluded" in head and "ago · restart wanted" in head and ">stopped<" not in head
     assert 'data-fold="ao-grind" data-n="2" aria-expanded="true"' in head and "▾ 2 sessions" in head
-    assert "foldmail" not in head  # nothing unread
+    assert "teammail" not in head  # nothing unread
     assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
     assert "It first closes grind-1, orc-ao" in head  # the confirm names what the Start closes
     assert html.index('data-team="adhoc"') < html.index('data-team="ao-grind"')  # sorted with the stopped
@@ -374,6 +374,8 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     )  # the tmp path says concluded
     # …and the header says why there is no Start, a clause per session (TD-241 slice 2)
     assert '<div class="meta notconcluded"' in head and "not concluded: grind-1 working</div>" in head
+    # …on the *i* panel's Definition line, not the header's row (TD-418, built by TD-428)
+    assert head.index('class="note secinfo helppanel"') < head.index('class="defline"') < head.index("notconcluded")
     assert 'title="Says why this team has no Start yet:' in head
     lead = {"tail": [], "capabilities": ["control"]}  # the manager, as the records say it: never declares
     member = {"tail": [], "controllers": ["orc-ao"]}
@@ -949,7 +951,12 @@ def test_a_teams_header_reads_its_flow_and_strip_and_why_it_cannot_follow_it(wor
     tmp_path, fleet = world
     _flow_org(tmp_path, ["build-review"])
     head = _head(client.get("/").text)
-    assert "· flow: build-review — build → review → you, through ao-agentorc-tl-ao</span>" in head
+    # the **flow chip** (TD-418): the strip its tooltip, its press the team's Settings card
+    assert (
+        '<a class="badge flowchip" href="/settings#team-ao-grind" '
+        'title="build → review → you, through ao-agentorc-tl-ao' in head
+    )
+    assert ">flow: build-review</a>" in head
     assert "flowcannot" not in head and "data-flow-apply" not in head  # stopped: nothing to compare
     # a team whose current flow needs a role it has none of: the reason, and the flow it could follow
     _flow_org(tmp_path, ["td", "build-review"])
@@ -1006,48 +1013,49 @@ def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(wor
     assert "flow:" not in head and ">flow changed<" not in head
 
 
-def test_the_flow_pick_lists_the_teams_flows_and_disables_one_it_cannot_follow(world, client):
-    """§4.5a team card **Flow** pick (TD-309 slice 4b): on a team that lists more than one flow, the
-    current selected, each it cannot follow disabled with the reason; one flow, no pick."""
+def test_the_header_is_one_row_and_the_definition_is_on_its_i_panel(world, client):
+    """§4.5a *team groups*, ***i*** mark, *team card: Flow pick* (TD-418, built by TD-428 slice 3): the
+    header is one row — the flow chip, ✉ n folded or not, the session count once (on the fold), the
+    counts by state for the fold alone — and no **Flow** pick, which moved to Settings (each team's
+    card there is `#team-<team>`, the chip's target); Members…, Open file, *Flow on Settings →* and
+    *not concluded:* are on the panel's **Definition** line, on a live and a stopped team alike."""
     tmp_path, fleet = world
     _flow_org(tmp_path, ["build-review", "build", "td"])
-    head = _head(client.get("/").text)
-    assert 'data-flow-pick="ao-grind" data-was="build-review"' in head
-    assert '<option value="build-review" selected>build-review</option><option value="build">build</option>' in head
-    assert '<option value="td" disabled title="td cannot be followed by ao-grind: no designer' in head
-    _flow_org(tmp_path, ["build-review"])
-    assert "data-flow-pick" not in _head(client.get("/").text)
 
+    def row_and_panel(team="ao-grind"):
+        head = _head(client.get("/").text, team)
+        at = head.index('class="note secinfo helppanel"')
+        return head[:at], head[at:]
 
-def test_a_flow_pick_writes_the_setting_and_nothing_more(world, client):
-    """§4.5a team card **Flow** pick, §4.9c *A switch takes one gate, Apply* (TD-356, TD-359): the pick
-    writes `teams.<team>.flow` through `set_settings` and relaunches nothing; its answer carries the
-    records' differences, which the toast reads (*— Apply to switch the running team*), and **Apply**
-    then moves the team. The preview route is gone with the pick's confirm."""
-    tmp_path, fleet = world
-    _flow_org(tmp_path, ["build-review", "build"])
-    fleet.sessions = [{**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
-    assert client.get("/api/teams/ao-grind/flow", params={"flow": "build"}).status_code == 405
-    no = client.post("/api/teams/ao-grind/flow", json={"flow": "hunt"})
-    assert no.status_code == 400 and "lists build-review, build, not 'hunt'" in no.json()["detail"]
-    got = client.post("/api/teams/ao-grind/flow", json={"flow": "build"}).json()
-    assert ("set_settings", {"teams": {"ao-grind": {"flow": "build"}}}) in fleet.calls
-    assert not [m for m, _ in fleet.calls if m in ("relaunch", "create")]  # nothing moves on a pick
-    assert got["flow"] == "build" and "grind-1: relaunched — lane none → free-pick" in [
-        d["line"] for d in got["differences"]
-    ]
-    assert "applied" not in got and "not_applied" not in got
-    # a flow it cannot follow is refused before anything is written, in the flow's own words
-    _flow_org(tmp_path, ["build-review", "td"])
-    fleet.calls.clear()
-    no = client.post("/api/teams/ao-grind/flow", json={"flow": "td"})
-    assert no.status_code == 400 and "td cannot be followed by ao-grind: no designer" in no.json()["detail"]
-    assert not [m for m, _ in fleet.calls if m == "set_settings"]
+    for live in (False, True):
+        fleet.sessions = [
+            {**badged("ao-agentorc-grind-1", "ao-grind", state="working" if live else "exited"), "name": "grind-1"}
+            | {"tail": [], "unread": 3}
+        ]
+        row, panel = row_and_panel()
+        assert ">flow: build-review</a>" in row and "data-flow-pick" not in row and "<select" not in row
+        assert "✉ 3" in row and "foldmail" not in row  # every header, folded or not
+        assert "· 1 session" not in row and row.count(" 1 session</button>") == 1  # the fold's count alone
+        assert "foldonly" in row and "unfoldonly" not in row  # the counts by state: the fold's
+        assert "data-members" not in row and ">Members…<" not in row
+        assert "Open file" not in row and "not concluded:" not in row
+        defline = panel[panel.index('<div class="defline"><b>Definition</b>') :]
+        assert 'data-members="ao-grind"' in defline  # an org-file team: Members… pressable
+        assert '<a class="btn sm ghost" href="/settings#team-ao-grind"' in defline and "Flow on Settings →" in defline
+        assert ("not concluded: grind-1 working" in panel) is live
+    # the Settings page's team card is the chip's target, and the old route the header's pick posted to is gone
+    settings = (Path(uiapp.__file__).parent / "templates" / "settings.html").read_text()
+    assert '<form class="card pad setcard" id="team-{{ t.name }}" data-section="teams"' in settings
+    assert client.post("/api/teams/ao-grind/flow", json={"flow": "build"}).status_code in (404, 405)
+    js = (Path(uiapp.__file__).parent / "static" / "app.js").read_text()
+    css = (Path(uiapp.__file__).parent / "static" / "app.css").read_text()
+    assert "flowPick" not in js and "data-flow-pick" not in js and "foldmail" not in css and "unfoldonly" not in css
+    assert "Apply on the team card to switch the running team" in js  # the Settings Save's toast
 
 
 def test_the_settings_pages_flow_is_written_and_nothing_more_on_save(world, client):
     """§4.5a *Settings page: Teams* **flow**: a pick of the team's flows, written on Save and nothing
-    more, as the card's Flow pick (TD-356); a flow it cannot follow is refused in place, naming why."""
+    more (TD-356; the card's Flow pick moved here, TD-418); a flow it cannot follow is refused in place, naming why."""
     from agentorc.ui import settings_page as setmod
 
     tmp_path, fleet = world

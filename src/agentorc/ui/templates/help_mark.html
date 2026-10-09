@@ -5,7 +5,8 @@
    by `hidden`, since it is also the button's `aria-describedby`; which are open is remembered in
    this browser (`AO.helpMarks`). Fixed text in the source, never a session's — but for a team's
    **who for what** (TD-252): under that paragraph the team's own lines, one per role, the
-   definition's words with the session that holds each, and neither where the team's roles carry none. #}
+   definition's words with the session that holds each, and neither where the team's roles carry none;
+   and a team's **Definition** line at its head (TD-418), the caller's block. #}
 
 {% macro mark(group, id) -%}
 <button class="imark helpmark" type="button" data-help="{{ group }}" data-info="help-{{ id }}" id="i-help-{{ id }}" aria-controls="help-{{ id }}" aria-expanded="false" aria-describedby="help-{{ id }}" aria-label="About these controls" title="About these controls: {{ help_names(group) }}">i</button>
@@ -13,6 +14,7 @@
 
 {% macro panel(group, id, who=None) -%}
 <div class="note secinfo helppanel" id="help-{{ id }}"{% for h in help_group(group) %} data-title-{{ h.key }}="{{ help_title(h.key) }}"{% endfor %} hidden>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
   {%- for h in help_group(group) %}
   {%- if h.key != 'who-for-what' %}
   <p><b>{{ h.name }}</b> — {{ h.text }}</p>

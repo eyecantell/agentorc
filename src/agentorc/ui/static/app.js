@@ -1407,12 +1407,7 @@
       sec.dataset.manager = g.manager || "";
       sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
-      // a header whose **Flow** pick is open or in flight is left as it is until the pick settles
-      // (§4.5a, TD-309): a swap would close the menu, or redraw the old flow under a pick being applied
-      const picking = head && [...head.querySelectorAll("[data-flow-pick]")].some((p) => p.disabled || p === document.activeElement);
-      if (g.html && picking) {
-        // the next delta after the pick draws it
-      } else if (g.html) {
+      if (g.html) {
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
         head.innerHTML = g.html;
         AO.applyHelpMarks(head);  // the header's *i* panel comes back as this browser left it
@@ -1627,32 +1622,15 @@
     }
   }
 
-  // design §4.5a team card **Flow** pick (§4.9c *Switching*, TD-309 slice 4b, TD-359): the pick writes
-  // the setting and nothing more — no confirm, nothing relaunched; the running team moves on **Apply**,
-  // the one gate (TD-356). The toast says which, and what **Add entry**'s feature now opens
+  // design §4.5a *Settings page: Teams* **flow** (§4.9c *Switching*, TD-356, TD-359; the team card's
+  // **Flow** pick moved there, TD-418): a Save writes the setting and nothing more — no confirm,
+  // nothing relaunched; the running team moves on **Apply**, the one gate. The toast says which, and
+  // what **Add entry**'s feature now opens
   AO.flowSet = (name, o) => {
     const moved = (o.differences || []).length;
-    AO.toast(`${name}: flow set to ${o.flow}${moved ? " — Apply to switch the running team" : ""}`, true);
+    AO.toast(`${name}: flow set to ${o.flow}${moved ? " — Apply on the team card to switch the running team" : ""}`, true);
     if (o.feature) AO.toast(`${name}: Add entry's feature now opens a ${o.feature}`, true);
   };
-  async function flowPick(sel) {
-    const name = sel.dataset.flowPick, flow = sel.value;
-    sel.disabled = true;
-    try {
-      const r = await fetch(`/api/teams/${encodeURIComponent(name)}/flow`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ flow }),
-      });
-      let o = {}; try { o = await r.json(); } catch (e) {}
-      if (!r.ok) throw new Error(o.detail || r.statusText);
-      sel.dataset.was = flow;  // written: the setting is what the header reads
-      AO.flowSet(name, o);
-    } catch (e) {
-      sel.value = sel.dataset.was;
-      AO.toast(`${name}: ${e.message}`);
-    } finally {
-      sel.disabled = false;
-    }
-  }
 
   async function teamAct(name, what, btn, anyway = false, lanes = "") {
     if (pendingTeams.has(name)) return;
@@ -2533,10 +2511,6 @@
       const f = $("#filter");
       f.value = AO.orgToggleWord(f.value, "team:" + b.dataset.team);
       layout();
-    });
-    box.addEventListener("change", (e) => {
-      const sel = e.target.closest("[data-flow-pick]");
-      if (sel) flowPick(sel);
     });
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     box.addEventListener("click", (e) => {
@@ -4164,7 +4138,7 @@
         const got = await post(section, body);
         drawn(f);
         say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
-        // **flow** writes and nothing more, as the team card's Flow pick (§4.5a, TD-356): the same toast
+        // **flow** writes and nothing more (§4.5a, TD-356): the toast says whether Apply is needed
         const ap = (got && got.pick) || null;
         if (ap) AO.flowSet(body.team, ap);
         if (section === "you" && AO.termChan) { AO.termChan.postMessage(body.terminal); AO.setTermLook(body.terminal); }

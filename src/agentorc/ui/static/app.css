@@ -229,10 +229,11 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 /* design §4.5a the ***i*** mark's panel (TD-167): under its group, full width, pushing the rows down */
 .helppanel { flex-basis: 100%; margin: 4px 0 0; max-width: 90ch; } .helppanel[hidden] { display: none; }
 .ghead .overline { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* **over its line** (§4.5a, TD-239): amber, display only */
-.ghead .notconcluded { flex-basis: 100%; white-space: normal; }  /* its own line under the header */
+.helppanel .defline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 .5em; }  /* the team's **Definition** line (§4.5a ***i*** mark, TD-418) */
+.helppanel .notconcluded { margin: 0 0 .5em; white-space: normal; }  /* *not concluded:* under it */
 .ghead .stopsnote { flex-basis: 100%; }  /* **stops** (§4.5a, TD-337): the team's stop time, its own line */
 .ghead .flowcannot { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* *cannot be followed* (§4.5a, §4.9c): its own line */
-.ghead .flowpick { width: auto; flex: none; height: 26px; display: inline-block; }  /* the **Flow** pick (§4.5a, TD-309): inline, beside the strip */
+.ghead .flowchip { text-decoration: none; cursor: pointer; }  /* the **flow chip** (§4.5a, TD-418): its press the team's Settings card */
 .ghead .flowchanged { color: var(--needs-fg); }  /* *flow changed* beside its Apply (§4.5a, TD-309) */
 .helppanel ul.whofor { margin: 0 0 .5em; padding-left: 1.4em; }
 .helppanel p { margin: 0 0 .5em; } .helppanel p:last-child { margin-bottom: 0; }
@@ -373,9 +374,8 @@ details.fold[open] > summary { margin-bottom: 3px; }
 /* a folded team (design §4.5a *team card: fold*, TD-194): the card is its header alone — the summary
    and the cards hidden, nothing unloaded — and a team with nothing live is also quieter (below) */
 .tgroup.folded:not(.filtering) .grid, .tgroup.folded:not(.filtering) .tsum { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
-.tgroup:not(.folded) .ghead .foldmail, .tgroup.filtering .ghead .foldmail { display: none; }  /* ✉ n: what the fold hides (TD-071) */
-/* a live team's header: the session count while its compact cards say the states, the counts by state while folded */
-.tgroup.folded:not(.filtering) .ghead .unfoldonly, .tgroup:not(.folded) .ghead .foldonly, .tgroup.filtering .ghead .foldonly { display: none; }
+/* a team's header: the counts by state only while folded (TD-418) — the cards say them otherwise */
+.tgroup:not(.folded) .ghead .foldonly, .tgroup.filtering .ghead .foldonly { display: none; }
 /* the header is the fold's press, grown to the row: the pointer and a hover tint where it folds */
 .tgroup:has(> .ghead .fold) > .ghead { cursor: pointer; border-radius: 6px; } .tgroup:has(> .ghead .fold) > .ghead:hover { background: var(--hover); }
 .tgroup > .ghead:focus { outline: none; } .tgroup > .ghead:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }  /* the ring, as on a card */

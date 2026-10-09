@@ -1,6 +1,7 @@
 {# One team group's header (design §4.5a Org **team groups**, §4.9; §4.5 *The card's anatomy*,
-   TD-095): the team, the host / repo its sessions share (*mixed* where they do not), the counts by
-   state, the team's marks and its controls — and **not** its manager's name, state or line, which
+   TD-095), **one row** (TD-418, built by TD-428): the team, the host / repo its sessions share
+   (*mixed* where they do not), the flow chip, the team's marks, its controls, the fold with the
+   session count, the *i* mark, and the counts by state only while folded — and **not** its manager's name, state or line, which
    are on the manager's card, the first in the group (Paul, 2026-09-21, reversing TD-074's header
    line). *No team* is headed by its count and nothing else. Rendered on page load and re-rendered
    per delta on /events — the client swaps the header's contents, never composes them. A team with
@@ -17,28 +18,32 @@
 {% elif not g.manager and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
 {% elif not g.members and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech Lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
 {% if not g.members and g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
-{# a live team's header carries no state chips: its compact member cards say it (TD-176, §4.5a *team card: summary*) #}
-{# …and folded, it does (TD-194, §4.5a *team card: fold*): the chips come back while the cards that say them are hidden #}
-{% if g.summary %}<span class="meta unfoldonly">· {{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</span>
-{% if g.counts %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}</span>{% endif %}
-{% elif g.counts %}<span class="meta counts">· {{ g.counts | join(' · ') }}</span>{% endif %}
 {% endif %}
-{#- design §4.5a *team groups* (§4.9c, TD-309): the flow the team runs and its strip — its stages in
-    order and the person last, as the brief's `{flow}` lines read — and, on a live team whose records
-    differ from what that flow compiles to, *flow changed* and **Apply** (`ao team flow <team> --apply`),
-    the members it would change in the mark's title. Read when the page was drawn, not per delta #}
-{% if g.team and g.flow %}<span class="meta flowstrip" title="the flow this team runs (design §4.9c): its stages in order, and the person last">· flow: {{ g.flow }}{% if g.flow_strip %} — {{ g.flow_strip }}{% endif %}</span>
-{#- the **Flow** pick (§4.5a, TD-309 slice 4b): the team's flows, the current one selected, each it cannot
-    follow disabled with the reason; a pick writes the setting and nothing more — Apply moves the team (TD-356) #}
-{% if g.flow_picks %}<select class="input sm flowpick" data-flow-pick="{{ g.team }}" data-was="{{ g.flow }}" aria-label="the flow {{ g.team }} runs" title="pick the flow this team runs: written to settings.yml and nothing more — the running team moves on Apply">{% for p in g.flow_picks %}<option value="{{ p.name }}"{% if p.current %} selected{% endif %}{% if p.cannot %} disabled title="{{ p.cannot }}"{% endif %}>{{ p.name }}{% if p.cannot %} — cannot be followed{% endif %}</option>{% endfor %}</select>{% endif %}
-{% endif %}
+{#- design §4.5a *team groups* (§4.9c, TD-309; TD-418): the **flow chip** — the flow the team runs, its
+    strip (its stages in order and the person last, as the brief's `{flow}` lines read) the chip's
+    tooltip, and its press the team's card on the Settings page, where the flow is picked — and, on a
+    live team whose records differ from what that flow compiles to, *flow changed* and **Apply**
+    (`ao team flow <team> --apply`), the members it would change in the mark's title. Read when the
+    page was drawn, not per delta #}
+{% if g.team and g.flow %}<a class="badge flowchip" href="/settings#team-{{ g.team }}" title="{{ g.flow_strip or g.flow }} — the flow this team runs (design §4.9c); pick it on Settings">flow: {{ g.flow }}</a>{% endif %}
 {#- …and on any live team, a seat its definition names that the run has no record of (§4.9c, TD-399): the
     mark reads *definition changed* where such seats are all that differ or the team runs no flow #}
 {% if g.team and g.flow_changed %}{% if g.definition_changed %}<span class="meta flowchanged" title="{% for d in g.flow_changed %}{{ d.line }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">definition changed</span><button class="btn sm ghost" data-flow-apply="{{ g.team }}" title="apply the definition to the running team, as ao team flow {{ g.team }} --apply: each seat it names that the run lacks is started — the anchor held, with why, while its checkout is not free" data-confirm="Apply the definition to {{ g.team }}? {{ g.flow_changed | map(attribute='line') | join('; ') }}.">Apply</button>{% else %}<span class="meta flowchanged" title="{% for d in g.flow_changed %}{{ d.line }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">flow changed</span><button class="btn sm ghost" data-flow-apply="{{ g.team }}" title="apply {{ g.flow }} to the running team, as ao team flow {{ g.team }} --apply: the members whose lane, reader or stage brief differ are relaunched, one the flow has no stage for sits out, one it needs is started" data-confirm="Apply {{ g.flow }} to {{ g.team }}? {{ g.flow_changed | map(attribute='line') | join('; ') }}.">Apply</button>{% endif %}{% endif %}
-{# design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, which the
-   fold hides — so drawn only while folded (CSS), on any team (TD-194); display only, the mail stays
-   where it is (§4.10) #}
-{% if g.team and g.unread %}<span class="badge unread foldmail" title="{{ g.unread }} unread message{{ '' if g.unread == 1 else 's' }} in this team's folded sessions — it stays there, and a start under the same name hands it to the new run (design §4.10); unfold to read it">✉ {{ g.unread }}</span>{% endif %}
+{# design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, on every
+   team's header, folded or not (TD-418); display only, the mail stays where it is (§4.10) #}
+{% if g.team and g.unread %}<span class="badge unread teammail" title="{{ g.unread }} unread message{{ '' if g.unread == 1 else 's' }} in this team's sessions — it stays there, and a start under the same name hands it to the new run (design §4.10); read it on the cards, unfolded">✉ {{ g.unread }}</span>{% endif %}
+{# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
+   team's sessions gave from the record since this browser last opened the Inbox's group — a
+   **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
+   since what "last opened" means lives in the browser; it is empty and hidden as rendered. #}
+{% if g.team %}<span class="meta answeredmark hidden" data-answered-team="{{ g.team }}" title="answers this team's sessions gave for you from the record since you last opened Answered for you in the Inbox (design §4.9b) — read them there"></span>{% endif %}
+{# design §4.5a **team header** → *PRs waiting* (§4.9b *The reader*, TD-093): the held PRs the
+   team's reader has not answered — a count and the oldest's age, never pressable; the entries are
+   `ao inbox <seat>`'s #}
+{% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
+{# *n ready to close* (TD-156 (b)): the idle sessions the checklist passes, a mark on every header #}
+{% if g.ready %}<span class="meta readymark" title="idle sessions whose ready-to-close checklist passes — Close each on its card">{{ g.ready }} ready to close</span>{% endif %}
+{% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
 <span class="grow"></span>
 {% if g.team and g.concluded %}<span class="meta" title="every session still here is idle, and every member has declared its run over ({{ 'one asks for a restart' if g.concluded.restart else 'out of work' }}) — Start closes them and starts the team again">concluded{% if g.concluded_age %} {{ g.concluded_age }} ago{% endif %} · {{ 'restart wanted' if g.concluded.restart else 'out of work' }}</span>
 {% elif g.team and not g.live %}{% if g.wound_down %}<span class="meta" title="every session that carried this team's badge declared it was out of work — Start is the restart">wound down{% if g.wound_down_age %} {{ g.wound_down_age }} ago{% endif %}{% if g.wound_after %}<span title="the run, from its first start to its last close, was under ten minutes"> · after {{ g.wound_after }}</span>{% endif %}{% if g.by_tick %}<span title="the host agent wound it down: its members had all declared and its manager had not, so the tick closed them and told you (design §6 rule 9)"> · by the tick</span>{% elif g.closed_by %} · by {{ g.closed_by }}{% endif %}{% if g.manager_why %}<span title="the manager's own declaration, its first line"> — {{ g.manager_why }}</span>{% endif %}</span>
@@ -50,13 +55,6 @@
 {% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}"{% if g.stays %} data-confirm="Wind down {{ g.team }}? {{ g.stays | join('; ') }}."{% endif %}>Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}"{% if g.stays %} data-confirm="Stop {{ g.team }} now? {{ g.stays | join('; ') }}."{% endif %}>Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead." data-closes="{{ g.concluded.names | join(', ') }}"{% endif %}>Start</button>{% endif %}{% endif %}
-{# design §4.5a *team card: **Members…*** (§4.9, TD-163, built by TD-172): beside Start on a stopped
-   team and beside Wind down on a live one; on a team a repo defines (§4.5a *Members… on a
-   repo-defined team*, TD-229) drawn disabled with its reason and **Open file** through the person's
-   `open_in` — a press that committed to a repo's default branch would go round the repo's review #}
-{% if g.team and g.defined %}{% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member or remove one — org.yml is edited in place, and on a live team the member is started or wound down">Members…</button>
-{% else %}{% set why = "defined in " ~ (g.source_repo or "the repo") ~ "'s .agentorc.yml — changed by PR" %}<button class="btn sm ghost" disabled title="{{ why }}">Members…</button> <span class="meta" title="{{ g.source or 'a repo' }}">{{ why }}</span>
-{%- set ed = editor_link(g.source) if g.source else None %}{% if ed %} <a class="btn sm ghost" href="{{ ed.url }}" title="open {{ g.source }} in {{ ed.label }}">Open file</a>{% endif %}{% endif %}{% endif %}
 {# the fold (design §4.5a *team card: fold*, TD-156 (f), TD-194): any team with sessions folds, and
    the control sits beside Start or Wind down, a chevron and the count — the keyboard's and the
    screen reader's press, which a click on the header's row grows to the mouse; the client keeps
@@ -71,22 +69,11 @@
    team with a definition — the group is its Start, Wind down, Stop now, Forget all and fold, and the
    cards' Forget, Resume, Close and Message…; the panel opens under the header, full width #}
 {% if g.team and g.defined %}{% import "help_mark.html" as hm %}{{ hm.mark('team', 'team-' ~ g.team) }}{% endif %}
-{# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
-   team's sessions gave from the record since this browser last opened the Inbox's group — a
-   **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
-   since what "last opened" means lives in the browser; it is empty and hidden as rendered. #}
-{% if g.team %}<span class="meta answeredmark hidden" data-answered-team="{{ g.team }}" title="answers this team's sessions gave for you from the record since you last opened Answered for you in the Inbox (design §4.9b) — read them there"></span>{% endif %}
-{# design §4.5a **team header** → *PRs waiting* (§4.9b *The reader*, TD-093): the held PRs the
-   team's reader has not answered — a count and the oldest's age, never pressable; the entries are
-   `ao inbox <seat>`'s #}
-{% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
-{% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
-{#- design §4.5a *team groups* ***not concluded:*** (§6 rule 9, TD-240, built by TD-241): on a live,
-    defined team that is not concluded, why there is no Start — one clause per unattended session
-    that keeps it from the home's reading, from the records; display only #}
-{#- …and under it, while the definition cannot follow its flow, the reason and the flows it could (§4.9c) #}
+{# the header carries no state chips while the cards that say them are shown (TD-176), and folded
+   it does, last on the row (TD-194, §4.5a *team card: fold*); the session count is the fold's alone (TD-418) #}
+{% if g.team and g.counts %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}</span>{% endif %}
+{#- under the header, while the definition cannot follow its flow, the reason and the flows it could (§4.9c) #}
 {% for line in g.flow_lines %}<div class="meta flowcannot">{{ line }}</div>{% endfor %}
-{% if g.team and g.defined and g.not_concluded %}<div class="meta notconcluded" title="{{ help_title('not-concluded') }}">not concluded: {{ g.not_concluded | join(' · ') }}</div>{% endif %}
 {#- design §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark in its own numbers,
     amber, display only — the line is moved on the Settings page #}
 {% if g.balance_note %}<div class="meta overline" title="its members take no new claim until it clears · Settings">{{ g.balance_note }}</div>{% endif %}
@@ -96,4 +83,19 @@
 {% if g.stops_note %}<div class="meta stopsnote" title="every member and seat stops here · Settings">{{ g.stops_note }}</div>{% endif %}
 {#- …and on a live team the start the rule made (§4.5a **work waiting** note): the header's second line #}
 {% if g.work_started %}<div class="meta workstarted" title="the home started this team because its lanes gained work while it was wound down (design §6 rule 8, on_work: start)">started <span class="localtime" data-at="{{ g.work_started.at }}">{{ g.work_started.age ~ ' ago' if g.work_started.age else g.work_started.at }}</span>{% if g.work_started.first %} for {{ g.work_started.first }}{% if g.work_started.more %} and {{ g.work_started.more }} more{% endif %}{% endif %}{% if g.work_started.failed %}<span class="warn" title="a replay that failed is on that record's restarts entry, with its error (ao status -v); Start on its card, or the team's Start once it winds down, brings it back"> · {{ g.work_started.n }} of {{ g.work_started.of }} records started — {{ g.work_started.failed | join(', ') }} did not</span>{% endif %}</div>{% endif %}
-{% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{#- **who for what** (§4.8, TD-171) is in the panel, not on the header (TD-252) #}{{ hm2.panel('team', 'team-' ~ g.team, g.who) }}{% endif %}
+{#- the team's *i* panel opens on its **Definition** line (§4.5a ***i*** mark, TD-418, built by TD-428):
+    **Members…** (§4.9, TD-163, built by TD-172; on a team a repo defines drawn disabled with its reason
+    — a press that committed to a repo's default branch would go round the repo's review, TD-229),
+    **Open file** on the definition's source through the person's `open_in`, *Flow on Settings →*, and
+    on a live, defined team that is not concluded the ***not concluded:*** line (§6 rule 9, TD-240,
+    built by TD-241) — why there is no Start, one clause per unattended session that keeps it from the
+    home's reading. **Who for what** (§4.8, TD-171) is in the panel too, not on the header (TD-252) #}
+{% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{% call hm2.panel('team', 'team-' ~ g.team, g.who) %}
+<div class="defline"><b>Definition</b>
+{% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member or remove one — org.yml is edited in place, and on a live team the member is started or wound down">Members…</button>
+{% else %}{% set why = "defined in " ~ (g.source_repo or "the repo") ~ "'s .agentorc.yml — changed by PR" %}<button class="btn sm ghost" disabled title="{{ why }}">Members…</button> <span class="meta" title="{{ g.source or 'a repo' }}">{{ why }}</span>
+{% endif %}
+{%- set ed = editor_link(g.source) if g.source else None %}{% if ed %} <a class="btn sm ghost" href="{{ ed.url }}" title="open {{ g.source }} in {{ ed.label }}">Open file</a>{% endif %}
+ <a class="btn sm ghost" href="/settings#team-{{ g.team }}" title="this team's card on the Settings page, where its flow is picked">Flow on Settings →</a></div>
+{% if g.not_concluded %}<div class="meta notconcluded" title="{{ help_title('not-concluded') }}">not concluded: {{ g.not_concluded | join(' · ') }}</div>{% endif %}
+{% endcall %}{% endif %}

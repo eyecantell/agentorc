@@ -309,7 +309,7 @@ def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
     head = ui.templates.get_template("group_head.html").render(g=g)
     # the chips come back only for the fold (TD-194): drawn as `foldonly`, which CSS shows while folded
     unfolded = re.sub(r'<span class="meta counts foldonly">[^<]*</span>', "", head)
-    assert "· 2 sessions" in head and "working" not in unfolded and "1 working" in head
+    assert "▾ 2 sessions" in head and "working" not in unfolded and "1 working" in head
 
 
 def test_a_wound_down_team_shows_what_it_left():
