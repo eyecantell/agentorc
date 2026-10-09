@@ -110,6 +110,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.3 Adapter contract
 
+- 2026-10-08 (TD-425, grinder-ao-1): every launch sets `CADENCE_ATTENTION_SCOPE` beside `AGENTORC_SESSION` — `own` for an unattended session, `machine` for an interactive one, from the record's mode at that launch. Until then dev-cadence's start hook found the scope by running `ao status --json` itself, a synced file calling `ao` against §8's rule (TD-159's ADR); the script already read the variable first.
 - 2026-09-13: the word *turn* was taken from OpenAI's Agents API (ADR decisions/2026-09-13-openai-agents-api.md) because it named a split agentorc already had and could not say in a sentence: session durable, turn one piece of work. Send to `idle` starts a turn, to `working` steers it — one control, not two, because the difference is what the person is doing, not what the code does.
 - 2026-09-14 (§4.10): `mail()` added to the adapter protocol; when an adapter has no native delivery path the core falls back to a pane write (a `send`), and §4.10's message/control line becomes a convention the adapter's brief keeps rather than a gate the host agent enforces.
 - The adapter status table was written "at design time", each row to be verified before its adapter is built; Claude Code and `shell` were phase 1.
@@ -1114,6 +1115,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 8. Lessons carried in
 
+- 2026-10-08 (TD-425, grinder-ao-1): the synced-file rule's `CADENCE_ATTENTION_SCOPE` is set by every launch (§4.3); the hook's `ao status` branch stays the one exception until dev-cadence drops it on TD-425's live check.
 - 2026-10-08 (TD-159, the anchor): the rule for which side a thing lives on, agentorc or dev-cadence, added from the inventory in ADR 2026-10-08. A synced file never calls `ao`, and agentorc passes a difference in by an environment variable.
 - No dated facts removed.
 

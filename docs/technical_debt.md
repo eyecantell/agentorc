@@ -69,7 +69,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Designed 2026-10-08 (five mockup rounds with Paul) — the build is TD-428 |
 | TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Open |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
-| TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Open |
+| TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Built (#1306); live check: an unattended session's env, then tell dev-cadence |
 | TD-426 | 13 live checks wait on the anchor, some since #343, and 10 designed entries wait on them as *design-first*: the bar counted them as the designer's work while its lane held nothing | Medium | Open |
 | TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Open |
 
@@ -1198,8 +1198,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** debt
 **Added:** 2026-10-08 (the anchor, from TD-159's ADR)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1306
+**Status:** Built 2026-10-08 (grinder-ao-1, PR #1306): the launch env sets `CADENCE_ATTENTION_SCOPE` beside `AGENTORC_SESSION` — `own` unattended, `machine` interactive — on every launch (restart, relaunch and fill included, since they share the one line); design §4.3 says so; `tests/test_agent.py::test_a_launch_tells_the_start_hook_whose_board_to_nudge_from` pins both. **The live check:** once #1306 is live (`ao promote status`), read with no press of yours the environment of an unattended session started after the promote (`/proc/<pane pid>/environ`, the pid from `tmux display -p -t <id> '#{pane_pid}'`) for `CADENCE_ATTENTION_SCOPE=own`, and of an interactive one for `machine`; then tell dev-cadence that `attention_scope`'s `ao status` branch can go (its change, cadence §3 — an entry on its ledger or mail to its team) and archive this entry.
 **Location:** `src/sessionorc/agent.py` (the launch env beside `AGENTORC_SESSION`, about line 1001), design §4.3 (*A repo's start hooks*) and §8; `scripts/cadence_hooks.sh` (`attention_scope`, SYNCED, read only)
 
 **Why:** `cadence_hooks.sh`'s `attention_scope` scopes the session-start nudge to the session's own board for an unattended agentorc session. It finds out by running `ao status --json` with a five-second timeout and matching `AGENTORC_SESSION`, so a synced file calls `ao`. That breaks the rule in design §8 (ADR 2026-10-08). The script already reads `CADENCE_ATTENTION_SCOPE=own|machine` first, so the seam exists, but agentorc never sets it.
