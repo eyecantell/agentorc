@@ -22,7 +22,9 @@
    everything else in the terminal.
 7. The host agent's edits to a repo's board file are always committed, never left in the tree.
 8. A session's process is launched as the adapter's argv, never through the person's
-   interactive shell (§4.1); tmux, not the host agent, holds the process.
+   interactive shell (§4.1); tmux, not the host agent, holds the process, and on the installed home
+   the tmux server runs outside the user manager's subtree (§4.1), so no stop of the host agent, the
+   UI or the person's user manager ends a session.
 9. Nothing keys on a session's role, team or project: policies key on `unattended`, `supervised` (§6), the
     schedule and a team's own settings (§5 `teams.<team>`: the stop time, the reserve, `on_work` — the badge says which sessions a person's setting is about, and grants nothing), acting RPCs key on grants and `controllers`, displays key on the report channels
    (§4.8). A preset sets defaults at start and is a badge afterwards; `team` and `project` are
