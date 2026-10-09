@@ -269,6 +269,7 @@ def in_lanes(
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
     rest.sort(key=lambda r: (-r["n"], r["owner"]))
+    # live = not ended: the UI's `cards.DEAD`, written out since sessionorc never imports agentorc
     alive = [frozenset(r["lane"]) for r in records if r.get("lane") and r.get("state") not in ("exited", "closed")]
     members = []
     for r in records:

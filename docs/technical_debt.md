@@ -68,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
+| TD-484 | A member's lane count goes stale on its siblings' cards until each gets a delta of its own | Low | Open |
 
 ---
 
@@ -1065,4 +1066,22 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
 
 **Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
+
+## TD-484: A member's lane count goes stale on its siblings' cards until each gets a delta of its own
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, review of PR #1358)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (the events stream: the `session` delta's `compact_in`, the `gone` redraw, the `repos` event), `src/agentorc/ui/static/app.js` (`syncGroups`), `src/agentorc/ui/repo.py` (`compact_in`)
+
+**Why:** TD-428 slice 5 (#1358) draws each member's own lane count in its pill (§4.5a *card: compact*). The count is recomputed for the one card whose `session` delta arrives: when g2 claims an entry its own card reads *13/2*, while g1's still reads *14/2* until g1 has an event. A `repos` event (the ledger changed) and a member's `gone` (which changes `k`) redraw no member card. The page load and every poll redraw it correctly.
+
+**Fix:** carry each member's `lane_count` on the `groups` payload every delta already sends (`heads()` reads the same lanes), keyed by id, and have `syncGroups` patch each card's `.lanecount` from it, adding or removing the span.
+
+**Done when:** a test drives two members sharing a lane, one claiming, and the other's card reads the new count from the groups payload alone.
+
+**Related:** TD-428 (slice 5), TD-418 (the design).
 
