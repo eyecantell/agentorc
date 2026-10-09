@@ -132,6 +132,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-09 (TD-473, the designer; Paul: *someone will need to post a large PowerPoint, Word or PDF file*): the attachment goes up **in pieces** of 2 MiB, each one `attach` call under the 8 MiB line, appended to a `.part` the host agent links into the final name only when the size is whole; the bound becomes the setting `person.attach.max` (`256M` by default, `1M`–`4G`) in place of the 4 MiB constant, which was the transport's limit and never a choice. A cancel deletes the `.part`; one untouched for an hour is swept. Built by TD-478.
 - 2026-10-09 (TD-419, the designer): **an attachment's life** — kept while the session is live, then deleted by the run-log sweep past `runs_keep_days`; not at Close, not at Forget. Built by TD-469.
 - 2026-10-07 (TD-384 slice 1, grinder-ao-1): work orders built in the repo reading — `sessionorc/workorders.py` runs the repo's own `nudge_user_attention.py --report --json --fetch` (a plain read when the fetch fails) and keys each open decided line, `fyi` left out, `board:<key>` by the reader's own `item_key`, loaded from that file; `_read_repo` reads them with the PRs every `REPOS_EVERY` as `work_orders`, a failed read keeping the last with the error; `ao repo` lists them first among the pickable rows and counts them.
 - 2026-10-07 (TD-380, the designer; asked by Paul the same day): a decided board line is a **work order** in the repo's lanes — the repo reading lists it as `board:<key>`, High, pickable; rule 8 counts it and a grinder picks it first; the Decide press writes nothing more, and the anchor seat (TD-381) is its other taker.
@@ -327,6 +328,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-473, the designer): the **Attach** row's bound reads `person.attach.max` (256 MiB by default) in place of 4 MiB, and an upload past one piece shows its progress with a ✕ that cancels it. Built by TD-478.
 - 2026-10-09 (TD-428 slice 3, grinder-ao-2): the team header's one row is built — the flow chip linking to the team's Settings card (`#team-<team>`), ✉ n on every header, the session count on the fold alone, the counts by state only folded, *n ready to close* a mark of its own; the **Flow** pick and its route `POST /api/teams/<team>/flow` gone; Members…, Open file, *Flow on Settings →* and *not concluded:* on the *i* panel's Definition line. The *Flow pick* row's route is corrected to the Settings Save's, `POST /api/settings/teams`.
 - 2026-10-09 (TD-428 slice 2, grinder-ao-2): the rollup's Agents *i*, *answer needed* above 0 only, Agents and Needs you alone with one team live, the one-height heads and bars, the summary's 1.15 : 0.85 : 1.2, a stopped team's empty facets left out, and Doing's *0m* are built; the rows say so.
 - 2026-10-09 (TD-464, the designer; the second pass, §4.5a first): the table's cells cut to the control and its rule — every *designed/built — TD-NNN* clause, Paul's quotes, the *until TD-NNN* placements and the restated reasons left the rows for this history; a row that said a thing *not built* which the code has since built says it as built. The section went from 37,684 to 33,494 words. What is left is rule: drawn words, conditions, calls and what a control does not do; a deeper cut means moving rules into the sections the cells point to.
@@ -1005,6 +1007,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-09 (TD-473, the designer): `person.attach.max` — the most a Focus attachment may be, `256M` by default, `1M` to `4G` — joins `person:`; a setting the person turns, so `settings.yml` and the You card, never a constant. Built by TD-478.
 - 2026-10-09 (TD-457, the designer): `teams.<team>.on_work` defaults to `start`, and covers a finished member's lane as well as a wound-down team's.
 - 2026-09-10 (TD-004): the shared `sessionorc.hosts` parser landed; in phase 1 the UI and the host agent run on one machine and read the same `local` entry (`name`, `vscode_host`, `local`, `volatile`, `repos_registry`, `runs_keep_days`); the env-var overrides were removed. The ssh entries stayed phase 2 work, becoming the node→home link of §4.4a.
 - 2026-09-16 (§4.4a): `home:` was added to `hosts.yml`.
