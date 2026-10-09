@@ -52,7 +52,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | In progress — slices 1–12 (§4.5a, §6, §4.10, §4.5, §4.9c, §4.4a, §4.8, §4.4, §4.9b, §4.9, §4.7, §4.8a/§4.2/§4.6) 2026-10-09 |
 | TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Partly done — slice 1 PR #1340 |
-| TD-467 | Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence | Medium | In progress |
 | TD-468 | Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start` | Low | Open |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
@@ -68,6 +67,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-481 | PR #1354's tests do not pin the three `app.py` call sites that pass `waits` and `repos` to `view` (the Org's heads, the Agents-pill `person_states`, the Repo page) | Medium | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
+| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Open |
 
 ---
 
@@ -808,22 +808,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-457 (the design), TD-214 / TD-227 (rule 8), TD-240 / TD-241 (rule 9), TD-407 (no hold for an untold entry), TD-271 (a question's end is work: unchanged).
 
-## TD-467: Build the lapsed-cache restart (TD-459): the doorbell's branch into rule 7's tick restart, `why: cache`, the two constants, `read_when`'s sentence
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (the designer, TD-459's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (parts (1)–(4) and (6): the constants, the doorbell's branch, the retry under `cache`, `read_when`'s sentence, `tests/test_cache_restart.py`) is PR #1346 (grinder-ao-1, 2026-10-09). **Left, as one page slice:** (5) the card's restart note and `ao status -v`'s *cache lapsed · idle 5h · 191k* from the newest `restarts` entry `why: cache` (its `idle` hours, `context` tokens). Neither surface draws a per-restart note today, and it touches grinder-ao-2's files (`cards.py`, `cli.py`).
-**Location:** design §4.10 *A lapsed cache is started again, not rung*, the `read_when` table's `idle` from a hook row; §6 rule 7 (the tick restart's third trigger); `src/sessionorc/agent_wake.py` (`_ring_typing`: after `_decide_wake` says ring, before `_type`), `src/sessionorc/agent_tick.py` (`_brief_restart`: the precondition and the close-and-replay, to share; `_just_restarted`; the `restarts` entry), `src/sessionorc/agent_common.py` (`CACHE_LIFETIME`, `CACHE_FLOOR` beside `WORK_SETTLE`), `src/sessionorc/mail.py` (`read_when`), `src/agentorc/ui/cards.py` and `src/agentorc/cli.py` (the restart note's words, *cache lapsed · idle 5h · 191k*)
-
-**Why:** TD-459: 23 of the week's 44 whole-context re-writes after a lapsed cache were doorbell rings of a grinder idle a median 5.4 h, each re-writing a median 191k tokens at the write price; a start on the brief writes about 23k ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, Paul's decision).
-
-**Fix:** as §4.10 says: (1) the two constants; (2) in `_ring_typing`, once `_decide_wake` has decided and charged the ring, a member whose `since` is older than `CACHE_LIFETIME` and whose `context.tokens` is over `CACHE_FLOOR` goes to the tick restart instead of `_type` — `_brief_restart`'s precondition and close-and-replay factored so a third trigger (`why: cache`, with `idle` in hours and `context` in tokens on the entry) shares them; when the precondition fails, the ring goes on as today; the restart counts as the ring for `_bells`, `_rang` and the watermark (one per idle stretch), and a failed close or replay is retried as rule 7 retries, the ring not re-decided; (3) never a seat, never `unattended: false` (already behind `_bell_blocked`), never a node's member (rung as today); (4) `read_when`'s `idle` from a hook sentence says *started again on its brief within a tick, and reads it first* when the record would be restarted rather than rung; (5) the card's restart note and `ao status -v` word `why: cache` as *cache lapsed · idle 5h · 191k*; (6) tests: idle 2 h with 150k and clean → replayed with `why: cache`, the budget charged once, no line typed; the same with a claim in progress, or a dirty tree, or idle 30 min, or 60k → rung; a seat → rung; the `read_when` sentence. **Done when** a clean idle member past the hour with a long context is restarted on its brief when mail lands, one that fails the precondition is rung, the record's `restarts` says why, and the tests pass.
-
-**Related:** TD-459 (the design), TD-458 (the metered profile's lifetime), TD-460 (the context-bound trial; both change how often a grinder restarts), TD-217 (rule 7's tick restart), TD-347 (the bell).
-
 ## TD-468: Build the wind-down note's added lines (TD-110): claims left, restarts, alarms, open questions, usage against `usage_at_start`
 
 **Priority:** Low
@@ -1065,4 +1049,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
 
 **Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
+
+## TD-485: The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (grinder-ao-2, TD-467 slice 2)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 *The card's anatomy* (row 5), §4.5a (the card rows), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the row-5 slot), `src/agentorc/ending.py` (`restart_words`, which `ao status -v` already uses)
+
+**Why:** TD-459's design said *the card's restart note and `ao status -v` say cache lapsed · idle 5h · 191k*, but no card surface draws any restart (the `restarts` field is read only by the ceiling, rule 8's *work started* header note and, since TD-467 slice 2, `ao status -v`'s `restarts:` line). A page change follows a §4.5a row, so the grinder built the CLI half and left the card to a design: where the note sits (row 5's slot, the report line's hover, or a chip as *brief changed* is), which `restarts` entries it names (the newest only, inside `RESTART_WINDOW`, every `why` or the tick's and the doorbell's alone), and how long it stays.
+
+**Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
+
+**Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
 
