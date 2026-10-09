@@ -235,7 +235,7 @@ not mix:
 - **report** — what a session declares about its work on its own record: **progress** (per
   reference) and **findings**. Addressed to nobody. — *proposed* (design §4.8).
 - **message** (**mail**) — an attributed entry delivered to a recipient's **inbox**, never typed
-  into a pane (design §4.10). Kinds: `note`, `ask`, `reply`, `conflict`. The sender keeps its own
+  into a pane (design §4.10). Kinds: `note`, `ask`, `steer`, `reply` (an `ask` to two or more controllers with `--cites` is what `conflict` was until TD-462). The sender keeps its own
   copy in its **outbox**, which is where the marks it must see live. — *proposed*; built 2026-09-17
   (TD-052 step 1).
 - **orphaned question** — an open `ask` or `steer` to the person whose `about` names a reference
