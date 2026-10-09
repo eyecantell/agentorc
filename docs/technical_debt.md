@@ -67,11 +67,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
-| TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
 | TD-488 | Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09) | High | Open |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Open |
 | TD-490 | An `exited` pill says *guessed from the screen*, never why the session ended | Medium | Open |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Open |
+| TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
 
 ---
 
@@ -1052,22 +1052,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-485 (the design), TD-467 (`ao status -v`'s line), TD-459 (the doorbell's restart), TD-217 (rule 7's restart), TD-103 (the ceiling).
 
-## TD-492: TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; neither is a TD-464 PR
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (docs-audit-ao-1, auditing the docs of PRs #1368–#1381: PR #1376)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt_archive.md` `## TD-464`, its `**Resolved:**` line
-
-**Why:** the line reads *each slice its own PR … (#1325 §4.5a, #1343 §6, #1351 §4.10, …)*. `gh pr view 1325` is *TD-063, TD-078: the CI read — named flakes fixed and quiet; archive; file TD-463*, and `gh pr view 1343` is *TD-462: the conflict mail kind folded into an ask to both controllers with --cites; TD-471 builds it*. The slices are `git log origin/main --grep "TD-464 slice"`: slice 1 (§4.5a) is #1345 and slice 2 (§6) is #1350. The other eleven numbers it names (#1351, #1355, #1357, #1362, #1365–#1369, #1372, #1373) match their slice titles. The line also says *the last PR for §4 and the sections under 900 words* without a number; that PR is #1376 (slice 14).
-
-**Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
-
-**Related:** TD-464 (the pass), PR #1376 (archived it).
-
 ## TD-488: Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09)
 
 **Priority:** High
@@ -1131,3 +1115,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first, starting from the chosen mockups: the composer folds to one bar (*✎ Compose a prompt… · Attach · Send*) and the terminal takes the height down to it. A click on the bar, `c`, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal (a resize makes Claude Code repaint, one of TD-474's causes). It folds again on Send, or on Esc when empty, and a draft survives a fold. A Settings → You choice decides whether it starts folded or always open. The terminal also takes the height an unattended Focus leaves empty under it today. This is the anchor of a wider Focus-screen round: other changes Paul names join this entry before its design. **Done when** the design says the fold, the overlay and the setting, the build lands, and the shapes are drawn again from the built page.
 
 **Related:** TD-472 (paste on the terminal), TD-474 (the struggling-terminal mark, which takes the header room), TD-003 (the phone).
+
+## TD-492: TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; neither is a TD-464 PR
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (docs-audit-ao-1, auditing the docs of PRs #1368–#1381: PR #1376)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt_archive.md` `## TD-464`, its `**Resolved:**` line
+
+**Why:** the line reads *each slice its own PR … (#1325 §4.5a, #1343 §6, #1351 §4.10, …)*. `gh pr view 1325` is *TD-063, TD-078: the CI read — named flakes fixed and quiet; archive; file TD-463*, and `gh pr view 1343` is *TD-462: the conflict mail kind folded into an ask to both controllers with --cites; TD-471 builds it*. The slices are `git log origin/main --grep "TD-464 slice"`: slice 1 (§4.5a) is #1345 and slice 2 (§6) is #1350. The other eleven numbers it names (#1351, #1355, #1357, #1362, #1365–#1369, #1372, #1373) match their slice titles. The line also says *the last PR for §4 and the sections under 900 words* without a number; that PR is #1376 (slice 14).
+
+**Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
+
+**Related:** TD-464 (the pass), PR #1376 (archived it).
