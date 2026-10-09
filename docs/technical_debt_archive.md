@@ -6865,3 +6865,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** the Focus page has **» put away**; pressing it gives the terminal the column's width (a Playwright shot of the live page at 1440 shows the rail and the wider terminal, committed as `docs/mockups/reviews/<date>-td412-*.png`), **«** and every glyph bring it back, a glyph's press opens its card, the choice survives a reload and a pop-out, `s` toggles it with the terminal unfocused and is listed by `?`, the phone row draws under 720px; `tests/test_ui_focus*.py` pin the button, the rail's glyphs for a `needs-you` session with `doing`, reports, inbox and a passing checklist, the `AO.KEYS` row, and the help paragraph; `pdm run test` and `pdm run lint` pass; TD-408 is archived with this entry.
 
 **Related:** TD-408 (the design), TD-156 (the side panel's folds), TD-046 (Pop out), TD-124 (the keys table), TD-003 (the phone layout).
+
+## TD-414: §6 rule 6 says a pruned `lane_seen` id keeps its drop "under `dropped`"; `work.reread` removes the mark with the id
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (docs-audit-ao-1, auditing #1277–#1286: PR #1284 against design §6)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/design/6-policies.md` (rule 6, *`lane_seen` is the lane's memory, never the ledger's*), `src/sessionorc/work.py` (`reread`), `tests/test_lane_news.py::test_an_entry_that_leaves_the_lane_and_comes_back_is_told_again`
+
+**Why:** §6 rule 6 reads: *an id in it that the reading holds and the lane no longer matches is removed, with the drop kept for it under `dropped`*. The code does the opposite: `reread` rebuilds `seen["dropped"]` without every pruned id (`{i: at for i, at in dropped.items() if i not in left}`), its docstring says *its `dropped` mark with it*, and the test asserts `rec.lane_seen["dropped"] == {"TD-002": ...}` after TD-001 left. The code is the right half (a kept mark would make the returning entry's second drop look already told, against the *a later drop of the same id is told again* sentence two paragraphs down), so the fix is the design's wording: say the mark is removed with the id. Found by reading PR #1284's diff against the section it built; the PR changed the design's wording in no later commit.
+
+**Resolved:** 2026-10-08 (PR #1291) — design §6 rule 6 now says a pruned id's `dropped` mark is removed with it, as `work.reread` and its test do; a dated line in `docs/design-history.md` §6; no code change.
+
+**Done when** the sentence in rule 6 says the pruned id's `dropped` mark leaves with it, and no other line of §6 or `docs/design-history.md` says it is kept; the doc-bound tests pass.
+
+**Related:** TD-407 (the design), TD-411 (the build), TD-247 (`dropped: {id: at}`).
