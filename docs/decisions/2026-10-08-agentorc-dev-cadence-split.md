@@ -2,7 +2,7 @@
 
 **Status:** decided 2026-10-08 by the anchor (owed to it by TD-159, Paul's question of 2026-09-25). Paul may overrule it with a superseding ADR.
 **Date:** 2026-10-08
-**Related:** TD-159, TD-425, TD-035, TD-055, TD-070, TD-118, TD-125, TD-126, TD-142; [ADR 2026-09-06](2026-09-06-adopt-dev-cadence.md); design §4.3, §8
+**Related:** TD-159, TD-425, TD-035, TD-055, TD-060, TD-070, TD-118, TD-125, TD-126, TD-142; [ADR 2026-09-06](2026-09-06-adopt-dev-cadence.md); design §4.3, §8
 
 ## Context
 
@@ -53,7 +53,9 @@ TD-036, TD-077, TD-075, and none needed for TD-125. Two remain open:
 - TD-035's clause (2), an argument form for the runner's repo root, is settled in design §4.3.
   The runner reads `CLAUDE_PROJECT_DIR`, else `git rev-parse --show-toplevel`, else `pwd`, and
   "an argument form would be dev-cadence's, if a tool ever needs one". No move is owed.
-- TD-055 names no dev-cadence change.
+- TD-055 names no dev-cadence change. The rename's "three synced files", which TD-159 attributed
+  to it, are TD-060's: that entry's own fix carries a dev-cadence sync as one of its steps, so its
+  clause already names its owner.
 
 ## Options
 
@@ -87,7 +89,7 @@ What stays, and why:
   pairs. The script is the definition and a test holds them equal.
 - **dev-cadence's supplements and records** stay where they are. A repo's own `.agentorc.yml`
   and briefs are that repo's configuration, and the dated records are history.
-- **TD-035 and TD-055** owe dev-cadence nothing.
+- **TD-035 and TD-055** owe dev-cadence nothing. TD-060's sync is a step of its own.
 
 The rule goes into design §8 as one paragraph, so that the next new thing lands on the right side
 without a review.

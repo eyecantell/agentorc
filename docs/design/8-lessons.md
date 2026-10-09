@@ -17,6 +17,7 @@ what needs a host agent, a session record or a second session.
   inside agentorc (`sessionorc/ledger.py`, `sessionorc/board.py`) is held equal to the script by a
   test and named in cadence §7's parity table.
 - A synced file never calls `ao`. Where it must behave differently in an agentorc session, it
-  reads an environment variable that agentorc's launch sets, as `CADENCE_ATTENTION_SCOPE` is
-  (TD-425).
+  reads an environment variable that agentorc's launch sets. `CADENCE_ATTENTION_SCOPE` is the
+  first: the hook reads it, and agentorc's launch does not set it yet (TD-425). Until then the
+  hook's `ao status` branch is the one known exception.
 
