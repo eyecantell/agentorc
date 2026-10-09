@@ -770,6 +770,7 @@ def focus():
       <div style="display: flex; align-items: center; gap: 8px;">
         <span class="btn">{ICON["clip"]}Attach</span>
         <span class="badge">~/.agentorc/attachments/tdgrind-1/spec.pdf</span><span class="badge">screenshot-1402.png</span>
+        <span class="meta" style="max-width: none; white-space: nowrap; overflow: visible;" title="an upload past one piece (§4.5a Attach, TD-473): the file goes up in 2 MiB pieces, its progress here, and ✕ cancels it leaving nothing on disk">Attaching q3-deck.pptx · 37%</span><span class="btn sm ghost" title="cancel the upload">✕</span>
         <span class="btn sm ghost" title="Review the PR I name next as the cadence says, then report.">review PR</span><span class="btn sm ghost" title="/stranded-work">sweep</span><span class="btn sm ghost" title="What is waiting on me across this repo's board and my inbox?">waiting on me</span><span class="meta" title="the role's prompts: (design §4.8, TD-161) — a press sends it; Shift+press fills the composer">·</span>
         <span style="flex-grow: 1;"></span>
         <span class="btn primary">{ICON["send"]}Send</span>

@@ -58,11 +58,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 | TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Open |
-| TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Open |
+| TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Open |
 | TD-475 | PR #1340's `work.finished_alone` has four guards no test would catch going back: `superseded_by`, `sat_out`, `seat is None`, `r is not manager` | Medium | Open |
 | TD-476 | PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets | Medium | Open |
 | TD-477 | PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere | Medium | Open |
+| TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
 
 ---
 
@@ -906,7 +907,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (ao-paul, Paul: someone will need to post a large PowerPoint, Word or PDF file)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-09 (the designer) — §4.4 *Attachment drop* says the road in pieces, the `.part` and its link into place, the cancel and the hour's sweep, and the bound `person.attach.max` (`256M` default, `1M`–`4G`; §5, the You card); §4.5a's row and §4.6's sweep line say their part. Built by TD-478. Was: Open.
+**Blocked by:** TD-478
 **Location:** design §4.4 *Attachment drop*, §4.5a *Attach / drop / paste*; `src/sessionorc/paths.py` (`ATTACH_BYTES_MAX`), `src/sessionorc/client.py` (`LINE_LIMIT`, 8 MiB), `src/sessionorc/agent.py` (`rpc_attach`, `_write_attachment`), `src/agentorc/ui/app.py` (`POST /api/sessions/<id>/attach`)
 
 **Why:** the page hands the file to the `attach` RPC base64-encoded on the RPC's one line, and a line is at most 8 MiB, so a file is at most 4 MiB (§4.4). That was a limit of the transport, not a choice about what a person may attach: a screenshot fits (300–550 KB seen), but a deck, a Word document or a scanned PDF commonly does not, and the refusal leaves the person to copy the file onto the host by hand.
@@ -978,4 +980,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Add a `test_ui_teams.py` case (the template half is already covered) for a team with a card Ready to close: the header context built by `repo.py` carries `ready == 1`, its `counts` does not contain `ready to close`, and the rendered header shows the mark folded and unfolded. Re-run both mutations and see them fail.
 
 **Related:** PR #1348.
+
+## TD-478: Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-473's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Attachment drop*, §4.5a *Attach / drop / paste*, §5 `person:`, §4.5 screen 8 **You**, §4.6 *Run-log retention*; `src/sessionorc/paths.py` (`ATTACH_BYTES_MAX` → `ATTACH_PIECE_BYTES`), `src/sessionorc/settings.py` (`PERSON_KEYS`, the `attach` parse), `src/sessionorc/agent.py` (`rpc_attach`, `_write_attachment`), `src/sessionorc/agent_tick.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`attach_file`), `src/agentorc/ui/static/app.js` (`AO.wireAttach`, ~L152; the Focus upload ~L3347), `src/agentorc/ui/settings_page.py` (the You card)
+
+**Why:** TD-473: a file rode base64 on the RPC's one 8 MiB line, so a Focus attachment was at most 4 MiB and a deck, a Word file or a scanned PDF was refused, leaving the person to copy it onto the host by hand.
+
+**Fix:** as §4.4 *Attachment drop* says. (1) `paths.ATTACH_PIECE_BYTES = 2 * 1024 * 1024` replaces `ATTACH_BYTES_MAX`. (2) `settings.py`: `attach` joins `PERSON_KEYS`; `max` parses `<n>M` | `<n>G` within `1M`–`4G`, default `256M`, a bad value dropped and named as the other person keys are; `set_settings` writes it. (3) `rpc_attach` gains `upload`, `offset`, `total`, `cancel`: a first piece (no `upload`) with `total` past the bound is refused before any write, in the words §4.4 gives; one whose `total` fits and is no more than one piece is written whole as today; otherwise the agent mints an `upload` id, appends to `<safe name>.<upload>.part` under `attachments/<session>/`, refuses an `offset` that is not the bytes written so far (and deletes the `.part`), and at `total` picks the final name by the `-2`, `-3`… rule with `os.link` (never over a file), unlinks the `.part` and answers `{path, bytes}`; a middle piece answers `{upload, bytes}`; `cancel: true` with the `upload` deletes the `.part`; still a person's act and this host only. (4) `_prune_runs` unlinks any `*.part` under `attachments_dir()` whose mtime is older than an hour, whatever `runs_keep_days`. (5) `attach_file` takes the piece and the form fields `upload`, `offset`, `total`, `cancel`, reads one piece at most, base64s it and calls `attach`; no whole-file read remains. (6) `AO.wireAttach`: the file is sliced by `ATTACH_PIECE_BYTES` (the page learns the piece size from the first answer or a served constant), pieces sent in order, one upload at a time as today; past one piece the label reads *Attaching <name> · n%* with a ✕ that sends the cancel and stops; a refusal `fail`s in the RPC's words; the path is inserted at the caret on the last answer. (7) The Settings page's You card gains the **attachment bound** field, drawn as the terminal size field is, the default beside it. Tests: a 5-piece upload lands whole and named; an out-of-order offset is refused and leaves no `.part`; a first piece past the bound is refused with nothing written; a cancel removes the `.part`; the sweep removes an hour-old `.part` with `runs_keep_days: 0`; the name rule holds at link time; the settings parse accepts `1G` and drops `9G`. **Done when** the tests pass, the design's §4.4 line reads *built*, and a 50 MB PDF dropped on a Focus composer of an interactive Claude Code session on this host comes back as a path the tool reads.
+
+**Related:** TD-473 (the design), TD-002 (the attach), TD-469 (the attachment's life), TD-472 (paste on the terminal).
 
