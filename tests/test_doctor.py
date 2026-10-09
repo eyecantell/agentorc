@@ -50,15 +50,19 @@ def test_doctor_is_a_never_gated_read():
 
 
 async def test_tmux_reads_a_server_replaced_under_the_agent(agent, monkeypatch):
+    me = os.getpid()
+    monkeypatch.setattr(agent.tmux, "server_pid", lambda: me)
+    agent._id_tmux_first = agent._id_server(me)  # the server the agent first read is the one there now
     got = (await agent.rpc_doctor())["tmux"]
-    assert got["replaced"] is False and got["first"] == (
-        {"pid": agent._id_tmux_first[0], "started": got["first"]["started"]} if agent._id_tmux_first else None
-    )
-    monkeypatch.setattr(agent.tmux, "server_pid", lambda: os.getpid())
+    assert got["pid"] == me and got["first"]["pid"] == me and got["replaced"] is False
+    assert got["started"] and got["started"].endswith("Z") and got["started"] == got["first"]["started"]
     agent._id_tmux_first = (1, 1)  # init's, long gone
     got = (await agent.rpc_doctor())["tmux"]
-    assert got["pid"] == os.getpid() and got["replaced"] is True and got["first"]["pid"] == 1
-    assert got["started"] and got["started"].endswith("Z")
+    assert got["replaced"] is True and got["first"]["pid"] == 1
+    agent._id_tmux_first = (me, 1)  # the same pid, started at another instant: a replacement on a reused pid
+    assert (await agent.rpc_doctor())["tmux"]["replaced"] is True
+    monkeypatch.setattr(agent.proc, "stat", lambda pid: None)  # `/proc` cannot tell the start: the pids decide
+    assert (await agent.rpc_doctor())["tmux"]["replaced"] is False
     monkeypatch.setattr(agent.tmux, "server_pid", lambda: None)
     got = (await agent.rpc_doctor())["tmux"]
     assert got["pid"] is None and got["replaced"] is False, "no server is not a replaced one"
@@ -84,7 +88,7 @@ async def test_hooks_read_each_live_agent_session_and_the_queue(agent, monkeypat
         assert set(by) == {"ao-d-fed", "ao-d-scraped"}, "a shell has no hooks, a closed session is not live"
         assert by["ao-d-fed"]["confidence"] == "hook" and by["ao-d-fed"]["last_hook"] == _z(t0 - timedelta(seconds=12))
         assert by["ao-d-scraped"]["confidence"] == "scraped" and by["ao-d-scraped"]["last_hook"] is None
-        assert got["queue"]["lines"] == 2 and got["queue"]["age"] >= 0
+        assert got["queue"]["lines"] == 2 and got["queue"]["written"] >= 0
     finally:
         for sid in ("ao-d-fed", "ao-d-scraped", "ao-d-shell", "ao-d-gone"):
             agent.sessions.pop(sid, None)
@@ -113,6 +117,12 @@ async def test_usage_is_asked_once_per_stale_account_never_when_fresh_cooling_or
         assert doc.asked == []
         assert got["a"]["usage"]["source"] == "reading" and got["a"]["usage"]["windows"][0]["pct"] == 61.0
         assert got["c"]["usage"]["source"] == "reading" and 0 < got["c"]["usage"]["cooling"] <= 3600
+        # after a restart only the kept reading remembers the 429: its `cool_until` holds the ask off too
+        agent._usage_wait.pop("docstub:heather")
+        agent._usage_checked.pop("docstub:heather")
+        agent._usage_acct["docstub:heather"]["cool_until"] = _z(datetime.now(UTC) + timedelta(minutes=10))
+        got = {r["profile"]: r for r in (await agent.rpc_doctor())["profiles"] if r.get("adapter") == "docstub"}
+        assert doc.asked == [] and 500 < got["c"]["usage"]["cooling"] <= 600
     finally:
         for k in ("docstub:paul", "docstub:heather"):
             agent._usage_acct.pop(k, None)
