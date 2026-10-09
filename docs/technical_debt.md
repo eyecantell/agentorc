@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Built — live check of #1215, waiting on a metered profile declared on the live copy |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
-| TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-198 | The kind bar's *pickable* bucket swallows design-first entries: 7 of 19 *pickable* on 2026-09-26 were the designer's, so the bar and the Repo page's pickable list read as grinder work that isn't | Low | Designed 2026-09-28 with TD-223 — the build is TD-228 |
 | TD-223 | Rule 6 (lane gains work) matches nothing in a ledger without Pickable/Owner/Kind header lines: dev-cadence's TD-070 was pickable while grinder-dc-1 sat idle, its `lane_seen` empty | Medium | Designed 2026-09-28 — the build is TD-228 |
 | TD-228 | Build the derived pickable: the reader's `Blocked by:` rule and the archive, the page's kinds in their new order, the lane words, this ledger's migration off the `**Pickable:**` line, the briefs' pick | Medium | Built — slices 1–4 (PRs #793, #898, #901 and slice 2); left: the live half of *Done when* on dc-grind after a promote |
@@ -69,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-421 | A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser | Medium | Designed — TD-422 builds it |
 | TD-422 | Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab | Medium | Open |
+| TD-425 | agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself | Low | Open |
 
 ---
 
@@ -173,7 +173,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Why:** dev-cadence's per-repo conventions are tool-neutral in their rules and scripts (cadence.md, the ledger and board, `check_cadence.py`, `cadence_hooks.sh`, the pre-push hook, the review-evidence PR comment) but their *wiring* is Claude Code's: the runner line lives in `.claude/settings.json` and in this adapter's launch layer, the runner resolves the repo from `CLAUDE_PROJECT_DIR`, and `check_anchor.py` reads the live-session registry under `~/.claude/sessions`. A repo worked by another tool gets the rules and none of the delivery: no attention board at session start, no cadence-changes entry, no anchor warning. Decided 2026-09-12 (with Paul): tool-specific wiring belongs in the harness adapter, not in the repo and not with a per-repo agent — the repo does not know which tool will work it; the harness does.
 
-**Fix:** (1) every adapter's launch runs `scripts/cadence_hooks.sh --session-start` for the session directory when the script is executable there: through the tool's own start hook where it has one (Gemini CLI hooks, design §4.3 table), otherwise by running the runner at launch with the hook payload it would have received and prepending its stdout to the first prompt — non-intrusive, nothing needed from the repo; (2) the runner takes the repo root from an argument or `PWD` as well as `CLAUDE_PROJECT_DIR` (dev-cadence change; it already falls back to `git rev-parse --show-toplevel`); (3) the anchor check needs an equivalent of the live-session registry for the other tool, or agentorc's own session records as the source when the session was launched by it — decide when the second adapter lands. Done when a session launched through a second adapter in a dev-cadence consumer prints the due-items line and the unseen cadence-changes entries at its start, and a hand-started session of that tool is untouched.
+**Fix:** (1) every adapter's launch runs `scripts/cadence_hooks.sh --session-start` for the session directory when the script is executable there: through the tool's own start hook where it has one (Gemini CLI hooks, design §4.3 table), otherwise by running the runner at launch with the hook payload it would have received and prepending its stdout to the first prompt — non-intrusive, nothing needed from the repo; (2) the runner takes the repo root from an argument or `PWD` as well as `CLAUDE_PROJECT_DIR` (dev-cadence change; it already falls back to `git rev-parse --show-toplevel`) — settled by design §4.3 and ADR 2026-10-08 (TD-159): the runner falls back to `pwd`, and nothing is owed to dev-cadence; (3) the anchor check needs an equivalent of the live-session registry for the other tool, or agentorc's own session records as the source when the session was launched by it — decide when the second adapter lands. Done when a session launched through a second adapter in a dev-cadence consumer prints the due-items line and the unseen cadence-changes entries at its start, and a hand-started session of that tool is untouched.
 
 **Related:** design §4.2 (the launch layer carries the line, 2026-09-11), §4.3 (adapter contract, the hooks table), §4.8 (relay); dev-cadence cadence §3 (one SessionStart line; who makes the change, 2026-09-12); TD-028 (orchestrator brief).
 
@@ -688,24 +688,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** §4.5 *The card's anatomy* (the outlined next act), §4.5a *Focus: Wrap up*, *Focus: Kill*, *Focus side panel: Close*, *card: Close session*, *Org: team groups* (the fold), §4.9a (a declaration is not a state), TD-081 / TD-145 / TD-155 (the resumed session this was seen on), TD-154 (reading a transcript, the other reason the session was resumed at all), TD-095 (the card's foot and slot).
 
-## TD-159: Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses
-
-**Priority:** Medium
-**Added:** 2026-09-25 (raised by Paul: *are there things that live here that should actually live in dev-cadence or vice-versa?*)
-**Owner:** anchor
-**Kind:** evaluation
-**Status:** Open — nothing reviewed. The output is a short ADR under `docs/decisions/` naming each item and where it belongs, then one TD per move; not the moves themselves.
-
-**Location:** the nineteen SYNCED FILE copies in this repo (`scripts/*.py`, `scripts/*.sh`, `scripts/git-hooks/*`, `docs/cadence.md`, `.claude/skills/{attention,cadence,stranded-work}/SKILL.md`), `.claude/settings.json` (the SessionStart wiring), and the dev-cadence checkout on kmaster; on the ledger's side every entry with a "dev-cadence's" clause — TD-035 (the runner reads the repo from `CLAUDE_PROJECT_DIR`), TD-070 (an answers field on a board entry), TD-118 (3) (the out-of-work triage), TD-125 (telling the other repos), TD-126 / TD-142 (the board reader's fields), the TD-055 rename's three synced files — and design §4.2 (the launch layer carries the SessionStart line), §4.8 (the relay), §8 (lessons carried in).
-
-**Why:** the two repos were split by origin, not by rule: dev-cadence is what tdgrind and the per-repo conventions had before agentorc existed, and agentorc took the session substrate and the org. Since then agentorc has grown things that are really per-repo conventions (the board's `Format:` line and its `Due:` dates are read by agentorc's Inbox but defined by dev-cadence; the attention report is dev-cadence's script and agentorc's page), and dev-cadence has gained fields that only agentorc reads (the reader's fields TD-142 waits on; the answers field of TD-070). Six open entries each say "that part is dev-cadence's" and stop, so a move that is nobody's owner stays undone, and a worker that could build a slice cannot tell whether the next slice is in this repo at all. Nothing states the rule: *what makes a thing dev-cadence's rather than agentorc's*. A candidate rule to test the inventory against: **dev-cadence is what a repo needs with no agentorc on the machine** (the ledger and board formats, the cadence check, the hooks, the skills that read a checkout); **agentorc is what needs a host agent, a record, or a second session** (the Inbox, mail, teams, the tick); a file that only agentorc's code reads, or only agentorc's page renders, is on the wrong side wherever it sits.
-
-**Fix:** (1) inventory: every synced file and every `.claude/` wiring here, with who reads it (a person, a hook, `ao`, the host agent, the UI) and whether it would still be needed with agentorc uninstalled; the same for dev-cadence's files that name agentorc, `ao`, or a record field; (2) test each against the rule above and list the misfits both ways, with the six ledger clauses resolved to *stays / moves / splits*; (3) the ADR, and a TD per move, each naming the repo whose session makes the change (a dev-cadence change is a dev-cadence session's, cadence §3 *who makes the change*); (4) the rule itself into design §8, one paragraph, so the next new thing lands on the right side without a review.
-
-**Done when** the ADR exists, every "dev-cadence's" clause in an open entry points at a TD in the repo that owns it, and the design states the rule in one paragraph.
-
-**Related:** design §4.2, §4.8, §8; `docs/decisions/2026-09-06-adopt-dev-cadence.md` (why it was adopted, what it changed); TD-035, TD-055, TD-070, TD-118, TD-125, TD-126, TD-142 (the clauses); dev-cadence cadence.md §3 (who makes a change to a synced file).
-
 ## TD-198: The kind bar's *pickable* bucket swallows design-first entries
 
 **Priority:** Low
@@ -1210,3 +1192,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a `https://` URL printed in a Focus pane underlines on hover and Ctrl+click (Cmd+click on a Mac) opens it in a new tab with `noopener`; a plain click and a drag over it select as before and open nothing; the same on a read-only Focus; `vendor/README.md` has the row and the licence file is in place; the help paragraph is there; tests pin the script tag, the `loadAddon` call with the handler and the scheme guard, and the help key; `pdm run test` and `pdm run lint` pass; TD-421 is archived with this entry.
 
 **Related:** TD-421 (the design), TD-174 (the mouse is the browser's), TD-096 (the read-only Focus), TD-038 (the WebGL addon's vendoring), TD-071 (the constraint).
+
+## TD-425: agentorc's launch never sets `CADENCE_ATTENTION_SCOPE`, so dev-cadence's session-start hook asks `ao status` itself
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from TD-159's ADR)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (the launch env beside `AGENTORC_SESSION`, about line 1001), design §4.3 (*A repo's start hooks*) and §8; `scripts/cadence_hooks.sh` (`attention_scope`, SYNCED, read only)
+
+**Why:** `cadence_hooks.sh`'s `attention_scope` scopes the session-start nudge to the session's own board for an unattended agentorc session. It finds out by running `ao status --json` with a five-second timeout and matching `AGENTORC_SESSION`, so a synced file calls `ao`. That breaks the rule in design §8 (ADR 2026-10-08). The script already reads `CADENCE_ATTENTION_SCOPE=own|machine` first, so the seam exists, but agentorc never sets it.
+
+**Fix:** the launch sets `CADENCE_ATTENTION_SCOPE=own` for an unattended session and `machine` for an interactive one, beside `AGENTORC_SESSION`. A relaunch or restart sets it again from the record's mode at that moment. §4.3 says so in a sentence. A test checks the env on both kinds of launch. Once this is live on every host that runs the hook, tell dev-cadence (its own session's change, cadence §3) that the `ao status` branch can go.
+
+**Done when** an unattended session's SessionStart scopes the nudge without calling `ao status` (the env reaches the runner), an interactive one reads `machine`, and the test passes.
+
+**Related:** TD-159 (the ADR), TD-118 (agentorc's scoping), dev-cadence TD-077 (the branch).

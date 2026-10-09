@@ -1102,6 +1102,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 8. Lessons carried in
 
+- 2026-10-08 (TD-159, the anchor): the rule for which side a thing lives on, agentorc or dev-cadence, added from the inventory in ADR 2026-10-08. A synced file never calls `ao`, and agentorc passes a difference in by an environment variable.
 - No dated facts removed.
 
 ## 9. Invariants
