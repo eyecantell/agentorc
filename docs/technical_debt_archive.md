@@ -7663,3 +7663,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** `tests/README.md` (the fixtures' timing rules), TD-069 (where it was seen).
 
 **Resolved:** 2026-10-08 (this PR) — the anchor read every CI run from 2026-09-27 to 10-09 (about 1,100), the failed ones and the first attempts of the 29 that were re-run to green (a re-run hides a flake from `gh run list --status failure`), and took each failed job's test names from its log. `test_restart_reloads_and_reconciles` has not failed in the read. `test_send_wait_three_outcomes`, the family's live member, timed out eleven times from 09-28 to 10-01 06:52Z and never since TD-261's fix (#866, merged 10-01 07:37Z): the forgotten record's pane was adopted inside one poll, and the wait read the adopted record for ever. The done-when's *a week of CI without it* holds, at eight days. Newer flakes of the same shape, a wait bounded on something other than its signal, are TD-463.
+
+## TD-109: Docs housekeeping after the design pass
+
+**Priority:** Low
+**Added:** 2026-09-22 (the anchor session; the design review)
+**Owner:** anchor
+**Kind:** evaluation
+**Status:** Resolved — Partly done — (1) done 2026-09-22 (grinder-ao-1): the six finished step briefs moved to `docs/briefs/archive/`, the README says so; (2) done 2026-09-22 (grinder-ao-1, PR #451): `docs/briefs/README.md` says what is true of briefs now — no run, date or stop time in a brief, the usage gate and `ao new --until` in place of per-brief rules, the primer named by the team definition's `context:`; (5) checked 2026-09-22 (grinder-ao-2): the primer (1,850 words, already inside the recipe's two to three thousand) was read against the design after the pass and three stale claims corrected beyond the restart lines TD-103 slice (5) had already fixed — `auditor` among the roles; `lead` and `orchestrator` are unknown roles, not read for a release; and `manager: {role: person}`, not the bare string — and `tests/test_primer.py` passes against the new headings; no shrink beyond that, since nothing in it repeats the design at length. (3), (4) and (6) remain. Was: (1) `docs/briefs/` holds finished step briefs — `td036-migration.md`, `td052-step2/3/4/8/8b.md` — beside the live team briefs; move them under `docs/briefs/archive/` or delete them (git keeps them). (2) `docs/briefs/README.md` describes the hand-launch path as if teams did not exist (TD-067). (3) The ledger is 1,000 lines with 50 open entries; a sweep of what is *Built — live check pending* (TD-038, TD-058, TD-095, TD-096, TD-097) into the archive once Paul has looked. (4) `docs/design-history.md` has its row and its rule in CLAUDE.md (the design pass added both); the same rule belongs in cadence.md §2, which is a SYNCED file and is dev-cadence's to change. (6) The pass cut the design from 86,000 words to 69,000 by removing narrative and kept every rule; a second, tighter pass — reasons cut to one sentence, the §4.5a cells and §4.4a shortened further — is worth doing once a fact-check of this one has held. (5) The techlead primer (`docs/briefs/techlead-context.md`) should shrink now that the design is readable per fill, and `tests/test_primer.py` re-run against the new headings. **Next:** (3) waits on Paul's live looks, (4) is dev-cadence's, (6) waits on a fact-check.
+**Location:** `docs/briefs/`, `docs/technical_debt.md`, `CLAUDE.md`, `docs/design-history.md`
+
+**Why:** the design pass makes the design readable; the rest of `docs/` should not undo that.
+
+**Related:** TD-067 (the operator's guide), TD-075 (the primer).
+
+**Resolved:** 2026-10-08 (this PR) — the three that were left:
+- **(3) is done.** TD-038, TD-058, TD-095, TD-096 and TD-097 are all in the archive.
+- **(4) is not needed.** The rule that the design keeps its dated record in `docs/design-history.md` is agentorc's own convention: CLAUDE.md states it, and the design's index links it. It is not a cadence rule every consumer repo needs. dev-cadence's ledger holds no entry for it and none is asked.
+- **(6) is filed as TD-464.** The design has grown from the pass's 69,000 words to about 190,000 (`docs/design/`, 2026-10-08), so the second pass is now worth more than when it was written.

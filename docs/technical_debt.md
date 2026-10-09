@@ -26,7 +26,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 built 2026-09-23 (PR #499); 8 is Paul's canvas |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-106 | Identity on one host (§4.8a) is finished as built: drop the unbuilt techlead alarm path and the `alarms` grant from the design, and decide the cgroup clause | Low | Open |
-| TD-109 | Docs housekeeping after the design pass: finished step briefs sit in `docs/briefs/`, the ledger is 1,000 lines with 50 open entries, and the history file needs a home in the map | Low | Partly done — (1) the step briefs archived |
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Low | Open |
 | TD-111 | `ao doctor`: one command that checks what the ledger keeps finding live — hooks, tmux, identity, usage, links, build | Medium | Open |
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
@@ -56,6 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Open |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
+| TD-464 | The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass | Low | Open |
 
 ---
 
@@ -303,19 +303,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** every line of unbuilt identity design is a line a techlead primer and a fact-check must carry for a path nobody has asked to use.
 
 **Related:** TD-077 (identity), TD-075 (the techlead), §4.4a (*A node that carries no person*).
-
-## TD-109: Docs housekeeping after the design pass
-
-**Priority:** Low
-**Added:** 2026-09-22 (the anchor session; the design review)
-**Owner:** anchor
-**Kind:** evaluation
-**Status:** Partly done — (1) done 2026-09-22 (grinder-ao-1): the six finished step briefs moved to `docs/briefs/archive/`, the README says so; (2) done 2026-09-22 (grinder-ao-1, PR #451): `docs/briefs/README.md` says what is true of briefs now — no run, date or stop time in a brief, the usage gate and `ao new --until` in place of per-brief rules, the primer named by the team definition's `context:`; (5) checked 2026-09-22 (grinder-ao-2): the primer (1,850 words, already inside the recipe's two to three thousand) was read against the design after the pass and three stale claims corrected beyond the restart lines TD-103 slice (5) had already fixed — `auditor` among the roles; `lead` and `orchestrator` are unknown roles, not read for a release; and `manager: {role: person}`, not the bare string — and `tests/test_primer.py` passes against the new headings; no shrink beyond that, since nothing in it repeats the design at length. (3), (4) and (6) remain. Was: (1) `docs/briefs/` holds finished step briefs — `td036-migration.md`, `td052-step2/3/4/8/8b.md` — beside the live team briefs; move them under `docs/briefs/archive/` or delete them (git keeps them). (2) `docs/briefs/README.md` describes the hand-launch path as if teams did not exist (TD-067). (3) The ledger is 1,000 lines with 50 open entries; a sweep of what is *Built — live check pending* (TD-038, TD-058, TD-095, TD-096, TD-097) into the archive once Paul has looked. (4) `docs/design-history.md` has its row and its rule in CLAUDE.md (the design pass added both); the same rule belongs in cadence.md §2, which is a SYNCED file and is dev-cadence's to change. (6) The pass cut the design from 86,000 words to 69,000 by removing narrative and kept every rule; a second, tighter pass — reasons cut to one sentence, the §4.5a cells and §4.4a shortened further — is worth doing once a fact-check of this one has held. (5) The techlead primer (`docs/briefs/techlead-context.md`) should shrink now that the design is readable per fill, and `tests/test_primer.py` re-run against the new headings. **Next:** (3) waits on Paul's live looks, (4) is dev-cadence's, (6) waits on a fact-check.
-**Location:** `docs/briefs/`, `docs/technical_debt.md`, `CLAUDE.md`, `docs/design-history.md`
-
-**Why:** the design pass makes the design readable; the rest of `docs/` should not undo that.
-
-**Related:** TD-067 (the operator's guide), TD-075 (the primer).
 
 ## TD-110: A night report, generated from the records
 
@@ -868,3 +855,22 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** take the four-time one first. Reproduce each under load (the file in a loop beside a full suite, as TD-078 did), then bound each wait on the signal it waits for rather than on a duration (TD-033, TD-261). A test that does not reproduce in 50 loaded runs is named as such here and watched. **Done when** each is fixed or watched, and none has failed in CI for a week.
 
 **Related:** TD-063 and TD-078 (archived; the same family), TD-285, TD-289, TD-326 (archived flakes, each fixed by waiting on its signal).
+
+## TD-464: The design is about 190,000 words, nearly three times what the 2026-09-22 pass left: a second, tighter pass
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from TD-109 step (6))
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — filed from TD-109's last step. The first pass (2026-09-22) cut the design from 86,000 words to 69,000, removing narrative and keeping every rule. It has since grown to about 190,000 words across `docs/design/`.
+**Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
+
+**Why:**
+- Every session that reads a section pays for it in context. TD-410 counts ~60k tokens of design read by a manager fill that found nothing to do, and TD-378's ADR shows reads are most of the week's cost.
+- A rule restated in several sections drifts apart, and every fact-check has to carry each copy.
+- Much of the growth is dated reasoning written in place (*until 2026-…*, *was:*, the review rounds), which by CLAUDE.md belongs in `docs/design-history.md`.
+
+**Fix:** a pass section by section, largest first, each section its own PR with a fact-check. Move dated reasons and *was* clauses to the history. Cut each reason to one sentence, and keep every rule and every number. Shorten the §4.5a cells to the control and its rule, with the rest in the section the cell points to. **Mind** the doc-bound tests (`tests/test_primer.py`, `help.py`'s bound text): a pass never rewords what they read without the same PR fixing them. **Done when** every section has had its pass, no rule lost, each PR fact-checked, and the total is written here before and after.
+
+**Related:** TD-109 (archived; step 6), TD-410 (what a fill reads), TD-378 (what reads cost).
