@@ -129,6 +129,15 @@ def alarm_note(alarms: list[dict[str, Any]]) -> str:
     return f"identity alarm: {newest['words']}{rest}"
 
 
+def host_volatile(name: str) -> bool:
+    """Whether `hosts.yml` marks the host `volatile` (design §5): this host's own `local` entry, or
+    another host's flags under `nodes:` (§4.4a)."""
+    local = hosts.local_host()
+    if name == local.name:
+        return local.volatile
+    return hosts._flag(hosts.nodes().get(name, {}).get("volatile"))
+
+
 def view(
     s: dict[str, Any],
     fleet: list[dict[str, Any]] | None = None,
@@ -210,6 +219,10 @@ def view(
     hl = s.get("host_link") or {}
     sup = hl.get("supervisor") or {}
     d["host_note"] = sup.get("doing") or (hl.get("why", "") if state == "unreachable" else "")
+    # A volatile host's silence is expected (a laptop asleep), so its unreachable card sorts with
+    # `idle`, not among the urgent (design §4.5 *One order, no control*, TD-004).
+    if state == "unreachable" and host_volatile(d["host"]):
+        d["rank"] = STATE_RANK["idle"]
     # The editor button (§4.5a, §5 *The person's own*, TD-095): the person's `open_in:`. A container
     # node's record reaches VS Code by attaching to that container (§4.4a "Reach"), from what the
     # home derived when the node dialed in; any other host's record has no link.

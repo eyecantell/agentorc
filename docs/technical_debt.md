@@ -17,7 +17,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
-| TD-004 | Host identity: `hosts.yml` `local` entry complete; ssh entries pending (phase 2, now the node→home link of TD-057) | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Partly done — the reset start (TD-133) and the start time (TD-152) designed; archives with them |
@@ -104,23 +103,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 **Fix:** soft-key row that sends keys through the terminal websocket (not `send-keys`, invariant 6), collapsed side panel, 44 px tap targets on Allow / Deny; test on a phone over WireGuard or the Cloudflare tunnel (design §4.5) once phase 2 lands it.
 
 **Related:** design §10 "Phone answers for questions" (open).
-
-## TD-004: Host identity: `hosts.yml`, host name and VS Code alias are env vars for now
-
-**Priority:** Medium
-**Added:** 2026-09-06
-**Owner:** anchor
-**Kind:** build
-**Status:** Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 after the first real session hit the unresolvable hostname. 2026-09-10 (PR #55): the parser moved to `sessionorc.hosts` so the agent can read it too; `volatile` (Team banner wording), `repos_registry` (registered repos head the New session directory list) and `runs_keep_days` (run-log retention on the tick, design §4.6) landed; the three `AGENTORC_*_HOST` env overrides are gone. Remaining: the ssh transport entries (phase 2) — and with them the `unreachable` card state and the volatile sort slot, which phase 1's single local host cannot produce. **Next:** what is left is the ssh transport, phase 2.
-**Location:** `src/sessionorc/hosts.py`, `src/sessionorc/agent.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`, `new_form`)
-
-**Note (2026-09-10, session tdgrind-ao-1):** the run-1 question "where do per-host agent settings live" was answered by moving the parser into `sessionorc`: the agent reads its own machine's `hosts.yml` `local` entry, which on a phase 2 session host is that host's own file (design §5).
-
-**Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
-
-**Fix:** `hosts.yml` loader; the local host is an entry like any other; drop the env vars. Done when the top bar shows `kmaster` from the file and the VS Code link uses the ssh alias from it.
-
-**Related:** design §4.5 browser mechanics (VS Code links), §5, phase 2.
 
 ## TD-005: `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json`
 

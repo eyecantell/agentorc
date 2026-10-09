@@ -6931,3 +6931,22 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** a Playwright run (the repo's `~/ao-shots/pwlib`, headless-screenshots memory) or a probe of `AO.focus` against a stubbed DOM: press `#sideaway` (`#side` gains `rail`, localStorage `ao.focus.side` is `"away"`), reload (the class is there before the first paint), press a glyph (`rail` leaves, its `details.side[data-side]` is `open`), press `#sideback`. Skip like the existing probe where the tool is absent. **Done when** removing each handler in `app.js` fails a test.
 
 **Resolved:** 2026-10-08 (PR #1296, grinder-ao-2) — the rail's wiring moved from inside `AO.focus` to `AO.wireRail` in `app.js`, unchanged in behaviour; `tests/test_ui_focus_rail.py` presses it in a node probe (put away, bring back, a glyph opening its card, needs-you's glyph, a press between glyphs) and runs `focus.html`'s inline script against what the presses stored. Removing any handler, the `store.set` or `d.open = true` fails a test. UI check on a scratch home in the PR body.
+
+## TD-004: Host identity: `hosts.yml`, host name and VS Code alias are env vars for now
+
+**Priority:** Medium
+**Added:** 2026-09-06
+**Owner:** anchor
+**Kind:** build
+**Status:** Resolved — was: Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 after the first real session hit the unresolvable hostname. 2026-09-10 (PR #55): the parser moved to `sessionorc.hosts` so the agent can read it too; `volatile` (Team banner wording), `repos_registry` (registered repos head the New session directory list) and `runs_keep_days` (run-log retention on the tick, design §4.6) landed; the three `AGENTORC_*_HOST` env overrides are gone. Remaining: the ssh transport entries (phase 2) — and with them the `unreachable` card state and the volatile sort slot, which phase 1's single local host cannot produce. **Next:** what is left is the ssh transport, phase 2.
+**Location:** `src/sessionorc/hosts.py`, `src/sessionorc/agent.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`, `new_form`)
+
+**Note (2026-09-10, session tdgrind-ao-1):** the run-1 question "where do per-host agent settings live" was answered by moving the parser into `sessionorc`: the agent reads its own machine's `hosts.yml` `local` entry, which on a phase 2 session host is that host's own file (design §5).
+
+**Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
+
+**Fix:** `hosts.yml` loader; the local host is an entry like any other; drop the env vars. Done when the top bar shows `kmaster` from the file and the VS Code link uses the ssh alias from it.
+
+**Related:** design §4.5 browser mechanics (VS Code links), §5, phase 2.
+
+**Resolved:** 2026-10-08 (PR #1292, the anchor) — what was left was the ssh transport's host entries and, with them, the `unreachable` card state and the volatile sort slot. The entries are not coming: the home and node split replaced the hub-and-spoke ssh transport (§7 phase 2), and §5 now says so. A machine node in use is TD-057's. `unreachable` was already built (`agent_serve.py`'s overlay for a node whose link is down). The volatile slot is `cards.host_volatile`: an unreachable card on a host whose `nodes:` flags, or own `local` entry, say `volatile` takes the `idle` rank (§4.5's order), pinned by `tests/test_card_volatile.py`. The *Done when* (the top bar's name and the VS Code alias from the file) has held since 2026-09-10 (PR #55).
