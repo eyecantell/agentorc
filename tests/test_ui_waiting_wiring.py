@@ -55,7 +55,11 @@ def client(monkeypatch, tmp_path):
         supervised=True,
         idle_open={"at": NOW, "ref": "TD-301"},
     )
-    fleet = [waiting, member("g2", root, state="working"), member("g3", root)]
+    fleet = [
+        waiting,
+        member("g2", root, state="working"),
+        member("g3", root, supervised=True, idle_open={"at": NOW, "ref": "TD-222"}),
+    ]
     # g3 waits on the person: an open ask whose `about` names a reference (TD-274)
     ask = {"id": "m-a", "from": "g3", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?", "at": NOW}
     replies = {
@@ -105,11 +109,13 @@ def test_the_events_streams_heads_and_rollup_read_waiting(tmp_path, monkeypatch)
 
 
 def test_the_inbox_state_rows_read_waiting(tmp_path, monkeypatch):
-    """`person_states`: the member's *idle · open work* row carries the Org card's pill, *waiting*."""
+    """`person_states`: each member's *idle · open work* row carries the Org card's pill, *waiting* —
+    g1's from its claim's open PR (`repos`), g3's from its ask to the person (`waits`)."""
     html = client(monkeypatch, tmp_path).get("/inbox").text
-    row = html[html.index('data-msg="g1:idle_open"') :]
-    row = row[: row.index("</div>")]
-    assert '<span class="pill s-waiting"' in row and "s-idle" not in row
+    for sid in ("g1", "g3"):
+        row = html[html.index(f'data-msg="{sid}:idle_open"') :]
+        row = row[: row.index("</div>")]
+        assert '<span class="pill s-waiting"' in row and "s-idle" not in row, sid
 
 
 def test_the_repo_page_builds_its_views_with_the_reading_and_the_waits(tmp_path, monkeypatch):
