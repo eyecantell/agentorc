@@ -67,7 +67,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
-| TD-488 | Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09) | High | Designed 2026-10-09 — build TD-493 |
+| TD-488 | Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09) | High | Designed 2026-10-09 — build TD-495 |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Open |
 | TD-490 | An `exited` pill says *guessed from the screen*, never why the session ended | Medium | Open |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Open |
