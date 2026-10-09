@@ -1076,9 +1076,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Location:** design §4.4 (the host agent and its tmux server), §4.6, §9 (sessions outlive the host agent); `ao service install` (the systemd units); the journal of 2026-10-09 12:30:53–16:50:26
+**Location:** design §4.4 (the host agent and its tmux server), §4.4a and §6 (a session survives the host agent's restart), §9 (tmux, not the host agent, holds the process); `ao service install` (the systemd units); the journal of 2026-10-09 12:30:53–16:50:26
 
-**Why:** at 12:30:53 the user manager (`systemd --user`, pid 1920) was sent SIGTERM (TD-489 says by whom) and ran `exit.target`: it stopped `agentorc-agent` and `agentorc-ui` and then SIGKILLed what was left in `user@1000.service`, the `tmux: server` among them, so every Claude Code session on kmaster ended at once. Linger was on, but linger only starts the manager at boot. Nothing restarted it until Paul's ssh login at 16:50:26 started a new one, so kmaster ran no session, no host agent and no UI for 4h20m. The design promises that sessions outlive the host agent, and they do across a restart of `agentorc-agent`, but they are no safer than the user manager they run under.
+**Why:** at 12:30:53 the user manager (`systemd --user`, pid 1920) was sent SIGTERM (TD-489 says by whom) and ran `exit.target`: it stopped `agentorc-agent` and `agentorc-ui` and then SIGKILLed what was left in `user@1000.service`, the `tmux: server` among them (it sits in `agentorc-agent`'s cgroup, which outlives the unit's own stop, but not the manager's), so every Claude Code session on kmaster ended at once. Linger was on, but linger only starts the manager at boot. Nothing restarted it until Paul's ssh login at 16:50:26 started a new one, so kmaster ran no session, no host agent and no UI for 4h20m. The design promises that a session survives the host agent's restart (§4.4a, §6), and it does across a restart of `agentorc-agent`, but they are no safer than the user manager they run under.
 
 **Fix:** design first: where the session tmux server lives so that it outlives both the host agent and the user manager. Candidates are its own user unit, which survives an agent restart but not a manager stop, or a system unit with `User=kmaster` (`KillMode=process`, the socket where the host agent expects it), which survives both. Also decide whether the host agent's units move with it. Weigh what `ao service install` may write as a non-root user, and say what a person runs once as root. **Done when** the design says where the server runs and why, the build lands, and on a scratch home a `systemctl --user exit` leaves the scratch tmux sessions alive and the host agent finds them again when it comes back.
 
@@ -1096,9 +1096,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Why:** to stop its own `sleep 90` polling loops, designer-ao-1 ran `for p in $(ps … grep '[s]leep 90' …); do pp=$(ps -o ppid= -p $p); kill $pp $p; done`. One of those `sleep`s had been orphaned, so its parent was `/usr/lib/systemd/systemd --user`. The loop killed it, which is TD-488's outage. Two gaps: (1) nothing tells a session never to signal a process it did not start, and "kill the parent" is how a cleanup reaches pid 1 or the user manager; (2) no alarm fired. The host agent, the UI and every session were gone for 4h20m, and the person found out only by logging in.
 
-**Fix:** design first, two parts. (1) A rule in every role brief and in `ao --skill`: signal only a pid this session started itself and still holds (a `$!`, a background task id), never a parent, and never by matching a name across the machine. Look at whether a guard fits too, such as a `PreToolUse` hook that refuses a `kill` of pid 1, the user manager, the tmux server or the host agent; a guard is wiring, so it goes in the adapter. (2) An alarm that does not need the host agent alive: something outside `user@1000` that sees the agent socket silent past a bound and reaches the person through the board's push or Telegram (TD-092). **Done when** the briefs and the skill carry the rule, the guard is built or written down as not built, and stopping the host agent on a scratch home raises the alarm within the bound.
+**Fix:** design first, two parts. (1) A rule in every role brief and in `ao --skill`: signal only a pid this session started itself and still holds (a `$!`, a background task id), never a parent, and never by matching a name across the machine. Look at whether a guard fits too, such as a `PreToolUse` hook that refuses a `kill` of pid 1, the user manager, the tmux server or the host agent; a guard is wiring, so it goes in the adapter. (2) An alarm that does not need the host agent alive: something outside `user@1000` that sees the agent socket silent past a bound and reaches the person through the board's push or Telegram (§4.10; TD-092, built as TD-319). **Done when** the briefs and the skill carry the rule, the guard is built or written down as not built, and stopping the host agent on a scratch home raises the alarm within the bound.
 
-**Related:** TD-488, TD-092 (Telegram), TD-111 (`ao doctor`).
+**Related:** TD-488, TD-092 and TD-319 (Telegram), TD-111 (`ao doctor`).
 
 ## TD-490: An `exited` pill says *guessed from the screen*, never why the session ended
 
@@ -1114,7 +1114,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Fix:** design first: the `exited` (and `closed`) pill's hover says the cause the record can prove, and the record keeps that cause when it can: the tool's exit code; *closed by <who>*; *wound down: out of work*; *wrap-up*; *pane gone, found at <time> by a host agent that was down since <time>*; *killed*. The dashed *guessed* style and its hover stay only where the state really was read from a screen. Say whether the cause also goes on the Focus exited banner. **Done when** the design names the causes and their words, the build lands, and each cause is drawn on a scratch home.
 
-**Related:** TD-488, TD-485 (the restart note), TD-096.
+**Related:** TD-488, TD-485 (the restart note).
 
 ## TD-491: The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot
 
