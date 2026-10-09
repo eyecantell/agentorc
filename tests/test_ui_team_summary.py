@@ -236,9 +236,9 @@ def test_answer_needed_opens_the_facet_and_doing_is_newest_first():
 
 def test_the_doing_list_reads_a_short_age_in_columns_and_the_script_spells_it_the_same():
     """TD-232 slice 2 (design §4.5a *team card: Answer needed / Doing*, **Ages and columns**): one
-    unit, *0m* under a minute and ahead of the clock (TD-418; *just now* until then), nothing for an unreadable instant; the
-    doer's width is the server's, the longest name up to eighteen; a longer name is cut and whole
-    in its tooltip; the script ages the cell once a minute in the same words."""
+    unit, *0m* under a minute and ahead of the clock (TD-418; *just now* until then), nothing for an
+    unreadable instant; the doer's width is the server's, the longest name up to eighteen; a longer
+    name is cut and whole in its tooltip; the script ages the cell once a minute in the same words."""
     from agentorc.ui.common import _short_age
 
     def ago(**kw):
@@ -276,7 +276,8 @@ def test_the_doing_list_reads_a_short_age_in_columns_and_the_script_spells_it_th
     fn = js[js.index("function fmtShortAge(iso)") :]
     fn = fn[: fn.index("\n  }\n")]
     assert fn  # the server's shape, unit for unit, read by running it: below
-    ages = _script_ages([ago(seconds=40), ago(minutes=5), ago(hours=2), ago(days=3), _iso(NOW + timedelta(minutes=3)), "x"])
+    ahead = _iso(NOW + timedelta(minutes=3))
+    ages = _script_ages([ago(seconds=40), ago(minutes=5), ago(hours=2), ago(days=3), ahead, "x"])
     assert ages == ["0m", "5m", "2h", "3d", "0m", ""]  # ahead of the clock is *0m* too
     assert "setInterval(() => showDoingAges(), 60000)" in js  # once a minute, not the one-second tick
     assert '$$("[data-doing-at]"' in js and ".age[data-doing-at]" not in js
@@ -402,7 +403,6 @@ def test_with_no_team_live_the_rollup_is_needs_you_alone():
     assert "answer needed" not in html and "asked you" not in html
 
 
-
 def _live(team: str, *ms: dict) -> list[dict]:
     for m in ms:
         m.update(team=team, rank=1, slot={}, place="kmaster / samscrape", pill_word=m["state"])
@@ -442,7 +442,7 @@ def test_the_rollup_with_zero_one_and_two_live_teams():
     html2 = render(ro=ro2, person_needs=1)
     assert not ro2["lone"] and 'class="rollup"' in html2
     assert "Agents (2)" in html2 and "TDs in motion (1)" in html2 and "PRs in motion (1)" in html2
-    assert ">1</b> <a href=\"#tsum-other\"" in html2 and "answer needed</a>" in html2
+    assert '>1</b> <a href="#tsum-other"' in html2 and "answer needed</a>" in html2
     css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
     assert ".rollup.lone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }" in css
 
@@ -498,6 +498,7 @@ def test_the_facets_heads_and_bars_are_one_height_and_the_summary_is_sized_by_wh
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     assert '<span class="kind">Doing</span><span class="grow"></span>' in html
     assert "the team's ao doing calls" not in html
+
 
 def test_every_card_carries_the_word_the_state_filter_matches():
     assert ui.view({"id": "a", "name": "a", "state": "needs-you"})["pill_word"] == "needs-you"

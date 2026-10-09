@@ -278,6 +278,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
+    FACETS,  # noqa: F401
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
@@ -298,6 +299,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401
     doing_rows,  # noqa: F401
+    drawn_facets,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
     repo_facet,  # noqa: F401
