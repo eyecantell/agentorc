@@ -7836,3 +7836,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (PR #1346, PR #1371) — slice 1 (#1346, grinder-ao-1) built parts (1)–(4) and (6) at the home: `agent_common.CACHE_LIFETIME`/`CACHE_FLOOR`, `cache_lapsed`, `tick_ready`, the doorbell's hand-off to `_cache_restart`, `read_when`'s `cache` sentence, `tests/test_cache_restart.py`; slice 2 (#1371, grinder-ao-2) built part (5) in `ao status -v` — a `restarts:` line in `ending.restart_words`' words, *cache lapsed · idle 5h · 191k*, and *closed by the tick · cache lapsed* — design §4.7 and §4.10. The card's restart note has no §4.5a row and went to TD-485's design.
 
 **Related:** TD-459 (the design), TD-458 (the metered profile's lifetime), TD-460 (the context-bound trial; both change how often a grinder restarts), TD-217 (rule 7's tick restart), TD-347 (the bell).
+
+## TD-476: PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1342)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/org.py` `drawn_facets` (the `face` key), `src/agentorc/ui/app.py` (`summary = {**first["summary"], "drawn": list(FACETS)}`); `tests/test_ui_team_summary.py`, `tests/test_ui_org.py`
+
+**Why:** Mutation probes over `tests/test_ui.py tests/test_ui_org.py tests/test_ui_team_summary.py tests/test_ui_teams.py tests/test_ui_work_row.py` (195 pass at baseline): (a) `"face": bool(summary.get("doing"))` — dropping `or summary.get("answers") or summary.get("asked")` — still 195 passed, though the docstring says a stopped team draws the facet for "a Doing row (or an answer or an ask)"; (b) replacing the Repo page's `{**first["summary"], "drawn": list(FACETS)}` with `first["summary"]` still 195 passed, though the comment says "the Repo page draws all three facets, whatever a stopped team's card leaves out". The other changes of the PR (`lone`, `"repo"`, `if not live`, `"0m"`, the `drawn` gate in the render) each fail a test.
+
+**Resolved:** 2026-10-09 (PR #1374) — `tests/test_ui_team_summary.py::test_an_answer_or_an_ask_alone_draws_the_face_facet` and `tests/test_ui_repo_page.py::test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_nothing`; mutations (a) and (b) each fail one test.
+
+**Related:** PR #1342.

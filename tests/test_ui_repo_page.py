@@ -326,3 +326,22 @@ def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
         "grind",
         "high",
     )
+
+
+def test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_nothing(tmp_path, monkeypatch):
+    """TD-476 (TD-418, §4.5 screen 11): a stopped team's card draws only the facets that hold something,
+    but the Repo page draws all three — a team that works here, nothing claimed and no Doing row still
+    shows *TDs in motion (0)*, *nothing claimed* and the Doing head."""
+    root = str(tmp_path / "samscrape")
+    fleet = [rec("g1", root, state="exited")]
+    from agentorc.ui import org as uiorg
+
+    c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet))
+    from agentorc.ui import app as ui
+
+    (g,) = ui.team_groups([{**fleet[0], "rank": 1}], (), {root: reading(root)}, {})
+    assert uiorg.drawn_facets(g["summary"]) == ["repo"]  # the card's: the repo alone holds something
+    html = c.get("/repo/samscrape").text
+    assert "serviced by" in html
+    assert "TDs in motion (0)" in html and "nothing claimed" in html
+    assert '<span class="kind">Doing</span>' in html

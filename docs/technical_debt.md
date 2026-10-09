@@ -59,7 +59,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
-| TD-476 | PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets | Medium | Open |
 | TD-477 | PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere | Medium | Open |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Open |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
@@ -922,22 +921,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first: a quiet mark in the Focus header beside the state pill, drawn after a grace as TD-372's banner is (no flicker on a navigation or a promote's restart): *reconnecting…* while the terminal socket is down, *no output for Ns* while it is open, the session reads `working` and no byte has come — never on an idle session, where silence is the normal case — and *resized by another client* when the pane's size changes under a Focus that did not ask for it (the count of attached clients is tmux's `#{session_attached}`). Hover says what each means and what to do. Record each kind of event with its time in the browser's console, so the next freeze names its cause. **Done when** the design says the marks and their graces, the build lands, and each of the three is drawn on a scratch home by forcing it (kill the socket, a silent `working` pane, a second `tmux attach` resizing).
 
 **Related:** TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-022 (scrollback through tmux).
-
-## TD-476: PR #1342's tests do not pin the facet rule's `answers`/`asked` arm, or the Repo page drawing all three facets
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1342)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/org.py` `drawn_facets` (the `face` key), `src/agentorc/ui/app.py` (`summary = {**first["summary"], "drawn": list(FACETS)}`); `tests/test_ui_team_summary.py`, `tests/test_ui_org.py`
-
-**Why:** Mutation probes over `tests/test_ui.py tests/test_ui_org.py tests/test_ui_team_summary.py tests/test_ui_teams.py tests/test_ui_work_row.py` (195 pass at baseline): (a) `"face": bool(summary.get("doing"))` — dropping `or summary.get("answers") or summary.get("asked")` — still 195 passed, though the docstring says a stopped team draws the facet for "a Doing row (or an answer or an ask)"; (b) replacing the Repo page's `{**first["summary"], "drawn": list(FACETS)}` with `first["summary"]` still 195 passed, though the comment says "the Repo page draws all three facets, whatever a stopped team's card leaves out". The other changes of the PR (`lone`, `"repo"`, `if not live`, `"0m"`, the `drawn` gate in the render) each fail a test.
-
-**Fix:** Add a `drawn_facets` case with only `answers` (and one with only `asked`) set that expects `["face"]`, and a Repo-page case for a stopped team whose summary holds nothing that asserts all three facets are drawn. Re-run mutations (a) and (b) and see them fail.
-
-**Related:** PR #1342.
 
 ## TD-477: PR #1348's `repo.py` producer of a team header's `ready` mark and folded-only `counts` is asserted nowhere
 
