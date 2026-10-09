@@ -2081,6 +2081,31 @@ async def test_a_tool_event_that_wakes_an_idle_session_is_logged(agent, tmp_path
         assert f"{s['id']}: PreToolUse:Read turned a hook-confirmed idle session working" in caplog.text
 
 
+async def test_a_launch_tells_the_start_hook_whose_board_to_nudge_from(agent, tmp_path):
+    """TD-425 (design §4.3, §8): every launch sets `CADENCE_ATTENTION_SCOPE` from the record's mode —
+    `own` for an unattended session, `machine` for an interactive one — so dev-cadence's start hook
+    scopes its nudge without asking `ao status` itself."""
+    async with LocalClient() as c:
+        for unattended, want in ((True, "own"), (False, "machine")):
+            out = tmp_path / f"scope-{want}.txt"
+            d = tmp_path / want
+            d.mkdir()
+            s = await c.call(
+                "create",
+                name=f"scope-{want}",
+                dir=str(d),
+                adapter="command",
+                unattended=unattended,
+                argv=["bash", "-c", f'echo "$CADENCE_ATTENTION_SCOPE" > {out}; sleep 30'],
+            )
+            for _ in range(50):
+                if out.exists() and out.read_text().strip():
+                    break
+                await asyncio.sleep(0.1)
+            assert out.read_text().strip() == want
+            await c.call("kill", id=s["id"])
+
+
 async def test_a_session_started_without_a_name_exports_the_one_it_was_given(agent, tmp_path):
     """TD-185: `AGENT_NAME` is the name the Org shows — for a blank name, the automatic one — so
     dev-cadence's commit hook signs with what a person sees on the card, whatever the adapter."""
