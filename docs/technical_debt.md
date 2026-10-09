@@ -69,7 +69,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-421 | A URL in the Focus terminal cannot be clicked: it is copied by hand and pasted into the browser | Medium | Designed — TD-422 builds it |
 | TD-422 | Build TD-421: `@xterm/addon-web-links` vendored and loaded in `AO.focus` — Ctrl+click / Cmd+click opens a pane's URL in a new tab | Medium | Open |
-| TD-424 | §4.5a's *Done* row still ends *TD-338 — designed 2026-10-05, not built*; TD-340 built it (#1144) and the *pending* row two above says so | Low | Open |
+| TD-424 | §4.5a's *Done* row still ends *TD-338 — designed 2026-10-05, not built*; TD-340 built it (#1144) and the *pending* row (line 14) says so | Low | Open |
 
 ---
 
