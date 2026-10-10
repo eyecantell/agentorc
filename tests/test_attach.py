@@ -771,3 +771,113 @@ def test_a_paste_event_on_the_terminal_pastes_once_from_its_own_data(tmp_path):
         **caught,
     }
     assert got["reads"] == 0
+
+
+MAIL_PROBE = (
+    PRELUDE
+    + """
+const tick = () => new Promise((r) => setImmediate(r));
+const stub = (extra) => { const on = {}; return Object.assign({ on, hidden: false,
+  classList: { hid: true, contains(c) { return c === "hidden" && this.hid; }, toggle(c, off) { this.hid = off; } },
+  addEventListener: (k, f) => { (on[k] = on[k] || []).push(f); }, dispatchEvent: () => {}, focus: () => {}, click() {},
+  attrs: {}, removeAttribute(k) { delete this.attrs[k]; delete this.title; } }, extra); };
+const fire = (el, k, e) => (el.on[k] || []).forEach((f) => f(e));
+const ev = (kind, files, types) => { const e = { prevented: false, preventDefault() { this.prevented = true; } };
+  e[kind] = { files, types: types || (files.length ? ["Files"] : []) }; return e; };
+const file = (name) => ({ name, type: "image/png" });
+AO.toast = () => {};
+async function run() {
+  const dlg = stub(), button = stub({ lastChild: { textContent: "Attach" }, disabled: false }), note = stub();
+  const input = stub({ files: [], value: "" }), cancel = stub();
+  const text = stub({ value: "", selectionStart: 0, selectionEnd: 0 });
+  const sent = [];
+  let hold = null;
+  const upload = (id) => async (f) => {
+    if (f.name === "slow.png") await new Promise((r) => { hold = r; });
+    sent.push([id, f.name]); return `/h/attachments/${id}/${f.name}`;
+  };
+  const m = AO.wireMailAttach({ dlg, button, input, cancel, text, note }, upload);
+  const out = {};
+  m.open("ao-x-1");
+  text.value = "see "; text.selectionStart = text.selectionEnd = 4;
+  const over = ev("dataTransfer", [], ["Files"]); fire(dlg, "dragover", over);
+  const drop = ev("dataTransfer", [file("a.png")]); fire(dlg, "drop", drop);
+  await m.attach([]);
+  const withText = ev("clipboardData", [file("t.png")], ["Files", "text/plain"]); fire(text, "paste", withText);
+  const shot = ev("clipboardData", [file("image.png")], ["Files"]); fire(text, "paste", shot);
+  await m.attach([]);
+  out.with_id = { hidden: button.hidden, title: note.title || "", dragover: over.prevented, drop: drop.prevented,
+    text_paste: withText.prevented, shot_paste: shot.prevented, value: text.value, sent: [...sent] };
+  // an upload still running when the dialog closes and opens again inserts nothing into the next one
+  m.attach([file("slow.png")]); await tick();
+  fire(dlg, "close", {}); m.open("ao-x-2"); text.value = ""; hold(); await m.attach([]);
+  out.late = { value: text.value, sent: sent.length };
+  m.open("");
+  const over2 = ev("dataTransfer", [], ["Files"]); fire(dlg, "dragover", over2);
+  const drop2 = ev("dataTransfer", [file("b.png")]); fire(dlg, "drop", drop2);
+  const shot2 = ev("clipboardData", [file("image.png")], ["Files"]); fire(text, "paste", shot2);
+  await m.attach([]);
+  out.no_id = { hidden: button.hidden, title: note.title || "",
+    prevented: over2.prevented || drop2.prevented || shot2.prevented, sent: sent.length };
+  m.open("ao-x-3");
+  out.again = { hidden: button.hidden, title: note.title || "" };
+  // the shared upload posts to the addressee's own route
+  const posts = [];
+  global.FormData = class { constructor() { this.f = {}; } append(k, v) { this.f[k] = v; } };
+  global.fetch = async (url, o) => { posts.push([url, o.method, Object.keys(o.body.f).sort()]);
+    return { ok: true, json: async () => ({ ok: true, path: "/h/attachments/ao-x-3/s.pdf" }) }; };
+  const f = { name: "s.pdf", type: "application/pdf", size: 3, slice: () => "abc" };
+  out.shared = { path: await AO.attachUpload("ao-x-3", 4)(f, { progress: () => {}, cancelled: () => false }), posts };
+  console.log(JSON.stringify(out));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.mark.unit
+def test_the_message_dialog_attaches_for_its_addressee(tmp_path):
+    """§4.5a *Message and Reply dialog: Attach / drop / paste* (TD-530, built by TD-531), under node:
+    opened for a session, the dialog draws Attach, a drop on it and an image pasted into its text go up
+    the addressee's road, each path at the caret, and a paste carrying text is the text's; an upload
+    that ends after its dialog closed inserts nothing into the next; opened for nobody (a seat with no
+    session, a board's Reply) Attach is hidden, the note says why, and nothing attaches; the shared
+    upload posts to the addressee's own `/attach`."""
+    got = _node(tmp_path, MAIL_PROBE)
+    w = got["with_id"]
+    assert w["hidden"] is False and w["title"] == ""
+    assert w["dragover"] is True and w["drop"] is True and w["shot_paste"] is True and w["text_paste"] is False
+    assert w["sent"] == [["ao-x-1", "a.png"], ["ao-x-1", "image.png"]]
+    assert w["value"] == "see /h/attachments/ao-x-1/a.png /h/attachments/ao-x-1/image.png "
+    assert got["late"] == {"value": "", "sent": 3}
+    assert got["no_id"] == {
+        "hidden": True,
+        "title": "attach needs a session in the seat",
+        "prevented": False,
+        "sent": 3,
+    }
+    assert got["again"] == {"hidden": False, "title": ""}
+    assert got["shared"]["path"] == "/h/attachments/ao-x-3/s.pdf"
+    assert got["shared"]["posts"] == [["/api/sessions/ao-x-3/attach", "POST", ["file", "total"]]]
+
+
+@pytest.mark.unit
+def test_the_message_dialog_is_wired_with_each_callers_addressee():
+    """TD-531 (2, 3): `#mailbox` carries Attach (a plain button, never the form's submit), its picker
+    and its hidden ✕, with the piece size; the Focus composer and the dialog share `AO.attachUpload`;
+    a Message passes its card's session and none on a seat, a Reply and an Overrule their row's sender."""
+    base = (UI / "templates" / "base.html").read_text()
+    dlg = base[base.index('<dialog id="mailbox"') : base.index("</dialog>", base.index('<dialog id="mailbox"'))]
+    assert '<button type="button" class="btn ghost" id="mailattach" data-piece="{{ attach_piece }}" hidden' in dlg
+    assert '<input type="file" id="mailattachfile" multiple hidden>' in dlg
+    assert '<button type="button" class="btn ghost hidden" id="mailattachcancel"' in dlg
+    js = (UI / "static" / "app.js").read_text()
+    assert 'upload: AO.attachUpload(id, Number($("#attach").dataset.piece)),' in js
+    assert "(id) => AO.attachUpload(id, Number(button.dataset.piece))," in js
+    assert 'id: action === "reply" ? b.dataset.from || "" : b.dataset.seat ? "" : id,' in js
+    assert 'data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-from="${esc(e.from)}"' in js
+    rows = (UI / "templates" / "inbox_row.html").read_text()
+    assert rows.count('data-act="reply"') == rows.count("data-from=") == 3
+    assert 'data-from="{{ a.asker or \'\' }}" data-name="{{ asker }}"' in rows  # Overrule: the asker
+    card = (UI / "templates" / "card.html").read_text()
+    assert card.count('data-act="message"') == card.count('{% if s.seat %} data-seat="1"{% endif %}') == 2
