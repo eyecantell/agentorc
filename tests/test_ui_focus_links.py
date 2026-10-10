@@ -84,10 +84,12 @@ def test_focus_loads_the_addon_with_the_handler_on_every_focus():
     assert html.index("vendor/xterm.js") < html.index("vendor/addon-web-links.js") < html.index("AO.focus(")
     js = (UI / "static" / "app.js").read_text()
     focus = js[js.index("AO.focus = function") :]
-    load = "term.loadAddon(new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri)));"
-    assert load in focus
+    made = "const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));"
+    load = "term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });"
+    assert made in focus and load in focus
     # beside the fit addon, before the attach decides read-only: no condition on the mode
-    assert focus.index("new FitAddon.FitAddon()") < focus.index(load) < focus.index("let readOnly = false")
+    fit, ro = focus.index("new FitAddon.FitAddon()"), focus.index("let readOnly = false")
+    assert fit < focus.index(made) < focus.index(load) < ro
 
 
 @pytest.mark.unit
@@ -107,3 +109,91 @@ def test_the_help_carries_the_pane_link_under_focus():
     assert h.name == "a URL is a link" and h.where == "Focus pane"
     assert "Ctrl+click (Cmd+click on a Mac)" in h.text and "noopener" not in h.text
     assert "pane-link" in dict((g[0], g[2]) for g in helpmod.SCREENS)["focus"]
+
+
+# The vendored addon itself reads a fake screen through `AO.cutRows` (TD-494): rows are strings, a
+# cell is a character, and `links(y)` is what the addon's provider hands xterm for 1-based row y.
+CUT_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: noop, createElement: el };
+global.window = {}; global.document = document; global.self = global;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const WebLinksAddon = require(process.argv[3]);
+const cell = (ch) => ({ getChars: () => ch, getWidth: () => 1 });
+const screen = (rows, cols) => {
+  const line = (text) => {
+    const cells = text.padEnd(cols, "\\0").slice(0, cols).split("").map((c) => (c === "\\0" ? "" : c));
+    return { isWrapped: false, length: cols, getCell: (x) => cell(cells[x]),
+      translateToString: (trim) => { const t = cells.map((c) => c || " ").join(""); return trim ? t.trimEnd() : t; } };
+  };
+  const lines = rows.map(line);
+  let provider = null;
+  const term = { registerLinkProvider: (p) => { provider = p; return { dispose: noop }; },
+    buffer: { active: { getLine: (y) => lines[y], getNullCell: () => cell("") } } };
+  const addon = new WebLinksAddon.WebLinksAddon(noop);
+  addon.activate(AO.cutRows(term));
+  return (y) => { let got; provider.provideLinks(y, (l) => { got = l; });
+    return got.map((k) => ({ text: k.text, range: k.range })); };
+};
+const cols = 80, url = "https://example.com/" + "a".repeat(180);
+const wrapped = [];
+for (let i = 0; i < url.length; i += cols) wrapped.push(url.slice(i, i + cols));
+const meet = ["x".repeat(cols - 22) + "https://a.example/abcd", "https://b.example/efgh and more"];
+const prose = ["y".repeat(cols - 4) + "word", "next line, no link"];
+const short = url.slice(0, 120), tail = ["see " + short.slice(0, cols - 4), short.slice(cols - 4) + " done"];
+const one = screen(wrapped, cols), two = screen(meet, cols), three = screen(prose, cols), four = screen(tail, cols);
+console.log(JSON.stringify({
+  url, short, wrapped: [one(1), one(2), one(3)],
+  meet: [two(1), two(2)],
+  prose: [three(1), three(2)],
+  tail: [four(1), four(2)],
+}));
+"""
+
+
+def _cut_probe() -> dict:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the join is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "cut_probe.js"
+    probe.write_text(CUT_PROBE)
+    vendor = UI / "static" / "vendor" / "addon-web-links.js"
+    out = subprocess.run(
+        [node, str(probe), str(UI / "static" / "app.js"), str(vendor)], capture_output=True, text=True, timeout=30
+    )
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+@pytest.mark.unit
+def test_a_url_tmux_cut_across_rows_is_one_link_from_every_row():
+    got = _cut_probe()
+    whole = {"text": got["url"], "range": {"start": {"x": 1, "y": 1}, "end": {"x": 40, "y": 3}}}
+    # 200 characters on an 80-column pane: three rows, each of them the whole URL, spanning all three
+    assert got["wrapped"] == [[whole], [whole], [whole]]
+    # a URL after words on its first row, and words after it on its last
+    span = {"text": got["short"], "range": {"start": {"x": 5, "y": 1}, "end": {"x": 44, "y": 2}}}
+    assert got["tail"] == [[span], [span]]
+
+
+@pytest.mark.unit
+def test_two_rows_that_merely_meet_at_the_width_stay_two():
+    got = _cut_probe()
+    # a row full to its last column, and the next starts a scheme of its own: two links, not one (a
+    # link that ends on the last column ends at x 0 of the next row: the addon's own range, unjoined too)
+    first = {"text": "https://a.example/abcd", "range": {"start": {"x": 59, "y": 1}, "end": {"x": 0, "y": 2}}}
+    second = {"text": "https://b.example/efgh", "range": {"start": {"x": 1, "y": 2}, "end": {"x": 22, "y": 2}}}
+    assert got["meet"] == [[first], [second]]
+    # prose that fills a row and goes on: joined, and still no link, since the regex finds none
+    assert got["prose"] == [[], []]

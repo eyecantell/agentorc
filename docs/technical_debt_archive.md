@@ -8461,3 +8461,19 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-467 (the build), PR #1371.
 
 **Resolved:** 2026-10-09 (PR #1425) — `tests/test_cli.py::test_a_malformed_restarts_field_reads_as_words_and_never_raises`: `idle` as `True`/`nan`/`inf`/`"5"`, `context` as `True`/`"191k"`, and `restarts` as `None`, a string, an int, a dict or a list of non-entries each read as words (or `""`) without raising; each of the Why's mutations now fails it.
+
+## TD-494: A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`: `term.loadAddon(new WebLinksAddon…)`, `AO.paneLink`), `src/agentorc/ui/static/vendor/addon-web-links.js` (0.11.0); design §4.6 *A URL in the pane is a link*, §4.5a *Focus pane: a URL is a link*
+
+**Why:** Paul, 2026-10-09: *It appears that urls are now clickable, but in the case of multiple lines it only links the first line.* The web-links addon (TD-422, built 2026-10-08) reads one screen row and follows the next only when xterm marked it wrapped (`isWrapped`); the Focus terminal shows a tmux pane with `scrollback: 0` (§4.6: the server keeps the history, xterm.js runs with no local buffer), and tmux repaints a long line as separate rows with no wrap mark, so a URL longer than the pane's width is two rows to the addon: the first row matches as a cut URL, underlined and opened cut on Ctrl+click (a wrong page or a 404), and the rest has no scheme and is no link. The harm is that the link the person reaches for is the one that is wrong, with nothing on the row to say so.
+
+**Resolved:** 2026-10-09 (PR #1428) — `AO.cutRows` in `src/agentorc/ui/static/app.js` hands the web-links addon a view where a row is wrapped when the row above is full to its last column and it begins with a URL character that starts no `scheme://`; §4.6 *A URL in the pane is a link* carries the rule and its one ambiguity; `tests/test_ui_focus_links.py` drives the vendored addon on a fake screen. The mechanism was not tmux's repaint (a shell line wider than the pane reached xterm marked wrapped, and linked whole before the fix) but a program printing its own rows; the scratch-home check is on the PR.
+
+**Related:** TD-421 / TD-422 (the URL link), TD-493 (a path as a link), TD-174 (the mouse is the browser's).
