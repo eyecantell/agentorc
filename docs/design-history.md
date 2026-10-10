@@ -76,6 +76,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-10 (TD-538, the designer; Paul, after #1476 went live and every card showed no files — his own edits were scripts run from Bash: *seems like it would be more prudent to have git tell us what files have changed and keep a running list as we commit/merge*): the record's `files` are git's — the porcelain's paths and the branch's commits' since `merge-base HEAD origin/<default>`, `{path, at, sha}`, read with the status read and re-read when `oid` or the porcelain changes; computed on each read and never kept, as Paul's refinement asked (*a simple git diff --name-only from the base … not have to track anything separately*), so empty after a merge. Was: the `PostToolUse` of an edit carried `file` and the record kept those. The hook's `file` dropped. Built by TD-541.
 - 2026-10-10 (TD-525, the designer): a `PostToolUse` of an edit carries `file`; the record keeps `files` (twenty, newest first). Built by TD-527.
 - 2026-10-09 (TD-490, the designer; after TD-488's outage three members read *exited · guessed from the screen*): **`confidence: tick`** for the host agent's own readings — a pane dead or gone, a kill, a close, `stalled?` — so only a classifier's verdict is dashed; the record's **`ended`** `{how, at, code?, reason?, by?, found?, down_since?}`, `down_since` from `host.json`'s `last_tick` at the agent's first tick after a start. Until this date a vanished pane and a kill were written `scraped`. Built by TD-498.
 - 2026-10-09 (TD-489, the designer): the table gains the row for a `Bash` call the kill guard refuses — `working`, and a `deny` with its reason (§4.3). Built by TD-496.
@@ -260,6 +261,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-10 (TD-538, the designer): item 4's **recent files** come from git — the tree's and the branch's changes since its base, the commit's time and sha on hover for a committed one, computed on each read and never kept — on every tool alike. Was: the hook's edits, absent on a tool whose hook reports none. Built by TD-541.
 - 2026-10-10 (TD-525, the designer; Paul: *a "recent files" list on the side panel under Session, with an Open button*): item 4's **Session** card gains **recent files** (the run's edits, from the hook, each a file link, **M** while uncommitted) and the **editor** button on its summary line, which leaves the acts line; the rail gains **‹›**. Paul's question — open the worktree first, then the file — answered in §4.6: the last-used window, no remembered press and no spike on the server's sockets. Built by TD-527.
 - 2026-10-09 (TD-498 slice 2, grinder-ao-2, building TD-490): row 5 (b)'s kill words gain *killed itself* for a session's own kill and *killed by the tick · stop time* for the home's — `rpc_kill` writes both `by`s, and the design named neither.
 - 2026-10-09 (TD-491, the designer; Paul's review of the Focus composer, the collapsed bar picked over a side panel): screen 2's composer is **folded to one bar by default**, opened over the terminal's foot; `Esc` folds it. Built by TD-500.
@@ -354,6 +356,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-10 (TD-538, the designer): the *recent files* row reads git, not the hook — the porcelain and the branch's commits since its base, the commit's sha on hover, computed and never kept, on every tool. Built by TD-541.
 - 2026-10-10 (TD-536, the designer; Paul, after testing TD-535: *we will want to have the command that fires when a file link is chosen to be configurable*): a **Settings page: You, file link** row — the *opens the folder first* switch and the **wait**; the You row's template gains **file**; the *a path is a link* row names the switch. Built by TD-537.
 - 2026-10-10 (TD-532, the designer; Paul: *any time we open a file from our worktree in vscode the worktree folder is opened as well*): rows *a path is a link*, *recent files* and the Session card's *VS Code* button — a file link is two launches, the folder link then the file form. Built by TD-535.
 - 2026-10-10 (TD-530, the designer): a **Message and Reply dialog: Attach / drop / paste** row — the Focus composer's road, the file under the addressee's `attachments/<session>/`, the path as text, not on a seat with nobody in it; the `ask` row's Reply names it. Built by TD-531.
