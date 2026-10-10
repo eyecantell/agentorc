@@ -45,9 +45,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-536 | What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form | Medium | Designed 2026-10-10 — build TD-537 |
 | TD-537 | Build `person.file_link` and the template's `file` (TD-536): the folder-first switch and the wait on the Settings page, served to the page with `editor`; `AO.openFile` reads them | Medium | Open |
-| TD-538 | The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead | Medium | Open |
+| TD-538 | The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead | Medium | Designed 2026-10-10 — build TD-541 |
 | TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Open |
 | TD-540 | No test holds `AO.openEditor`'s `quiet` argument: the second launch of a file link's pair can toast again and the suite stays green (test audit of #1483) | Low | Open |
+| TD-541 | Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped | Medium | Open |
 
 ---
 
@@ -679,7 +680,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (ao-paul, Paul's question on TD-527)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-10 (the designer) — (1) §4.2: the record's `files` are git's, read with the status read on the record's host: every path the porcelain holds and every path in the commits from `merge-base HEAD origin/<default>` (the cadence's default-branch rule; no origin, the tree alone) to `HEAD`, `{path, at, sha}` — `at` the file's mtime while dirty, else the newest touching commit's committer time, `sha` that commit's — newest first, a path once, twenty kept; one `git log --name-only` beside the status, re-read only when `oid` or the porcelain changes. (2) Computed on each read and never kept, Paul's refinement (#1489): after a squash merge the base has caught up with `HEAD` and the list is the tree's alone, empty when clean — the merged files are the PR's; the base follows a rebase where the creation commit would not. (3) The hook's `file` is dropped — a change is a change whatever made it — and the `shell` adapter shows the same list (§4.3). (4) A session with no branch of its own (on `main`) lists its tree and its unpushed commits by the same rule; the cap stays twenty. (5) §4.5 item 4 and the §4.5a row: the commit's time and short sha on hover for a committed file, **M** from the porcelain. The card's shape is unchanged, so no new mockup. Built by TD-541. Was: Open.
+**Blocked by:** TD-541
 **Location:** design §4.5 item 4 (the **Session** card's *recent files*, `docs/design/4.5-ui.md` ~L425: *the files the session edited in this run … absent until the first edit, and on a tool whose hook reports none*), §4.3 (the adapter contract's neutrality); `src/agentorc/adapters/claude_code/hook.py` (`EDIT_TOOLS` ~L73, `file` on a `PostToolUse`), `src/sessionorc/gitinfo.py` (the record's `git.files`, up to 20 porcelain lines)
 
 **Why:** On 2026-10-10, after TD-527 (#1476) went live, the card showed no recent files for any session: `ao status --json` gave `files: []` for ao-paul and both grinders. ao-paul had changed `docs/technical_debt.md` four times that day, each by a Python script run from Bash, which the hook does not report (only `Edit`, `Write`, `MultiEdit`, `NotebookEdit` do). Paul: *Is this the right design? Seems like it would be more prudent to have git tell us what files have changed and keep a running list as we commit/merge?* The hook list misses every shell edit, a generated file, a `git mv`, a rebase's resolution. It is Claude-Code-shaped too, so another adapter shows nothing (§4.3). Git sees every change, whatever made it, and the host agent already reads `git status` into the record's `git.files` for the **M** mark.
@@ -721,3 +723,27 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a node probe that runs the real `AO.openEditor` with `AO.toast` and `document.body.appendChild` stubbed: a call without `quiet` toasts once, a call with `true` toasts none, and `AO.openFile` through it toasts exactly once across the pair. Revert the `if (!quiet)` guard to confirm the test fails, then restore. **Done when** the test is named here under **Resolved:**.
 
 **Related:** TD-535 (the build), TD-532 (the design), TD-533 / TD-534 (earlier audit findings on the same area).
+
+## TD-541: Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (the designer, TD-538's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 (*The record's `files`*), §4.5 item 4, §4.5a *Focus side panel, Session card: recent files*; `src/sessionorc/gitinfo.py` (a `changed_files(directory, base, timeout)` read beside `git_info`: the porcelain's paths with their mtimes and `git log --name-only --format=%H%x09%ct <base>..HEAD` over the branch's commits; `ledger_mod.default_ref` for the base, as `_checkout_tree` in `agent_tick.py` ~L2452 reads it), `src/sessionorc/agent_tick.py` (the status loop ~L3000: the read when `oid` or the porcelain changed since the record's last; ~L3663 the hook's `files` line, dropped), `src/agentorc/adapters/claude_code/hook.py` (`EDIT_TOOLS` ~L73 and the `file` on `PostToolUse`, dropped), `src/sessionorc/models.py` (`RECENT_FILES` ~L701; `files` entries gain `sha`), `src/agentorc/ui/static/app.js` (`AO.recentFiles` ~L3503: the hover's time and sha, **M** from the porcelain as today), `src/agentorc/ui/cards.py` (nothing new on `editor`), `docs/mockups/gen.py` (`focus_session_card`'s `files` tuples may carry a sha; optional), `tests/test_gitinfo.py`, `tests/test_recent_files.py`, `tests/test_ui_focus_recent_files.py`, the hook's tests
+
+**Why:** TD-538: after #1476 went live the card showed no recent files for any session — Paul's edits were scripts run from Bash, which the hook never reports — and the hook-fed list is Claude-Code-shaped, so another adapter shows nothing; git sees every change.
+
+**Fix:**
+1. `gitinfo.changed_files`: the base is `merge-base HEAD <default_ref>` where `default_ref` names one, else none (the tree alone); the list is `git diff --name-only <base>` plus the porcelain's untracked paths; the branch's commits read in one `git log --name-only` with hash and committer time, newest first, for each path's time and sha; each path once with the newest commit that touched it; the porcelain's paths (changed and untracked, from the status just read) with the file's mtime (`stat`; a deleted path keeps the commit's time or, uncommitted, the read's time); merged into one list newest first, cut at `RECENT_FILES`. Bounded by the status read's timeout; a read that fails leaves the record's list as it was.
+2. `agent_tick`'s status loop: after `git_info`, call `changed_files` only when the record's `git.oid` or its `files` porcelain differs from the last read, or the record holds no list yet; set `s.files` to what the read returned, empty included — nothing kept between reads, nothing to start empty at a restart.
+3. Drop the hook's `file` (`EDIT_TOOLS` and its `PostToolUse` line) and the tick's `files` update on a hook; the §4.2 line in the hook's docstring says so.
+4. `AO.recentFiles`: the hover reads *edited 20:11* for a dirty path and *committed 3f2a9c1 20:30* for a committed one; **M** as today; the repo-relative drawing unchanged.
+5. Tests: `changed_files` on a scratch repo (dirty, committed since base, both, no origin, a deleted path); the tick's re-read trigger and that an empty read empties the list; the hook reports no `file`; the card's hover and the empty list after a merge; `ao status --json` shows `files` for a session whose edits were made by a script.
+6. UI check on a scratch home (§4.9b): a session edits by a script run from Bash — the file appears within the status cadence; it commits — the sha on hover; its PR squash-merges and the worktree sits on main — the list is empty; a `shell` session shows its list. Shots `docs/mockups/reviews/2026-10-10-td541-*.png` in the PR.
+
+**Done when** the Session card lists the files a session's work changed whatever made the change, with the commit's time and sha on a committed one and **M** on a dirty one, is empty after a merge, shows the same on a `shell` session, the hook reports no `file`, and the tests pin it.
+
+**Related:** TD-538 (the design), TD-525 / TD-527 (the card and its first, hook-fed list, #1474 / #1476), TD-532 / TD-535 / TD-536 (the file link's launches), TD-112 (adapter neutrality), TD-080 (`git_info` and one measure of pushed); the base is `ledger.default_ref`'s (cadence §9's default-branch rule).
