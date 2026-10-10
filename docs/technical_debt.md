@@ -73,7 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
-| TD-495 | Build the tmux server's system unit (TD-488): `agentorc-tmux.service` under `Delegate=yes`, `ao service install --system`, the pane cgroup the host agent makes, §4.8a's clause for it, the doctor's and `service status`' line, the person's one-time install | High | In progress — slice 1 PR #1392 |
+| TD-495 | Build the tmux server's system unit (TD-488): `agentorc-tmux.service` under `Delegate=yes`, `ao service install --system`, the pane cgroup the host agent makes, §4.8a's clause for it, the doctor's and `service status`' line, the person's one-time install | High | Built — live check of #1396 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Open |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | Open |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
@@ -1166,8 +1166,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** feature
 **Added:** 2026-10-09 (the designer, TD-488's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (PR #1392, grinder-ao-1): the host agent's half, Fix (2) and (3) and the doctor RPC's placement (`runs`). Left: (1)'s `service.py` unit text, `install`'s root line, `install --system`, `ao service status`'s line (src/agentorc), then (4)'s board line once live. Was: Open
+**Kind:** live-check #1396
+**Status:** Built — slice 1 #1392 (the host agent's half) and slice 2 #1396 (`ao service install`'s stage and root line, `--system`, `status`'s line). **The live check:** once #1396 is live (`ao promote status`), read `ao service status` for the tmux line (expected today: the *under the user manager* warning). Then write (4)'s board line for Paul, `Due:` a week out, in the Fix's words, with the printed root line (`sudo <abs ao> service install --system`) and the proof (`systemctl --user exit`, then an ssh login: every session still live, `ao status` finding them).
 **Location:** design §4.1 (the host agent bullet: the unit), §4.8a (*unknown* clause; the fourth signal), §4.7 `ao doctor`'s tmux check, §9 invariant 8; `src/agentorc/service.py` (the unit texts, `install`, `status`), `src/agentorc/cli.py` (`ao service`), `src/sessionorc/identity.py` (`detached_check`), the host agent's create path (`src/sessionorc/agent.py`, `tmux.py` — the pane cgroup write), the `doctor` RPC's tmux reading (TD-465 slice 1); `docs/briefs/` untouched
 
 **Why:** TD-488: on 2026-10-09 one SIGTERM to `systemd --user` emptied `user@1000.service`, the tmux server and every session with it, for 4h20m; §4.1 now says the server runs outside that subtree.
