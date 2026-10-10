@@ -3357,7 +3357,7 @@
       const lc = run.match(/:(\d+)(?::(\d+))?$/);
       let path = lc ? run.slice(0, lc.index) : run;
       if (!lc) { path = path.replace(/[.,;:)\]}'"]+$/, ""); run = path; }
-      if (!path.includes("/") || /^\.*\/*$/.test(path)) continue;
+      if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
       out.push({ run, path, line: lc ? +lc[1] : null, col: lc && lc[2] ? +lc[2] : null, start, end: start + run.length });
     }
     return out;
@@ -3379,26 +3379,38 @@
   // remembered nowhere, so the next hover asks again.
   AO.pathProvider = function (term, id, file, fetchPaths) {
     const known = new Map();
+    let era = 0;  // an answer that lands after a `clear` belongs to the attach before it
     const ask = fetchPaths || ((runs) => fetch(`/api/sessions/${encodeURIComponent(id)}/paths`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runs }),
     }).then((r) => (r.ok ? r.json() : Promise.reject(r.status))));
     return {
-      clear: () => known.clear(),
+      clear: () => { known.clear(); era += 1; },
       provideLinks(y, callback) {
         const row = term.buffer.active.getLine(y - 1);
         const text = row ? row.translateToString(true) : "";
         const runs = AO.pathRuns(text).slice(0, 8);
         if (!runs.length) { callback(undefined); return; }
+        // the text's indices as the row's cells: a wide character is one character over two cells
+        const cellOf = [];
+        if (row && row.getCell) {
+          for (let x = 0; x < row.length; x++) {
+            const c = row.getCell(x);
+            if (!c || c.getWidth() === 0) continue;
+            for (let k = 0; k < (c.getChars() || " ").length; k++) cellOf.push(x);
+          }
+        }
+        const col = (i) => (i < cellOf.length ? cellOf[i] : i);
         const links = (paths) => runs.filter((r) => paths[r.path]).map((r) => ({
-          range: { start: { x: r.start + 1, y }, end: { x: r.end, y } },
+          range: { start: { x: col(r.start) + 1, y }, end: { x: col(r.end - 1) + 1, y } },
           text: r.run,
           decorations: { underline: true, pointerCursor: true },
           activate: (event) => AO.pathLink(event, file, paths[r.path], r.line, r.col),
         }));
         if (known.has(text)) { const l = links(known.get(text)); callback(l.length ? l : undefined); return; }
+        const asked = era;
         ask([...new Set(runs.map((r) => r.path))]).then((got) => {
           const paths = (got && got.paths) || {};
-          known.set(text, paths);
+          if (asked === era) known.set(text, paths);
           const l = links(paths); callback(l.length ? l : undefined);
         }, () => callback(undefined));
       },

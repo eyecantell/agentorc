@@ -152,7 +152,24 @@ const FILE = "vscode://file{path}?windowId=_blank", SSH = "vscode://vscode-remot
   const savedOpen = AO.openEditor; AO.openEditor = (...a) => opened.push(a);
   const plainClick = link[0].activate({}), ctrlClick = link[0].activate({ ctrlKey: true });
   AO.openEditor = savedOpen;
+  // a wide character before the path: one character, two cells (xterm's width-0 cell after it)
+  const cells = [["界", 2], ["", 0], [" ", 1], ..."a/b.py".split("").map((c) => [c, 1])];
+  const wide = { buffer: { active: { getLine: () => ({ length: cells.length,
+    translateToString: () => "界 a/b.py",
+    getCell: (x) => ({ getChars: () => cells[x][0], getWidth: () => cells[x][1] }) }) } } };
+  const wp = AO.pathProvider(wide, "ao-x-1", FILE, (r) => Promise.resolve({ paths: { "a/b.py": "/r/a/b.py" } }));
+  const wideLinks = await new Promise((res) => wp.provideLinks(1, (l) => res(l.map((k) => k.range))));
+  // an answer that lands after a re-attach's clear is not kept: the next hover asks again
+  let release;
+  const slowAsked = [];
+  const sp = AO.pathProvider(term, "ao-x-1", FILE, (r) => { slowAsked.push(r);
+    return new Promise((res) => { release = () => res({ paths: { "scripts/x.py": "/r/scripts/x.py" } }); }); });
+  const pending = new Promise((res) => sp.provideLinks(3, res));
+  sp.clear(); release(); await pending;
+  sp.provideLinks(3, noop); await new Promise((r) => setImmediate(r));
   console.log(JSON.stringify({
+    wideLinks, slowAsks: slowAsked.length,
+    long: runs("x/" + "a".repeat(600) + " and src/ok.py"),
     one: runs("see src/agentorc/cli.py:364 and build/review."),
     shapes: runs("(./a/b.py) ~/x/y.md, /etc/hosts; ../up/z.ts:3:7] word a/"),
     url: runs("https://github.com/a/b/pull/1 and http://x/y/z"),
@@ -189,6 +206,16 @@ def test_the_runs_a_row_yields():
     assert got["shapes"][3][2:4] == [3, 7]
     # a run inside a URL is the URL's, and a bare word, `./` or `/` is never a candidate
     assert got["url"] == [] and got["bare"] == []
+    # a run past the read's 512 characters is no candidate, so the rest of its row is still asked
+    assert [r[0] for r in got["long"]] == ["src/ok.py"]
+
+
+@pytest.mark.unit
+def test_a_links_range_is_in_cells_and_an_answer_from_before_a_reattach_is_not_kept():
+    got = _probe()
+    # `界` is one character over two cells: the path starts at cell 4, not 3
+    assert got["wideLinks"] == [{"start": {"x": 4, "y": 1}, "end": {"x": 9, "y": 1}}]
+    assert got["slowAsks"] == 2
 
 
 @pytest.mark.unit

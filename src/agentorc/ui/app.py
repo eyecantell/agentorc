@@ -126,6 +126,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
     build_chip,  # noqa: F401
+    editor_file,  # noqa: F401
     editor_link,  # noqa: F401
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
