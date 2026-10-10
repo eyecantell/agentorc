@@ -57,7 +57,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
+| TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Built — live check of #1439: `ao doctor hooks` once live |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-513 | The client half of TD-484's lane-count patch is pinned by no test: deleting the `syncGroups` block leaves every UI test green | Medium | Open |
 | TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
@@ -891,8 +891,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** debt
 **Added:** 2026-10-09 (grinder-ao-2, TD-465's live check)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1439
+**Status:** Built — PR #1439 (2026-10-10): `layer_reading` leaves out every command naming one of `CADENCE_WIRED_MARKERS`, tested in `tests/test_doctor.py`. Left: once #1439 is live (`ao promote status`), `ao doctor hooks` on kmaster — a read — prints no *does not resolve* line for the `+cadence` layers; it holds → archive with `**Resolved:**`.
 **Location:** `src/agentorc/adapters/claude_code/__init__.py` (`layer_reading`: `c != CADENCE_HOOK_LINE`; `_resolves`; `CADENCE_WIRED_MARKERS`), `tests/` beside the hooks reading
 
 **Why:** `ao doctor` on the live copy (c469063, 2026-10-09) printed *warning: hooks — layer grind+cadence.json names f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi, which does not resolve*, and the same for `grind+cadence+unattended.json`. Those two layers were last written on 2026-09-11 and 2026-09-23 and carry dev-cadence's runner line from before 2026-09-25. `layer_reading` is meant to leave dev-cadence's line out, but it drops only a command equal to today's `CADENCE_HOOK_LINE`. `_resolves` then reads the shell snippet's first word (`f=…/cadence_hooks.sh;`) as a path that is not there. The line is guarded by `[ -x ]` and is harmless, so the warning names something that is not wrong. A person reading `ao doctor` learns to skip the hooks warnings, and the check exists for those warnings.
