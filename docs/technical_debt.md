@@ -43,9 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-524 | A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder | Medium | Designed 2026-10-10 — build TD-526 |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
-| TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Built (#1467); waits for Paul's look |
 | TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open |
 | TD-530 | The Message and Reply dialog takes no file: a screenshot or a document for a session goes through Focus's composer and a send, or not at all | Medium | Designed 2026-10-10 — build TD-531 |
 | TD-531 | Build the Message and Reply dialog's Attach / drop / paste (TD-530): the Focus road on `#mailbox`, the addressee's id to `AO.compose`, the path at the caret, no Attach on an empty seat | Medium | Open |
@@ -631,23 +629,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-## TD-524: A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (ao-paul, found live by Paul on TD-501's links)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-10 (the designer) — the handler's rule confirmed in VS Code's source (`getWindowOpenableFromProtocolUrl`: a `vscode-remote` path ending in `:digits` is a file, a bare one a folder). §4.6 *A path in the pane is a link*: the line rides after the path on every `vscode` form, `:1` where none was printed; the file form carries no `windowId=_blank`, so a file lands in the last-used window (the worktree's once Open was pressed) and the button's folder form keeps it; a template takes `{line}`; §4.5a's row and §5's `open_in` say the same. Built by TD-526. Was: Open.
-**Blocked by:** TD-526
-**Location:** design §4.6 *A path in the pane is a link* (the line rides on the local form alone), §4.5a **a path is a link**; `src/agentorc/ui/static/app.js` `AO.pathLink` (~L3370, the `at` suffix), `src/agentorc/ui/uiconf.py` `editor_file` (~L179, the remote and container forms with `windowId=_blank`)
-
-**Why:** Paul, 2026-10-10, Ctrl+clicked `src/agentorc/adapters/claude_code/__init__.py:263` in ao-paul's pane: VS Code opened, named `__init__.py` in its title, connected to kmaster, then opened nothing and asked for a folder or repo. `AO.pathLink` appends `:line[:col]` only to the `vscode://file{path}` form; the `vscode://vscode-remote/ssh-remote+<host>{path}?windowId=_blank` form goes out with the bare path. As far as is known (not yet tested), VS Code's URL handler opens a `vscode-remote` path as a *file* only when it ends in `:line`, and as a folder otherwise, which fails for a file. Every file link from a UI that is not on the host is therefore broken. Seen in the same test and not a bug: `src/agentorc/doctor.py:168` drew no link because ao-paul's worktree was on a commit from before that file existed, so the host rightly resolved nothing.
-
-**Fix:** first confirm the handler's rule against VS Code. Then the design: the line rides on every `vscode` form (local, ssh-remote, attached-container), `:1` when the run printed none, so a remote path always opens as a file. Weigh dropping `windowId=_blank` from the *file* form only: the file would land in the VS Code window used last, which is the worktree's once the editor button has opened it, instead of a new window with no folder. The editor button keeps `_blank` (the first-use finding of 2026-09-06 that a reused window loses what it showed, `src/agentorc/ui/uiconf.py` ~L207). A person's own template keeps what it says. TD-525 asks whether a file link can open the worktree first, and its answer may change this choice, so the two rounds go together. **Done when** the design says it, and the build entry it names is ledgered.
-
-**Related:** TD-493 / TD-501 (#1456, the links), TD-525 (the Session card, the auto-open question), TD-011 (the percent-encoding).
-
 ## TD-525: The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button
 
 **Priority:** Medium
@@ -669,29 +650,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the design says all three and the build entries it names are ledgered.
 
 **Related:** TD-524 (the remote file link, decided with this), TD-493 / TD-501 (#1456, the pane's file links).
-
-## TD-526: Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (the designer, TD-524's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built by PR #1467 (the UI check held on a scratch home: the remote link carries `:line`, `:1` where none, no `windowId`); merged 2026-10-10 (691a868); waits for Paul's look in VS Code over SSH, sent as m-4e7a04cfda2c — *Works* archives it
-**Blocked by:** decision (paul)
-**Location:** design §4.6 *A path in the pane is a link* (the line, the window), §4.5a **a path is a link**, §5 `person.open_in` (the file form, `{line}`); `src/agentorc/ui/uiconf.py` (`editor_file`: the three `vscode` forms without `?windowId=_blank`, `vscode_link` unchanged), `src/agentorc/ui/static/app.js` (`AO.pathLink`: the `at` suffix on every `vscode://` form, `:1` when no line was printed, `{line}` filled in a template), `tests/test_ui_focus_paths.py`
-
-**Why:** TD-524: Paul's Ctrl+click from a UI reached over SSH opened VS Code, which named the file and asked for a folder — the remote form carried no `:line`, and VS Code's handler opens a `vscode-remote` path as a file only when it ends in `:digits` (`getWindowOpenableFromProtocolUrl`, read in the source 2026-10-10). Every file link from a UI not on the host was broken.
-
-**Fix:**
-1. `AO.pathLink`: on any `vscode://` form (`vscode://file`, `vscode://vscode-remote/ssh-remote+…`, `…/attached-container+…`) append `:line[:col]` as printed, `:1` when the run printed none; on a template fill `{line}` the same way (`1` when none) and append nothing.
-2. `uiconf.editor_file`: the local, ssh-remote and container file forms carry no `?windowId=_blank` (the container form keeps the reach link's prefix and drops its query); `editor_link` / `vscode_link` (the folder) keep `_blank`. A template of the person's own is used as it stands.
-3. Tests: the three forms with a printed line, with none (`:1`), a template with and without `{line}`; the folder link still `_blank`.
-4. On a scratch home (`scripts/look_home.py`), from a browser on another machine or with `hosts.yml`'s `local` off: a Ctrl+click on a pane path opens the file in VS Code over SSH at its line, and a second press with the worktree window open lands in it. Shot the opened editor if one is at hand; else the link's `href` from the page, in the PR.
-
-**Done when** a remote file link opens the file at its line, a file link opens into the last-used window and the folder button into a new one, and the tests pin the forms.
-
-**Related:** TD-524 (the design), TD-525 / TD-527 (the Session card, the same window rule), TD-501 (#1456, the links), TD-011 (the percent-encoding).
 
 ## TD-527: Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone
 

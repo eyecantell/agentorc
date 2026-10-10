@@ -9055,3 +9055,37 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Why:** TD-524's round gave a template `{line}` beside `{path}` and `{remote}`, filled on the file form (built by TD-526, #1467). The folder form — the Session card's and the card's editor button, *edit yml*, Settings' **Open file** — fills only `{path}` and `{remote}`, so a template such as `zed://ssh/{remote}{path}:{line}`, which the file links invite, draws a folder button whose link ends `:{line}` literally. The design says `{line}` is the file form's only and is silent on what the folder form does with it; the Settings page's note under the url names `{path}` and `{remote}` alone, so a person never learns `{line}` exists.
 
 **Resolved:** 2026-10-10 (PRs #1469, #1471) — designed in #1469 (§5 `person.open_in`: a folder form drops `{line}` with the one `:` before it; §4.5a **Settings page: You**, the *url* note) and built by TD-529 in #1471.
+
+## TD-526: Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (the designer, TD-524's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.6 *A path in the pane is a link* (the line, the window), §4.5a **a path is a link**, §5 `person.open_in` (the file form, `{line}`); `src/agentorc/ui/uiconf.py` (`editor_file`: the three `vscode` forms without `?windowId=_blank`, `vscode_link` unchanged), `src/agentorc/ui/static/app.js` (`AO.pathLink`: the `at` suffix on every `vscode://` form, `:1` when no line was printed, `{line}` filled in a template), `tests/test_ui_focus_paths.py`
+
+**Why:** TD-524: Paul's Ctrl+click from a UI reached over SSH opened VS Code, which named the file and asked for a folder — the remote form carried no `:line`, and VS Code's handler opens a `vscode-remote` path as a file only when it ends in `:digits` (`getWindowOpenableFromProtocolUrl`, read in the source 2026-10-10). Every file link from a UI not on the host was broken.
+
+**Resolved:** 2026-10-10 (PRs #1467, #1468) — every `vscode` file form carries `:line[:col]`, `:1` where none was printed, and no `windowId=_blank` (`AO.pathLink`, `uiconf.editor_file`; `tests/test_ui_focus_paths.py`). Paul's look (m-4e7a04cfda2c) answered *Works* (m-2b271718855d): a Ctrl+click over SSH opens the file at its line.
+
+**Done when** a remote file link opens the file at its line, a file link opens into the last-used window and the folder button into a new one, and the tests pin the forms.
+
+**Related:** TD-524 (the design), TD-525 / TD-527 (the Session card, the same window rule), TD-501 (#1456, the links), TD-011 (the percent-encoding).
+
+## TD-524: A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (ao-paul, found live by Paul on TD-501's links)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.6 *A path in the pane is a link* (the line rides on the local form alone), §4.5a **a path is a link**; `src/agentorc/ui/static/app.js` `AO.pathLink` (~L3370, the `at` suffix), `src/agentorc/ui/uiconf.py` `editor_file` (~L179, the remote and container forms with `windowId=_blank`)
+
+**Why:** Paul, 2026-10-10, Ctrl+clicked `src/agentorc/adapters/claude_code/__init__.py:263` in ao-paul's pane: VS Code opened, named `__init__.py` in its title, connected to kmaster, then opened nothing and asked for a folder or repo. `AO.pathLink` appends `:line[:col]` only to the `vscode://file{path}` form; the `vscode://vscode-remote/ssh-remote+<host>{path}?windowId=_blank` form goes out with the bare path. As far as is known (not yet tested), VS Code's URL handler opens a `vscode-remote` path as a *file* only when it ends in `:line`, and as a folder otherwise, which fails for a file. Every file link from a UI that is not on the host is therefore broken. Seen in the same test and not a bug: `src/agentorc/doctor.py:168` drew no link because ao-paul's worktree was on a commit from before that file existed, so the host rightly resolved nothing.
+
+**Resolved:** 2026-10-10 (PRs #1467, #1468) — designed in §4.6 *A path in the pane is a link* and §5 `person.open_in`; built by TD-526, whose look Paul answered *Works* (m-2b271718855d).
+
+**Related:** TD-493 / TD-501 (#1456, the links), TD-525 (the Session card, the auto-open question), TD-011 (the percent-encoding).
