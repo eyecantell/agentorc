@@ -58,12 +58,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
-| TD-490 | An `exited` pill says *guessed from the screen*, never why the session ended | Medium | Designed 2026-10-09 — build TD-498 |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
-| TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | In progress |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
@@ -903,23 +901,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-488, TD-092 and TD-319 (Telegram), TD-111 (`ao doctor`).
 
-## TD-490: An `exited` pill says *guessed from the screen*, never why the session ended
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (ao-paul, Paul: the grinders exited, were they out of work? the reason should show on hovering *exited*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1391): §4.2 — a third `confidence`, **`tick`**, for the host agent's own readings (a pane dead or gone, a kill, a close, `stalled?`), so the dashed *guessed* pill is a classifier's verdict alone; the record's **`ended`** written by whoever ends it; §4.5 row 5 (b) **an exit, and how** — `ending.exit_words`: *exited · code N*, *exited · <reason>*, *killed by <who>*, *pane gone · found <time>*, *… by a host agent down since <time>* (from `host.json`'s `last_tick`), *· after wrap-up*; §4.5a **state pill hover** (the card, the Inbox row, the Focus overlay's first line); §4.7 `ao status -v`. The build is TD-498, and this entry archives with it.
-**Blocked by:** TD-498
-**Location:** `src/agentorc/ui/templates/card.html` (the pill's `title`, ~L21 and L34), `inbox_row.html` ~L457, design §4.5a (the state pill), §4.2 (states); the record's exit fields
-
-**Why:** after TD-488's outage, three ao-grind members read `exited`, and the hover said *guessed from the screen*: `scraped` is true on any state not reported by a hook, so the hover talks about where the state came from and never about why the session ended. To learn that they had not run out of work took a journal and a transcript.
-
-**Fix:** design first: the `exited` (and `closed`) pill's hover says the cause the record can prove, and the record keeps that cause when it can: the tool's exit code; *closed by <who>*; *wound down: out of work*; *wrap-up*; *pane gone, found at <time> by a host agent that was down since <time>*; *killed*. The dashed *guessed* style and its hover stay only where the state really was read from a screen. Say whether the cause also goes on the Focus exited banner. **Done when** the design names the causes and their words, the build lands, and each cause is drawn on a scratch home.
-
-**Related:** TD-488, TD-485 (the restart note).
-
 ## TD-491: The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot
 
 **Priority:** Low
@@ -985,22 +966,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §4.10 says. (1) `service.py`: `agentorc-watch.service` — `[Service] Type=oneshot, User=<the person>, ExecStartPre=+/usr/bin/systemctl start user@<uid>.service, ExecStart=<venv>/agentorc-watch` — and `agentorc-watch.timer` — `OnBootSec=2min, OnUnitActiveSec=5min, [Install] WantedBy=timers.target` — written beside the tmux unit when absent or differing, installed by the same `--system`, named by `status`. (2) `watch.py`: one never-gated read of the home's socket with a ten-second bound; `~/.agentorc/watch.json` holding `silent_since`, `manager_started_at`, `told` (which of the three lines went for this outage); the three lines in §4.10's words, sent as `notify.argv(secrets)`'s Doppler child with the line on its stdin, `secrets` from `notify.telegram` read from `settings.yml`, nothing sent with `on: false`; a failed send logged to `~/.agentorc/watch.log`, not retried; the manager's start is the unit's `ExecStartPre`, and the run reads `systemctl is-active user@<uid>.service` before and after to know it happened. (3) The doctor's **agent** reading adds the timer's presence and `LastTriggerUSec`, the two lines in §4.7's words. (4) TD-495's board line for Paul extends to the watch: after the press, `systemctl --user stop agentorc-agent` for eleven minutes brings the *has not answered* line and `start` the *answers again* line. **Done when** a fake socket (silent / answering), a fake `systemctl` and a fake clock drive `watch.json` through stopped-manager → started → told, and silence → told at 10 min → recovery → told, exactly one message each and none under `on: false`; the unit texts are pinned; `install` writes the watch files beside the tmux unit and `--system` installs both; the doctor's two lines read from fixtures; the board line is extended.
 
 **Related:** TD-489 (the design), TD-488 / TD-495 (the press), TD-319 (the Telegram child), TD-111 / TD-465 (the doctor).
-
-## TD-498: Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick`
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-490's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1, the host agent's half (part 1's `tick` and the `~`/`scraped` marks, part 2's `ended` and `last_tick`), is PR #1401 (grinder-ao-1, 2026-10-09). **Left:** slice 2, the words — part 3's `ending.exit_words`, the card's, the Inbox row's and the Focus overlay's hover and first line, `ao status -v`'s line, and the scratch-home check of each cause.
-**Location:** design §4.2 (the three confidences; the `SessionEnd` row), §4.5 row 5 (b) *an exit, and how*, §4.5a **state pill hover**, §4.7 `ao status -v`; `src/sessionorc/models.py` (`Confidence`, `ended`), `src/sessionorc/agent_tick.py` (~L3335 the gone pane, ~L3381 the dead pane: `tick`, `ended`; `last_tick` written to `host.json` each tick), `src/sessionorc/agent.py` (`rpc_kill` ~L1595: `tick` and `ended.by` from the caller as `rpc_close` ~L1609 does with `closer_of`), `src/sessionorc/agent_tick.py` `_apply_event` ~L3433 (the hook's state write ~L3490: a `SessionEnd` keeps `reason`), `src/agentorc/adapters/claude_code/hook.py` (`SessionEnd`'s `reason` on the event), `src/agentorc/ending.py` (`exit_words`), `src/agentorc/ui/cards.py` (~L212 `scraped`; the hover text), `src/agentorc/ui/templates/card.html` (L21, L36 `title`), `inbox_row.html` (~L457), `static/app.js` (~L3385 the end overlay), `src/agentorc/cli.py` (~L234 the `~` mark; the `-v` line)
-
-**Why:** TD-490: after the 2026-10-09 outage three members read *exited · guessed from the screen*, and finding out that they had not run out of work took a journal and a transcript.
-
-**Fix:** as §4.2, §4.5 and §4.5a say. (1) `Confidence` gains `tick`; every `set_state` the tick, a kill, a close or a link makes passes it; `cards.py`'s `scraped` is `confidence == "scraped"`; `cli.py`'s `~` likewise. (2) `ended: {how, at, code?, reason?, by?, found?, down_since?}` on the record: the hook's `SessionEnd` (`how: tool`, the payload's `reason`, `code` when the payload carries one), the dead pane (`how: pane`, `code: dead_status`), the gone pane (`how: gone`, `found: now`, and `down_since` when this is the agent's first tick after its start and `host.json`'s `last_tick` is older than `CREATE_GRACE`), `rpc_kill` (`how: kill`, `by` as `closer_of` derives it from the caller); `last_tick` written to `host.json` on each tick. (3) `ending.exit_words(s, names)` in §4.5's words, *· after wrap-up* when `wrapup_at` precedes `ended.at`; `cards.py` draws it into the slot's ending and into the pill's `title` with the time; the card's and the Inbox row's `title` follow §4.5a's order; the Focus end overlay's first line is the same words; `ao status -v` prints the line beside the closer's. **Done when** fixtures pin each `ended` shape's words, the hover for each state in §4.5a's order, a gone pane on the first tick after a start carrying `down_since` from a `host.json` fixture, a kill by a person and by a session, `~` absent on a `tick` state, and a rendered card, Inbox row and Focus header for an exited record of each cause on a scratch home.
-
-**Related:** TD-490 (the design), TD-488 (the outage), TD-485 / TD-487 (the restarted chip), TD-265 (the closer), TD-023 (`pane` after a kill).
 
 ## TD-500: Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page
 
