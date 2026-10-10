@@ -39,6 +39,19 @@ REFUSED = [
     "nice -n 5 killall x",
     "\\pkill x",
     "cat <<EOF\nnothing here\nEOF\npkill x",  # past the body, a command again
+    "kill -- -1",  # the targets past `--` (TD-502)
+    "kill $(sudo pgrep x)",  # a search run under sudo is still a search
+    # each wrapper is seen through to the command it runs, and so is a wrapper's option that takes a value
+    "env pkill x",
+    "env -u X pkill x",
+    "nohup killall x",
+    "exec pkill x",
+    "command pkill x",
+    "builtin pkill x",
+    "setsid pkill x",
+    "time pkill x",
+    "echo x | xargs pkill",
+    "xargs -I {} pkill x",
 ]
 
 ALLOWED = [
