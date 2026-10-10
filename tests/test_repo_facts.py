@@ -826,3 +826,25 @@ def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch,
     out = capsys.readouterr().out
     assert "  anchor-ao-1 is out of work with 1 in its lane: TD-370" in out
     assert "  grinder-ao-2 is out of work with 3 in its lane: TD-355, TD-358, TD-360" in out
+
+
+async def test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_once(agent, repo, monkeypatch):
+    """TD-516: `_refresh_repos` hands `_read_repos` no live commits (`None`, unknown) until the promote
+    pass has assigned its readings since the start, and the promote's live commits after."""
+    await park_ticks(agent)
+    _register(repo)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    handed = []
+    real = agent._read_repos
+
+    def spy(todo, prev, full, roots=None, live=None):
+        handed.append(live)
+        return real(todo, prev, full, roots, live)
+
+    monkeypatch.setattr(agent, "_read_repos", spy)
+    agent._promotes, agent._promotes_read = {"r": {"live": "abc"}}, False
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    agent._promotes_read, agent._repos_read_at = True, float("-inf")
+    await agent._refresh_repos()
+    assert handed == [None, {"r": "abc"}]

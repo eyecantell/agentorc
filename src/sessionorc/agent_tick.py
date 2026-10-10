@@ -2811,7 +2811,8 @@ class TickMixin:
         check's build is read against its repo's (§4.9b). `None` — no promote reading since the
         host agent started — is unknown, not *not live*: each live check keeps the `live` its last
         reading gave it (§6 rule 6, TD-516), so a restart never takes one out of a lane and brings
-        it back as new."""
+        it back as new. A promote pass that keeps failing keeps it unknown, and nothing goes live
+        while it does."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
