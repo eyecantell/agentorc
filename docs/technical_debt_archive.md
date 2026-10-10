@@ -8056,4 +8056,4 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 
 **Related:** TD-496 (#1395), TD-489 (the guard's design).
 
-**Resolved:** 2026-10-09, the PR on branch `td502-kill-guard-rows`: twelve `REFUSED` rows — `kill -- -1`, `kill $(sudo pgrep x)`, each of `WRAPPERS`' eight beyond sudo/timeout/nice (`env`, `nohup`, `exec`, `command`, `builtin`, `setsid`, `time`, `xargs`), and the value options `env -u X` and `xargs -I {}`. Each mutation in the Why, re-run: `--` → `[]` 1 failed, the substitution's `sudo` removed 1 failed, `WRAPPERS` cut to three 10 failed, `xargs`' values emptied 1 failed, `env`'s emptied 1 failed.
+**Resolved:** 2026-10-09 (PR #1408): twelve `REFUSED` rows — `kill -- -1`, `kill $(sudo pgrep x)`, each of `WRAPPERS`' eight beyond sudo/timeout/nice (`env`, `nohup`, `exec`, `command`, `builtin`, `setsid`, `time`, `xargs`), and the value options `env -u X` and `xargs -I {}`. Each mutation in the Why, re-run: `--` → `[]` 1 failed, the substitution's `sudo` removed 1 failed, `WRAPPERS` cut to three 10 failed, `xargs`' values emptied 1 failed, `env`'s emptied 1 failed.
