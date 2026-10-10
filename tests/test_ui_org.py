@@ -1607,6 +1607,9 @@ def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypat
     assert STATE_RANK["working"] < v["rank"] < STATE_RANK["idle"] - 0.5  # after working, before an unseen idle
     # the tick's `review_pr`, and an open PR whose head branch names the reference, are the same reading
     assert view(_card(progress=claim(review_pr=1302)), repos=repos)["pill_word"] == "waiting"
+    # `review_pr` alone, on a reference no open branch names
+    rp = [{"ref": "TD-1", "status": "claimed", "review_pr": 1302}]
+    assert view(_card(progress=rp), repos=repos)["slot"]["text"] == "waiting · review #1302"
     assert view(_card(progress=claim()), repos=repos)["slot"]["text"] == "waiting · review #1302"
     # *with the techlead* while the seat's `prs_waiting.asks` holds this record's ask for that PR
     asks = [{"from": "ao-w@kmaster", "pr": 1302}]

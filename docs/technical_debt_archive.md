@@ -8382,3 +8382,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-427 (archived), TD-423 (the model for the wording), TD-455.
 
 **Resolved:** 2026-10-09 (PR #1421) — §4.5 screen 6 *Find* and §4.5a's **Inbox page: find** row (the row that names the count) say the count holds its line while empty, so the first word typed moves no toggle; `docs/design-history.md` carries the TD-427 line under §4.5 and under §4.5a, each beside TD-423's.
+
+## TD-482: PR #1354's `review_pr` assertion is vacuous: dropping `review_pr` from `review_wait` fails nothing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1354)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/cards.py` `review_wait` (`p.get("pr") or p.get("review_pr") or by_branch.get(...)`); `tests/test_ui_org.py` `test_an_idle_session_that_waits_on_someone_reads_waiting`
+
+**Why:** The test says "the tick's `review_pr`, and an open PR whose head branch names the reference, are the same reading" and asserts `view(_card(progress=claim(review_pr=1302)), repos=repos)["pill_word"] == "waiting"`. But `claim()` carries `ref: "TD-009"` and the fixture's open PR 1302 has branch `td009-x`, so the branch fallback finds it with `review_pr` unread. Mutation probe: replacing `p.get("pr") or p.get("review_pr") or by_branch...` with `p.get("pr") or by_branch...` leaves `tests/test_ui_org.py tests/test_ui_repo_page.py tests/test_ui_team_summary.py` at 83 passed. The `review_pr` source (a claim whose PR is set by the tick, the docstring's second source) is therefore pinned by nothing.
+
+**Fix:** Build the `review_pr` case on a claim whose ref names no open branch (say `ref: "TD-1"`, `review_pr=1302`) and assert *waiting · review #1302*. Re-run the mutation and see it fail.
+
+**Related:** PR #1354, TD-428.
+
+**Resolved:** 2026-10-09 (PR #1422) — `tests/test_ui_org.py::test_an_idle_session_that_waits_on_someone_reads_waiting` reads a claim on `TD-1` (no open branch names it) with `review_pr=1302` as *waiting · review #1302*; the Why's mutation (`review_pr` dropped from `review_wait`) now fails it (1 failed, 86 passed).

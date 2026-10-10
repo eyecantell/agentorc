@@ -49,7 +49,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Built (#1370, #1413); live check waiting on the 50 MB PDF look |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
-| TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
 | TD-484 | A member's lane count goes stale on its siblings' cards until each gets a delta of its own | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
@@ -66,6 +65,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
 | TD-511 | `cards.pill_title`'s *waiting* and *seat on call* branches and `ending.clock`'s day prefix are pinned by no test — the pill hover §4.5a words in order | Medium | Open |
+| TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 
 ---
 
@@ -747,21 +747,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-474 (the design), TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-096 (the read-only frame).
 
-## TD-482: PR #1354's `review_pr` assertion is vacuous: dropping `review_pr` from `review_wait` fails nothing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1354)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/cards.py` `review_wait` (`p.get("pr") or p.get("review_pr") or by_branch.get(...)`); `tests/test_ui_org.py` `test_an_idle_session_that_waits_on_someone_reads_waiting`
-
-**Why:** The test says "the tick's `review_pr`, and an open PR whose head branch names the reference, are the same reading" and asserts `view(_card(progress=claim(review_pr=1302)), repos=repos)["pill_word"] == "waiting"`. But `claim()` carries `ref: "TD-009"` and the fixture's open PR 1302 has branch `td009-x`, so the branch fallback finds it with `review_pr` unread. Mutation probe: replacing `p.get("pr") or p.get("review_pr") or by_branch...` with `p.get("pr") or by_branch...` leaves `tests/test_ui_org.py tests/test_ui_repo_page.py tests/test_ui_team_summary.py` at 83 passed. The `review_pr` source (a claim whose PR is set by the tick, the docstring's second source) is therefore pinned by nothing.
-
-**Fix:** Build the `review_pr` case on a claim whose ref names no open branch (say `ref: "TD-1"`, `review_pr=1302`) and assert *waiting · review #1302*. Re-run the mutation and see it fail.
-
-**Related:** PR #1354, TD-428.
 ## TD-484: A member's lane count goes stale on its siblings' cards until each gets a delta of its own
 
 **Priority:** Low
@@ -1041,3 +1026,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** each probe in the Why fails a test.
 
 **Related:** TD-490, TD-498 (#1415).
+
+## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, found on #1421)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Open
+**Location:** `scripts/check_cadence.py` (the `ledger` row; a SYNCED FILE, dev-cadence's), `tests/test_ledger.py`
+
+**Why:** On #1421 (TD-461) an archive edit written as `open(a, "w").write(open(a).read() + entry)` truncated the file before reading it: the archive went from 8,363 lines to 22, its header and every entry from TD-011 to TD-455 gone. `pdm run pytest tests/test_ledger.py` passed (11 passed), and the cadence check's `ledger` row reads only that the PR names its TD and touches a ledger file. Only the Sonnet fact-check caught it, by reading the diff's `@@ -1,8363 +1,22 @@`. The archive is append-only by its own header ("appended in resolution order", "Each keeps its original TD number forever"), so a PR that deletes archived entries is never right.
+
+**Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
+
+**Related:** TD-461 (#1421).
