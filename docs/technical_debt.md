@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448; the look sent to Paul (m-37f220f9e955) |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
-| TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
@@ -648,22 +647,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
 
 **Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
-
-## TD-487: Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-485's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a **restarted** chip, §4.5 *The Focus screen's anatomy* (the identity line), §6 *Keeping a team running* (the ceiling), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (~L187 `marks`, the `restart_wanted` chip ~L356; `brief_changed` is drawn in the slot ~L874, which this chip never is), `src/agentorc/ui/templates/card.html` (row 4, beside the report line — a new badge; the card has no *brief changed* chip to copy) and `focus.html` (the header chips beside *brief changed*, ~L61), `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`, the same words), `src/sessionorc/agent_common.py` (`RESTART_WINDOW`, `_counted`)
-
-**Why:** TD-485: a member the tick or the doorbell restarted reads like a fresh start on the card; `ao status -v` says it since TD-467 slice 2 and the page says nothing.
-
-**Fix:** as §4.5a says. (1) `cards.py`: from the record's `restarts`, the entries inside `RESTART_WINDOW` of now whose `why` is neither `start` nor `fill`; with any, `d["restarted"] = {"short": "restarted · " + <the why's words alone: cache lapsed, brief, wanted, person, …>, "text": "restarted · " + restart_words(newest), "hover": "<each entry, newest first, full words + age>\n<n> of 3 in 2 h"}`, the count from `agent_common._counted`'s rule so the chip agrees with the ceiling; none on a seat. (2) On the card a new `<span class="badge">` in row 4 beside the report line drawing `short`, on the Focus header a chip beside *brief changed* drawing `text`, each with the hover as its `title`, never pressable. (3) The view is pushed, so the chip appears with the restart and goes when the window passes — the page re-derives it from `restarts` on each render, no new field on the record. Tests: a record with a `cache` entry ten minutes old draws *restarted · cache lapsed · idle 5h · 191k*; one with a `start` entry alone draws none; one whose newest entry is three hours old draws none; a seat with a `fill` entry draws none; the hover lists two entries newest first with *2 of 3 in 2 h*; `cli.restarts_line` and the chip agree on the words (one table of cases). **Done when** the tests pass and, on a scratch home (`scripts/look_home.py`), a member the tick restarts for a changed brief shows *restarted · brief* on its card and its Focus header, with the entry and its age on hover, and the chip is gone two hours later.
-
-**Related:** TD-485 (the design), TD-467 (`ao status -v`'s line), TD-459 (the doorbell's restart), TD-217 (rule 7's restart), TD-103 (the ceiling).
 
 ## TD-489: A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m
 
