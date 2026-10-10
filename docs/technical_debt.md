@@ -49,7 +49,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-478 | Build the attachment road in pieces (TD-473): `ATTACH_PIECE_BYTES`, the `upload`/`offset`/`total`/`cancel` arms of `attach`, the `.part` and its link into place, `person.attach.max` on the Settings page, the composer's progress and ✕ | Medium | Built (#1370, #1413); live check waiting on the 50 MB PDF look |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
-| TD-484 | A member's lane count goes stale on its siblings' cards until each gets a delta of its own | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
@@ -746,23 +745,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-474 (the design), TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-096 (the read-only frame).
 
-## TD-484: A member's lane count goes stale on its siblings' cards until each gets a delta of its own
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (grinder-ao-2, review of PR #1358)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/app.py` (the events stream: the `session` delta's `compact_in`, the `gone` redraw, the `repos` event), `src/agentorc/ui/static/app.js` (`syncGroups`), `src/agentorc/ui/repo.py` (`compact_in`)
-
-**Why:** TD-428 slice 5 (#1358) draws each member's own lane count in its pill (§4.5a *card: compact*). The count is recomputed for the one card whose `session` delta arrives: when g2 claims an entry its own card reads *13/2*, while g1's still reads *14/2* until g1 has an event. A `repos` event (the ledger changed) and a member's `gone` (which changes `k`) redraw no member card. The page load and every poll redraw it correctly.
-
-**Fix:** carry each member's `lane_count` on the `groups` payload every delta already sends (`heads()` reads the same lanes), keyed by id, and have `syncGroups` patch each card's `.lanecount` from it, adding or removing the span.
-
-**Done when:** a test drives two members sharing a lane, one claiming, and the other's card reads the new count from the groups payload alone.
-
-**Related:** TD-428 (slice 5), TD-418 (the design).
 ## TD-485: The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one
 
 **Priority:** Low

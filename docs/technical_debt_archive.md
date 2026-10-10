@@ -8423,3 +8423,23 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-490, TD-498 (#1415).
 
 **Resolved:** 2026-10-09 (PR #1423) — `tests/test_exit_words.py::test_the_pill_hover_takes_the_first_that_applies` reads `pill_title` on a waiting view, a seat, a seat also exited (the seat text before the ending) and a host note over a seat; `::test_an_ending_before_today_says_its_day` reads the weekday on an instant two days back, in `clock` and `ending_hover`. Each of the Why's three probes now fails a test (1 failed, 810 passed).
+
+## TD-484: A member's lane count goes stale on its siblings' cards until each gets a delta of its own
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, review of PR #1358)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (the events stream: the `session` delta's `compact_in`, the `gone` redraw, the `repos` event), `src/agentorc/ui/static/app.js` (`syncGroups`), `src/agentorc/ui/repo.py` (`compact_in`)
+
+**Why:** TD-428 slice 5 (#1358) draws each member's own lane count in its pill (§4.5a *card: compact*). The count is recomputed for the one card whose `session` delta arrives: when g2 claims an entry its own card reads *13/2*, while g1's still reads *14/2* until g1 has an event. A `repos` event (the ledger changed) and a member's `gone` (which changes `k`) redraw no member card. The page load and every poll redraw it correctly.
+
+**Fix:** carry each member's `lane_count` on the `groups` payload every delta already sends (`heads()` reads the same lanes), keyed by id, and have `syncGroups` patch each card's `.lanecount` from it, adding or removing the span.
+
+**Done when:** a test drives two members sharing a lane, one claiming, and the other's card reads the new count from the groups payload alone.
+
+**Related:** TD-428 (slice 5), TD-418 (the design).
+
+**Resolved:** 2026-10-09 (PR #1424) — `render_heads` carries each member's lane count on its group as `lanes` (`{id: span or ""}`, the `lanecount.html` macro the card also calls), so every `session`, `gone` and `groups` delta brings every sibling's count, and `syncGroups` patches each pill; `tests/test_ui_team_summary.py::test_each_member_card_draws_its_own_lane_count_in_its_pill` reads g1's *13/2* from the groups payload after g2's claim. Design §4.5a *card: compact* says so.
