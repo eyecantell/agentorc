@@ -225,7 +225,6 @@ def test_ao_service_install_prints_the_root_line_only_when_staged(tmp_path, monk
     assert "root's to install" in capsys.readouterr().err
 
 
-
 def test_ao_service_install_says_a_failed_stage_and_still_succeeds(monkeypatch, capsys):
     from agentorc import cli
 
@@ -253,6 +252,7 @@ def test_ao_service_install_system_names_what_it_wrote(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert out.startswith("wrote /etc/systemd/system/agentorc-tmux.service; ")
     assert f"{service.TMUX_UNIT} and {service.WATCH_UNIT}.timer enabled and started" in out
+
 
 def test_the_watch_reads_as_not_loaded_on_a_host_without_systemd(monkeypatch):
     def missing(argv, **kw):
