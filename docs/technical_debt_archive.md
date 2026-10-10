@@ -8208,3 +8208,23 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-462 (the design), TD-039 (the conflict), TD-105 (archived; the evaluation), TD-052 (mail).
 
 **Resolved:** 2026-10-09 (PR #1412) — `agent_mail.msg` refuses `--kind conflict` and a `--cites` anywhere but an `ask` to two or more in one sentence naming §4.10 *Two controllers disagree* (`models.CITES_ON_AN_ASK`), which `ao msg --kind conflict` prints too, before argparse's *invalid choice*; the person gate covers an `ask` to two; `MAIL_KINDS`/`ASK_KINDS` drop the kind and `MailEntry.from_dict` reads a retained `conflict` as an `ask`; `cli.py`, `inbox.py`, `app.js`, `inbox_row.html`, `grinder.md`, `skill.md` and `techlead-context.md` drop it; `tests/test_mail.py`, `tests/test_cli.py` pin the four cases and the retained entry.
+
+## TD-462: Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, TD-105's evaluation)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Resolved:** 2026-10-09 (the designer; archived with its build TD-471, PR #1412) — the kind is gone from the design and the code: `--kind conflict` is refused naming §4.10 *Two controllers disagree*, `--cites` rides on an `ask` to two or more, a retained `conflict` reads as an `ask`. Was: Designed 2026-10-09 (the designer, PR #1343): the kind goes. §4.10 *Two controllers disagree* replaces *A `conflict` is an `ask` for every rule* — an `ask` to both controllers with `--cites`, which is accepted on an `ask` to two or more sessions and refused otherwise, an `ask` to two or more never naming the person (the gate that was the conflict's); the kinds table loses its row; `--kind conflict` is refused naming the paragraph, and a retained entry of that kind is read as an `ask`; *A disagreement, worked* keeps the judgement; every *ask, steer or conflict* enumeration in §4.10 and §4.5 reads *ask or steer*; §4.7's `--kind` list loses it. The build is TD-471. Was: Open — filed from TD-105's reading. The design round decides whether the kind goes, and files the build entry if it does.
+**Location:** design §4.10 (the kinds table, *A conflict is an `ask` for every rule in this section*, *A conflict, worked*), §4.5a (the conflict's rows), `src/sessionorc/mail.py`, `src/sessionorc/agent_mail.py`, `src/agentorc/briefs/` (each brief that names `--kind conflict`), `ao msg --kind conflict --cites`
+
+**Why:**
+- No session has sent a `conflict` since the kind was built (TD-039). Not one of the more than 650 run logs from 2026-09-07 holds a conflict send, and the roughly 300 retained entries hold none.
+- A conflict is an `ask` addressed to two or more controllers. Every team gives a member one controller, its manager, so the case cannot arise in today's shape.
+- §4.10 already says *a conflict is an ask for every rule in this section*. Yet every brief, every Inbox row renderer, every open-question count and every fact-check carries it as its own kind.
+
+**Fix:** design: fold `conflict` into an `ask` with several addressees and `--cites`. Keep what the kind uniquely carries: the cited `sends` and the rule that it never names the person. Alternatively, write down why the kind earns its place before a second controller exists. Then a build entry. **Done when** the design has one kind fewer, or says why it keeps it.
+
+**Related:** TD-105 (archived; the evaluation), TD-039 (the conflict), TD-052 (mail).
