@@ -63,6 +63,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-513 | The client half of TD-484's lane-count patch is pinned by no test: deleting the `syncGroups` block leaves every UI test green | Medium | Open |
 | TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
+| TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
 
 ---
 
@@ -984,3 +985,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Add one case each: a member with a `claimed` entry `{ref: 'TD-1', review_pr: 1302}` on a repo whose open PRs name no `td001` branch gives a `motion_rows` row with `pr == 1302` and a compact line ending `TD-1 → #1302`. **Done when** each probe fails a test.
 
 **Related:** TD-482 (#1422), TD-428.
+
+## TD-515: `pill_title`'s order — a *waiting* pill's reason before a seat and the ending, a host note before all — is asserted in no case that holds two of its inputs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/cards.py` (`pill_title`), `tests/test_exit_words.py` (`test_the_pill_hover_takes_the_first_that_applies`)
+
+**Why:** The test-audit of #1423 (TD-511). The test's docstring says §4.5a's order is *an unreachable host's reason, a waiting pill's reason, a seat on call, then the ending*, and its comment says the waiting reason and the seat are read *before the ending*. The cases it adds each hold one input (`{state_class: waiting, ...}` alone; `seat` alone), except `seat` with an ending and `host_note` with `seat`. Probes, `pytest -q tests/test_exit_words.py tests/test_ui_org.py`: the `waiting` branch moved below the `seat` and `ending` branches — **57 passed**; the `host_note` branch moved below the `waiting` branch — **9 passed**. So the order of a waiting pill against a seat, an ending and a host note is stated and asserted nowhere.
+
+**Fix:** Add cases holding two inputs: `{host_note, state_class: waiting}` gives the host note; `{state_class: waiting, seat: True}` and `{state_class: waiting}` with an ending give the waiting reason (or, if the design says a seat wins, the test says so and §4.5a is read first). **Done when** both probes fail a test.
+
+**Related:** TD-511 (#1423), TD-490.
