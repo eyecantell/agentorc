@@ -47,6 +47,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Designed 2026-10-10 — build TD-542 |
 | TD-542 | Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list | Medium | Open |
 | TD-541 | Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped | Medium | Open |
+| TD-545 | `person.file_link` is merged field by field and no test says so: dropping `file_link` from `_person_change`'s nested table leaves the whole suite green | Low | Open |
+| TD-546 | The Settings You form's `file_link` and template `file` collection and its two toggles are in no test: five mutations of `app.js` leave the suite green | Medium | Open |
 
 ---
 
@@ -712,3 +714,40 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-539 (the design), TD-062 (the promoted install), TD-120 / TD-132 (Promote; slice 5 built the first chip), TD-226 (rollback and its hold), TD-233 (the usage chip beside it).
 
+## TD-545: `person.file_link` is merged field by field and no test says so: `_person_change`'s nested table can lose `file_link` and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1492, TD-537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_settings.py` (`_person_change`'s `nested` table, the `"file_link": settings_mod.FILE_LINK_KEYS` line added by #1492); `tests/test_ui_settings.py::test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file`
+
+**Why:** the docstring #1492 wrote says *"`terminal`, `inbox`, `attach` and `file_link` merged field by field, a field set to None cleared"*. The only test that saves `file_link` posts both fields at once (`{"folder_first": False, "wait": 2.5}`) and then clears the whole key, so a whole-key replace gives the same answers. Probe: delete that one line from `nested` in a scratch worktree and run `tests/test_ui_open_in.py tests/test_ui_settings.py tests/test_ui_focus_paths.py tests/test_ui_focus_recent_files.py` — `67 passed`, as without the change. The merge is what lets the Settings form send `{wait: 3}` and leave the person's `folder_first: false` alone; without it that save silently turns the folder back on.
+
+**Fix:** a test in `test_ui_settings.py` (or beside `terminal`'s merge test): save `{folder_first: false}`, then `{wait: 3}`, read `person.file_link` back and expect both; then `{wait: null}` and expect `{folder_first: false}` alone.
+
+**Related:** TD-537 (the build), TD-536 (the design), TD-546 (the form's side).
+
+## TD-546: The Settings You form's `file_link` and template `file` collection and its two toggles are in no test: five mutations of `app.js` leave the suite green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1492, TD-537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the `you:` collector ~L4636-4650, the `input` handler's `#setfilelink` / `wait.disabled` lines ~L4691, the `#setopenin` change handler and the `folder_first` change handler ~L4751-4757); `tests/test_ui_settings.py::test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file`
+
+**Why:** that test posts JSON to `/api/settings/you` itself and reads the server-rendered page, so no line of the form's own JavaScript runs under it, and its docstring (*"the wait input disabled with the switch off"*) is true only of the first paint. Each of these mutations of `app.js`, made one at a time in a scratch worktree, left `test_ui_open_in.py`, `test_ui_settings.py`, `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` at `67 passed`:
+- `wait: f.elements.wait.value === "" ? null : Number(…)` replaced by `wait: 1` — an edited wait is never saved, and an emptied one never cleared;
+- `folder_first: f.elements.folder_first.checked` replaced by `true` — the switch can never be saved off;
+- `open_in.file = f.elements.file.value.trim()` removed — a template's **file** is never sent;
+- the `#setopenin` handler's `fl.classList.toggle("hidden", openin.value === "none")` replaced by `false` — the file link rows stay drawn under *none*;
+- `wait.disabled = !first.checked` removed — the wait stays editable with the switch off.
+This is the part of #1492 a person touches; the PR body's scratch-home UI check is its only guard.
+
+**Fix:** a node probe of the settings collector and handlers in the style of `test_ui_focus_paths.py` (a fake form with `elements`, the `you:` collector's return value, the change handlers' effect on `hidden` and `disabled`), or a Playwright check where `tests/` has one. The five mutations above are the acceptance.
+
+**Related:** TD-537 (the build), TD-536 (the design), TD-290 (a UI change is verified by the grinder), TD-545.
