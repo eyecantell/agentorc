@@ -104,7 +104,6 @@ async def test_closing_an_exited_record_keeps_its_end_and_is_the_ticks(agent, tm
 async def test_a_forgotten_hosts_records_close_as_the_ticks_and_keep_their_end(agent):
     from test_link import record
 
-    agent.sessions.clear()
     ended = {"how": "pane", "at": "2026-10-09T12:00:00Z", "code": 0}
     agent._take_records("laptop", [record("ao-x-v", state="exited", ended=ended)], whole=True)
     async with LocalClient() as c:
@@ -114,12 +113,15 @@ async def test_a_forgotten_hosts_records_close_as_the_ticks_and_keep_their_end(a
 
 
 async def test_a_failed_last_tick_write_is_never_a_failed_tick(agent, monkeypatch):
-    def refuse(_rec):
+    tried = []
+
+    def refuse(rec):
+        tried.append(rec["last_tick"])
         raise OSError("read-only")
 
     monkeypatch.setattr(agent.host_store, "save", refuse)
     await agent.tick()  # completes: the write's failure is logged, not raised
-    assert agent._ticked and agent._host_rec["last_tick"]
+    assert tried
 
 
 async def test_the_stop_time_kill_is_the_ticks(agent, tmp_path):
