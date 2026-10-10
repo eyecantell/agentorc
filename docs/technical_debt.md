@@ -54,7 +54,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-520 | A text paste with Ctrl+V on the Focus terminal is typed twice: `pasteClip` pastes it and the browser's own paste event reaches xterm.js as well | Low | Open |
 
 ---
 
@@ -823,18 +822,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-## TD-520: A text paste with Ctrl+V on the Focus terminal is typed twice: `pasteClip` pastes it and the browser's own paste event reaches xterm.js as well
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-10 (grinder-ao-2, met while building TD-479)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (Focus: `term.attachCustomKeyEventHandler`, the Ctrl+V / Ctrl+Shift+V / Shift+Insert lines that call `pasteClip` and `return false`)
-
-**Why:** On a scratch home (`scripts/look_home.py`, headless Chromium under Playwright, clipboard permissions granted), `MARK` on the clipboard and Ctrl+V on a shell session's terminal put `MARKMARK` at the prompt — on `origin/main`'s `app.js` as on TD-479's. The key handler's `return false` stops xterm.js from handling the key, but not the browser's default: the keydown still raises a `paste` event on xterm's textarea, which xterm.js pastes itself, beside `pasteClip`'s `term.paste`. A file-only clipboard is not doubled (xterm's own handler takes text alone), so TD-479's screenshot paste uploads once. Not yet seen in a headed browser, where a person would see a pasted command twice — a `git commit -m "…"` pasted into a shell would run with its text doubled.
-
-**Fix:** Read the doubling in a headed Chrome and Firefox first. If it holds there, take one road: either `preventDefault()` the key events `pasteClip` handles (the custom handler gets the `KeyboardEvent`), or let the native `paste` event carry text and call `pasteClip` only for the file case. A node test against stubs, as `tests/test_attach.py` runs the page's functions, pins that one Ctrl+V pastes once.
-
-**Related:** TD-479 (the terminal's file paste), TD-472.

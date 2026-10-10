@@ -234,6 +234,19 @@
     } catch (e) { blocked(); }
   };
 
+  // The terminal's paste chords — Ctrl+V, Ctrl+Shift+V, Shift+Insert — taken by `paste` (the one road,
+  // `AO.clipPaste`) and the browser's own paste cancelled: a key handler's `false` stops xterm.js from
+  // reading the key, not the browser from raising `paste` on xterm's textarea, which xterm.js pastes
+  // itself, so the text went in twice (TD-520). True when it took the key.
+  AO.pasteKey = function (e, paste) {
+    if (e.type !== "keydown") return false;
+    const v = e.key === "v" || e.key === "V";
+    if (!((e.ctrlKey && v && (e.shiftKey || !e.altKey)) || (e.shiftKey && e.key === "Insert"))) return false;
+    e.preventDefault();
+    paste();
+    return true;
+  };
+
   // One file up the attach road in pieces (§4.4 *Attachment drop*, TD-478): sliced by `piece` (the
   // host agent's `paths.ATTACH_PIECE_BYTES`, served on the Attach button) and sent in order through
   // `post(fields)`, which answers the route's JSON. The first piece carries `total`; the host agent
@@ -3397,12 +3410,11 @@
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) { copySel(); return false; }
-      if (e.ctrlKey && e.shiftKey && (e.key === "V" || e.key === "v")) { pasteClip(); return false; }
       if (e.ctrlKey && !e.shiftKey && (e.key === "c" || e.key === "C") && term.hasSelection()) { copySel(); term.clearSelection(); return false; }
-      // Plain Ctrl+V pastes text too: passed through, Claude Code reads ^V as "paste an image from
-      // the clipboard", which over ssh only produces a "try scp" message (first-use finding).
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "v" || e.key === "V")) { pasteClip(); return false; }
-      if (e.shiftKey && e.key === "Insert") { pasteClip(); return false; }
+      // Plain Ctrl+V pastes text too, as Ctrl+Shift+V and Shift+Insert do: passed through, Claude Code
+      // reads ^V as "paste an image from the clipboard", which over ssh only produces a "try scp"
+      // message (first-use finding).
+      if (AO.pasteKey(e, pasteClip)) return false;
       if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown")) { ws && ws.readyState === 1 && ws.send(JSON.stringify({ scroll: e.key === "PageUp" ? "up" : "down" })); return false; }
       return true;
     });
