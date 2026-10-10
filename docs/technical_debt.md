@@ -44,6 +44,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-523 | Ctrl+V on the Focus terminal makes the browser draw a *Paste* button the person must press: the page reads the clipboard by script (`clipboard.read()`) instead of the paste event's own data | Medium | Built (#1462); waits for Paul's look |
+| TD-524 | A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder | Medium | Open |
+| TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Open |
 
 ---
 
@@ -642,3 +644,40 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** let the paste chords (Ctrl+V, Ctrl+Shift+V, Shift+Insert) raise the browser's own `paste` event rather than cancelling their keydown. Catch it on the terminal's element in the capture phase, before xterm.js's textarea handler, `preventDefault()` + `stopPropagation()` so it is pasted once (TD-520's doubling stays fixed). Read `e.clipboardData`: a `text/plain` item pastes its text, a file and no text takes the attach road (TD-479). Keep the read-only toast first. Right-click and the header's **Paste** have no paste event, so they keep `AO.clipPaste`'s script read; a prompt there is the browser's and expected. Factor the pick of text vs file so the event road and `clipPaste` share it. Tests under node: a stub paste event with text pastes once and no `clipboard.read()` is called; one with a PNG and no text uploads once; the chords no longer `preventDefault()` their keydown. A UI check on a scratch home (headless Chromium, as #1448's): text and a PNG each pasted once with Ctrl+V. **Done when** the tests pass, and a look to Paul confirms Ctrl+V on the terminal pastes with no *Paste* button in his browser.
 
 **Related:** TD-479 (the file paste, whose look found it), TD-520 (#1449, the doubled paste whose fix moved Ctrl+V to the script read), TD-472.
+
+## TD-524: A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (ao-paul, found live by Paul on TD-501's links)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.6 *A path in the pane is a link* (the line rides on the local form alone), §4.5a **a path is a link**; `src/agentorc/ui/static/app.js` `AO.pathLink` (~L3370, the `at` suffix), `src/agentorc/ui/uiconf.py` `editor_file` (~L179, the remote and container forms with `windowId=_blank`)
+
+**Why:** Paul, 2026-10-10, Ctrl+clicked `src/agentorc/adapters/claude_code/__init__.py:263` in ao-paul's pane: VS Code opened, named `__init__.py` in its title, connected to kmaster, then opened nothing and asked for a folder or repo. `AO.pathLink` appends `:line[:col]` only to the `vscode://file{path}` form; the `vscode://vscode-remote/ssh-remote+<host>{path}?windowId=_blank` form goes out with the bare path. As far as is known (not yet tested), VS Code's URL handler opens a `vscode-remote` path as a *file* only when it ends in `:line`, and as a folder otherwise, which fails for a file. Every file link from a UI that is not on the host is therefore broken. Seen in the same test and not a bug: `src/agentorc/doctor.py:168` drew no link because ao-paul's worktree was on a commit from before that file existed, so the host rightly resolved nothing.
+
+**Fix:** first confirm the handler's rule against VS Code. Then the design: the line rides on every `vscode` form (local, ssh-remote, attached-container), `:1` when the run printed none, so a remote path always opens as a file. Weigh dropping `windowId=_blank` from the *file* form only: the file would land in the VS Code window used last, which is the worktree's once the editor button has opened it, instead of a new window with no folder. The editor button keeps `_blank` (the first-use finding of 2026-09-06 that a reused window loses what it showed, `src/agentorc/ui/uiconf.py` ~L207). A person's own template keeps what it says. TD-525 asks whether a file link can open the worktree first, and its answer may change this choice, so the two rounds go together. **Done when** the design says it, and the build entry it names is ledgered.
+
+**Related:** TD-493 / TD-501 (#1456, the links), TD-525 (the Session card, the auto-open question), TD-011 (the percent-encoding).
+
+## TD-525: The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's idea and calls in conversation)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 (Focus side panel, the **Session** card ~L423), §4.5a (the header's **VS Code** editor button row, the **Session** card row ~L68, **a path is a link**), §4.6 *A path in the pane is a link*, §5 `settings.yml` (the editor's label and template); mockup `Focus.dc.html`, `FocusRail.dc.html`
+
+**Why:** Paul, 2026-10-10: a "recent files" list on the side panel under Session, with an **Open** button. The **Session** card exists already (the last card, folded at first: profile, adapter id, tmux, directory, started, last, mode, run log, the stops, the grants and controllers); this extends it. Talking it over, Paul agreed that **Open** replaces the header's VS Code button rather than duplicating it, and that a browse-the-repo picker behind Open is not needed: VS Code's own Ctrl+P does that once the worktree is open.
+
+**Fix:** a design round settles:
+1. **Recent files.** The files this session edited (and perhaps read), newest first, each a file link as in the pane, perhaps with a mark for uncommitted change (`git diff --stat` against the worktree). The source should be the hooks the host agent already receives: Claude Code's PostToolUse carries each Edit/Write/Read's path. It should not be a screen scrape. Say what a session from a tool with no such hook shows.
+2. **Open.** The editor button moves into the card with its setting unchanged (label, template, or none). TD-501's *no editor button, no file links* keys on the setting (`open_in` kind `none`), not on the button's place. The card starts folded, so say where Open sits so that it is not hidden: on the card's summary line, or the card unfolded, or Open outside it. The put-away rail carries an Open mark, so the worktree is reachable with the panel collapsed.
+3. **Paul's question: can a file link open the worktree first when it is not yet open, then the file?** The browser cannot see VS Code's windows. Options: (a) the page remembers, per browser, that it pressed Open for this session (wrong once VS Code is closed), and on a first file link sends the folder link and then the file link (two protocol-handler launches, timing-dependent, perhaps two browser prompts); (b) the host agent asks the VS Code server on the host: each open remote window has an IPC socket (`/run/user/<uid>/vscode-ipc-*.sock`, 305 on kmaster on 2026-10-10, many stale) that the server's `remote-cli` `code --reuse-window <file>` can use, if the window holding the worktree can be told apart (unproven; a spike first); (c) none, relying on TD-524's `windowId` choice. Recommend one with its reasons.
+
+**Done when** the design says all three and the build entries it names are ledgered.
+
+**Related:** TD-524 (the remote file link, decided with this), TD-493 / TD-501 (#1456, the pane's file links).
