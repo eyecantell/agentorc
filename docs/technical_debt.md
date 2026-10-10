@@ -47,7 +47,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
 | TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Built (#1467); waits for Paul's look |
 | TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open |
-| TD-528 | A template `person.open_in` with `{line}` draws the folder button with `{line}` unfilled, and the Settings page's url note names only `{path}` and `{remote}` | Low | Open |
+| TD-528 | A template `person.open_in` with `{line}` draws the folder button with `{line}` unfilled, and the Settings page's url note names only `{path}` and `{remote}` | Low | Designed 2026-10-10 — build TD-529 |
+| TD-529 | Build the folder form's drop of a template's `{line}` (TD-528): `editor_link` strips `:{line}`, the Settings note names `{line}` | Low | Open |
 
 ---
 
@@ -725,9 +726,31 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (grinder-ao-2, found by the independent review of TD-526's #1467)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-10 (the designer) — §5: a folder form drops `{line}` together with the one `:` before it (`zed://ssh/{remote}{path}:{line}` opens the directory as `…/dir`); filling `1` would make the handler read a file and refusing the template would take the button away; §4.5a's Settings row names the *url* note's three words. Built by TD-529. Was: Open.
+**Blocked by:** TD-529
 **Location:** design §5 `person.open_in` (`{line}`: *the file form only*), §4.5a **Settings page** rows for `open_in`; `src/agentorc/ui/uiconf.py` (`editor_link`, which fills `{path}` and `{remote}`), `src/agentorc/ui/templates/settings.html` (the template url's note)
 
 **Why:** TD-524's round gave a template `{line}` beside `{path}` and `{remote}`, filled on the file form (built by TD-526, #1467). The folder form — the Session card's and the card's editor button, *edit yml*, Settings' **Open file** — fills only `{path}` and `{remote}`, so a template such as `zed://ssh/{remote}{path}:{line}`, which the file links invite, draws a folder button whose link ends `:{line}` literally. The design says `{line}` is the file form's only and is silent on what the folder form does with it; the Settings page's note under the url names `{path}` and `{remote}` alone, so a person never learns `{line}` exists.
 
 **Fix:** a design call first: what the folder form does with `{line}` (drop it with what is around it, fill `1`, or refuse such a template for the button), and the Settings note's words. Then the build: `editor_link` as decided, a test with a `{line}` template, the note.
+
+## TD-529: Build the folder form's drop of a template's `{line}` (TD-528): `editor_link` strips `:{line}`, the Settings note names `{line}`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (the designer, TD-528's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §5 `person.open_in` (*a folder form drops it with the one `:` before it*), §4.5a **Settings page: You** (the *url* note); `src/agentorc/ui/uiconf.py` (`editor_link`: the template branch), `src/agentorc/ui/templates/settings.html` (the note under *url*, ~L188), `tests/test_ui_open_in.py`
+
+**Why:** TD-528: a template written for the file links, `…{path}:{line}`, drew every folder button with a literal `:{line}` at its tail, and the Settings page never said `{line}` exists.
+
+**Fix:**
+1. `editor_link`'s template branch: before filling `{path}` and `{remote}`, remove `:{line}` where the `:` is there and a bare `{line}` otherwise; `editor_file` unchanged.
+2. The Settings note under *url*: `{path}` *the directory or file*, `{remote}` *the host*, `{line}` *the line, on a file link; a folder drops it with the `:` before it*.
+3. Tests: a `…{path}:{line}` template's folder link ends at the path; a bare `{line}` goes too; a template without `{line}` is as before; the file form still fills it.
+
+**Done when** a `{line}` template's folder buttons open the directory, the note names `{line}`, and the tests pin both.
+
+**Related:** TD-528 (the design), TD-526 (the file form's `{line}`), TD-524.
