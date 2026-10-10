@@ -47,7 +47,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
-| TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | In progress |
+| TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Built — live check of #1403 |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
@@ -737,8 +737,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** feature
 **Added:** 2026-10-09 (the designer, TD-111's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1, part (1), the never-gated `doctor` RPC with the adapter's `doctor_profiles`, is PR #1363 (grinder-ao-1, 2026-10-09); slice 2, parts (2) and (4), `cmd_doctor` with `agentorc.doctor`'s verdicts and `ao --skill`'s line, is grinder-ao-2's (2026-10-09). **Left:** (3) `--probe`. The **agent** line's watch is TD-497's.
+**Kind:** live-check #1403
+**Status:** Built — slice 1 #1363 (the `doctor` RPC), slice 2 #1400 (`ao doctor`'s verdicts, `ao --skill`'s line), slice 3 #1403 (`--probe`). The **agent** line's watch is TD-497's. **The live check:** once #1403 is live (`ao promote status`), run `ao doctor` and `ao doctor --json` — never-gated reads — and check that the seven checks print with verdicts, that the JSON carries the raw readings, and that the exit code matches the lacks. A seeded lack and the probe both act: run them on a scratch home (`scripts/look_home.py`). The probe on kmaster's own profiles is Paul's: `ao doctor hooks --probe` from his terminal.
 **Location:** design §4.7 **`ao doctor`** (the whole of it), §4.8a (the never-gated reads), §4.2 (the layer, `confidence`, the queue); `src/agentorc/cli.py` (`cmd_doctor`, beside `cmd_identity`, `cmd_host`, `cmd_promote`, `cmd_gate` and the `org check` printing it reuses), `src/sessionorc/agent_identity.py` (the server read `_id_server` keeps; `rpc_identity`), `src/sessionorc/tmux.py` (`server_pid`), `src/agentorc/adapters/claude_code/__init__.py` (`hooks_file`, `hook_command`, `credentials_ok`, `usage_for`), `src/sessionorc/containers.py` (`host_status`), `src/agentorc/skill.md`
 
 **Why:** TD-111's read (2026-10-08): half the checks exist over five commands and the half that needs a probe does not; every *found live* entry cost a session an hour a line would have printed.

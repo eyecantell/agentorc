@@ -15,6 +15,8 @@ CHECKS = ("agent", "tmux", "hooks", "identity", "profiles", "nodes", "org")
 HOME_ONLY = frozenset({"nodes", "org"})
 # a queued hook line older than this the tick should have applied: it drains within a tick
 QUEUE_STALE = 60.0
+# how long a probe waits for its scratch launch's first hook (§4.7 `--probe`)
+PROBE_WAIT = 30.0
 # a session just launched is scraped until its first hook lands: no warning inside this
 FIRST_HOOK = 60.0
 
@@ -153,6 +155,25 @@ def hooks(r: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
     if newest is not None:
         text += f", newest {_words(newest)} ago"
     return [_row("hooks", OK, text, hooks=r)]
+
+
+def probe(profile: str, took: float | None, tail: list[str], wait: float = PROBE_WAIT) -> dict[str, Any]:
+    """A probe's line (`--probe`): the scratch launch's first hook and how long it took, or none in
+    the wait, with the pane's last lines under it."""
+    if took is not None:
+        return _row("hooks", OK, f"hooks — probe {profile}: SessionStart in {took:.1f}s", probe=profile, took=took)
+    last = "".join(f"\n    {t}" for t in tail if t.strip())
+    return _row("hooks", LACKING, f"hooks — probe {profile}: no hook in {int(wait)}s{last}", probe=profile, tail=tail)
+
+
+def probe_failed(profile: str, what: str, why: str) -> dict[str, Any]:
+    return _row("hooks", LACKING, f"hooks — probe {profile}: {what}: {why}", probe=profile)
+
+
+def probe_left(profile: str, sid: str, why: str) -> dict[str, Any]:
+    """A probe whose record could not be killed or removed: the person cleans it up by name."""
+    text = f"hooks — probe {profile}: {sid} not cleaned up ({why}): `ao kill {sid}`, then `ao forget {sid}`"
+    return _row("hooks", WARNING, text, probe=profile, id=sid)
 
 
 def identity(r: dict[str, Any]) -> list[dict[str, Any]]:

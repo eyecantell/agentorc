@@ -6,6 +6,7 @@ check's raw reading, *home only* on a node. The RPC is faked: what is judged is 
 from __future__ import annotations
 
 import json
+import pathlib
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -293,3 +294,98 @@ def test_no_host_agent_stops_at_the_first_line_exit_3(monkeypatch, capsys):
     monkeypatch.setattr(cli, "_agent_answers", lambda: False)
     assert cli.main(["doctor"]) == 3
     assert capsys.readouterr().out.splitlines()[0] == "lacking: agent — no host agent answering"
+
+
+@pytest.fixture
+def probed(agent, monkeypatch):
+    """`create`, `explain`, `kill` and `remove` for a probe; `hook_after` is how many reads of the
+    record pass before its first hook (None: never)."""
+    calls: list[tuple[str, dict]] = []
+    state = {"hook_after": 1, "reads": 0}
+
+    def fake(method, **params):
+        calls.append((method, params))
+        if method == "create":
+            assert pathlib.Path(params["dir"]).is_dir() and "prompt" not in params
+            return {"id": f"ao-{params['name']}"}
+        if method == "explain":
+            state["reads"] += 1
+            hooked = state["hook_after"] is not None and state["reads"] > state["hook_after"]
+            return {"last_hook": "2026-10-09T12:00:00Z" if hooked else None, "tail": ["", "Do you trust?"]}
+        if method in ("kill", "remove"):
+            return {}
+        return agent[method]
+
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.setattr(cli.doctor, "PROBE_WAIT", 0.3)
+    monkeypatch.setattr(cli, "_probe", lambda row, wait=0.3, every=0.01, f=cli._probe: f(row, wait, every))
+    state["fake"] = fake
+    return calls, state
+
+
+def test_a_probe_fires_sessionstart_and_leaves_nothing(probed, capsys):
+    calls, _ = probed
+    assert cli.main(["doctor", "hooks", "--probe", "grind"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[1].startswith("ok: hooks — probe grind: SessionStart in ")
+    made = next(p for m, p in calls if m == "create")
+    assert made["name"] == "probe-grind" and made["profile"] == "grind" and made["adapter"] == "claude-code"
+    assert [m for m, _ in calls if m in ("kill", "remove")] == ["kill", "remove"]
+    assert not pathlib.Path(made["dir"]).exists()
+
+
+def test_a_probe_with_no_hook_lacks_with_the_panes_last_lines(probed, capsys):
+    calls, state = probed
+    state["hook_after"] = None
+    assert cli.main(["doctor", "hooks", "--probe"]) == 1
+    out = capsys.readouterr().out
+    assert "lacking: hooks — probe grind: no hook in 0s\n    Do you trust?" in out
+    assert [m for m, _ in calls if m in ("kill", "remove")] == ["kill", "remove"]
+
+
+def test_a_probe_is_refused_to_a_session_and_outside_hooks_and_for_an_unknown_profile(probed, monkeypatch, capsys):
+    calls, _ = probed
+    assert cli.main(["doctor", "tmux", "--probe"]) == 1
+    assert cli.main(["doctor", "hooks", "--probe", "nope"]) == 1
+    assert "no profile 'nope'" in capsys.readouterr().err
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-me")
+    assert cli.main(["doctor", "--probe"]) == 1
+    assert "a person's own" in capsys.readouterr().err
+    assert not [m for m, _ in calls if m == "create"]
+
+
+def test_a_refused_launch_is_the_probes_lack_and_the_other_checks_still_print(probed, monkeypatch, capsys):
+    calls, state = probed
+
+    def refuse(method, **params):
+        if method == "create":
+            raise cli.AgentError("probe-grind is taken")
+        return state["fake"](method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    assert cli.main(["doctor", "--probe"]) == 1
+    out = capsys.readouterr().out
+    assert "lacking: hooks — probe grind: launch refused: probe-grind is taken" in out
+    assert "ok: org" in out
+
+
+def test_a_failed_read_still_cleans_up_and_a_failed_cleanup_is_said(probed, monkeypatch, capsys):
+    calls, state = probed
+
+    def broken(method, **params):
+        if method == "explain":
+            raise cli.AgentError("gone")
+        if method == "kill":
+            calls.append((method, params))
+            raise cli.AgentUnavailable("down")
+        return state["fake"](method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", broken)
+    assert cli.main(["--json", "doctor", "hooks", "--probe"]) == 1
+    rows = json.loads(capsys.readouterr().out)["checks"]
+    texts = [(r["verdict"], r["text"]) for r in rows if r.get("probe")]
+    assert texts[0] == ("lacking", "hooks — probe grind: record unread: gone")
+    assert texts[1][0] == "warning" and "ao-probe-grind not cleaned up (down)" in texts[1][1]
+    made = next(p for m, p in calls if m == "create")
+    assert not pathlib.Path(made["dir"]).exists()
