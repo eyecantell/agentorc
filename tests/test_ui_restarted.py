@@ -78,6 +78,11 @@ def test_the_hover_lists_the_window_newest_first_and_counts_toward_the_ceiling()
     person = restarted_view([{"why": "person", "at": ago(minutes=5)}, {"why": "brief", "at": ago(minutes=20)}], NOW)
     assert person["hover"].split("\n")[-1] == "1 of 3 in 2 h"
     assert person["text"] == "restarted · person"
+    # a malformed `done` costs the count its rule, never the page (view() runs for every card)
+    bad = restarted_view(
+        [{"why": "brief", "at": ago(minutes=30), "done": 5}, {"why": "wanted", "at": ago(minutes=5), "done": 5}], NOW
+    )
+    assert bad["text"] == "restarted · wanted" and bad["hover"].split("\n")[-1] == "2 of 3 in 2 h"
 
 
 @pytest.mark.unit

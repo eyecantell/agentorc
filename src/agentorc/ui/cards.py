@@ -655,7 +655,11 @@ def restarted_view(restarts: Any, now: datetime) -> dict[str, str] | None:
     short = "cache lapsed" if newest.get("why") == "cache" else str(newest.get("why") or "") or "restarted"
     hours = round(RESTART_WINDOW.total_seconds() / 3600)
     lines = [f"{restart_words(r)}, {_age(r.get('at'), now)} ago" for _, r in window]
-    lines.append(f"{len(_counted(entries, now))} of {RESTART_CEILING} in {hours} h")
+    try:
+        counted = len(_counted(entries, now))
+    except (TypeError, ValueError, AttributeError):  # a malformed `done`: this card's count, not the grid
+        counted = len(window)
+    lines.append(f"{counted} of {RESTART_CEILING} in {hours} h")
     return {
         "short": f"restarted · {short}",
         "text": f"restarted · {restart_words(newest)}",
