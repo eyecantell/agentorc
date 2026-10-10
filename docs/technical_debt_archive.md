@@ -8643,3 +8643,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-501 (#1429), TD-493.
 
 **Resolved:** 2026-10-10 (PR #1442) — `test_paths_is_served_under_enforce_from_a_channel_nobody_can_place`: under `enforce`, with the channel check made to fail, `paths` answers while `doing` is refused. The probe in the Why (`"paths",` deleted from `identity.READS`) fails it.
+
+## TD-514: Two `review_pr` reads in `ui/org.py` — the TDs-in-motion row's PR and the compact line's `→ #N` — are pinned by no test in the suite
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/org.py` (`motion_rows`: `pr = p.get("pr") or p.get("review_pr")`; `compact_line`: `pr = claims[0].get("pr") or claims[0].get("review_pr")`)
+
+**Why:** The test-audit of #1422 (TD-482). TD-482 pinned the `review_pr` source in `cards.py`'s `review_wait` only. `org.py` reads the tick's `review_pr` twice more, and the docstring of `motion_rows` names it as a source (*its own `pr`, the tick's `review_pr`, or else an open PR whose head branch names the reference*). Probe: both `or p.get("review_pr")` / `or claims[0].get("review_pr")` removed, then the whole `pytest -q tests` — every test passed (all dots, no F), as did `tests/test_ui_org.py tests/test_ui_team_summary.py tests/test_ui_work_row.py tests/test_ui.py` alone (156 passed). A claim whose PR the tick set but whose branch no open PR names draws no `review` row PR and no `→ #N`, unseen.
+
+**Fix:** Add one case each: a member with a `claimed` entry `{ref: 'TD-1', review_pr: 1302}` on a repo whose open PRs name no `td001` branch gives a `motion_rows` row with `pr == 1302` and a compact line ending `TD-1 → #1302`. **Done when** each probe fails a test.
+
+**Related:** TD-482 (#1422), TD-428.
+
+**Resolved:** 2026-10-10 (PR #1444) — `tests/test_ui_team_summary.py::test_a_claims_pr_the_tick_set_is_its_review_row_and_its_compact_lines_pr`: a claim carrying only the tick's `review_pr` 1302, no open PR on its branch, gives a *review* row with `pr == 1302` and the compact line `Grinder · TD-1 → #1302`; each probe in the Why now fails it.
