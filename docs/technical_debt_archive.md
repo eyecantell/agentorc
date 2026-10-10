@@ -9298,3 +9298,19 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-536 (the design), TD-532 / TD-535 (the pair, #1483), TD-526 (the one launch), TD-528 / TD-529 (a folder form drops `{line}`), TD-095 / TD-146 (`person.open_in`), TD-148 (the Settings page's You).
 
 **Resolved:** 2026-10-10 (PR #1492) — `person.file_link: {folder_first, wait}` parsed in `sessionorc/settings.py` and read by `uiconf.file_link()`; a template's `file` served by `editor_file`; the record's `editor` carries `first` and `wait`, which `AO.openFile` and the recent files obey; the Settings page's You draws and saves the switch, the wait and **file**; the help gains *file link*. `tests/test_ui_open_in.py`, `test_ui_settings.py`, `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` pin it; the UI check on a scratch home held every case (PR body).
+
+## TD-540: No test holds `AO.openEditor`'s `quiet` argument: the second launch of a file link's pair can toast again and `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` stay green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1483)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`AO.openEditor`'s `if (!quiet) AO.toast(…)`, added by #1483, TD-535); `tests/test_ui_focus_paths.py` (`test_a_press_is_two_launches_the_folder_then_the_file_a_second_after`), `tests/test_ui_focus_recent_files.py` (`test_a_recent_file_click_sends_the_folder_then_the_file_and_the_cards_button_one_launch`)
+
+**Why:** the `AO.openFile` comment says *"One toast for the pair"*, and the test's docstring repeats it (*"quietly — one toast for the pair"*). Both tests replace the launcher (`open` as a recording stub, or `AO.openEditor = (...x) => opened.push(x)`) and assert only that the file launch is *called with* a third argument `true`; neither runs `AO.openEditor` itself, so what that argument does is never exercised. Probe, on `origin/main` 3e9cb7db, in the worktree: change `if (!quiet) AO.toast(` to `if (true) AO.toast(` and run `PYTHONPATH=$PWD/src python -m pytest -q tests/test_ui_focus_paths.py tests/test_ui_focus_recent_files.py` — **20 passed**, three runs of the unmutated pair also 20 passed. A press then toasts *opening in VS Code…* twice (the folder's and the file's) and the suite does not notice. (The other mutations tried, the dropped wait, the removed no-folder fallback and a 6 s wait, each fail a test.)
+
+**Related:** TD-535 (the build), TD-532 (the design), TD-533 / TD-534 (earlier audit findings on the same area).
+
+**Resolved:** 2026-10-10 (PR #1496) — `tests/test_ui_focus_paths.py::test_open_editor_toasts_unless_quiet_and_a_pair_toasts_once` runs the real `AO.openEditor` under node, with `AO.toast` and the hidden frame recorded. A launch toasts once, a quiet one none, and `AO.openFile`'s pair sends both frames under one toast. With the guard reverted to `if (true)`, the test fails.

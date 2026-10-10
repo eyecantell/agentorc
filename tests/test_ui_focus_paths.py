@@ -337,3 +337,54 @@ def test_the_help_carries_the_path_link_under_focus():
     assert h.name == "a path is a link" and h.where == "Focus pane"
     assert "Ctrl+click (Cmd+click on a Mac)" in h.text and "no file links" in h.text
     assert "pane-path" in dict((g[0], g[2]) for g in helpmod.SCREENS)["focus"]
+
+
+QUIET_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop, remove: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+const frames = [];
+const body = { ...el(), appendChild: (f) => frames.push(f.src) };
+const document = { documentElement: el(), body, querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: noop, createElement: el };
+global.window = {}; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+const timers = [];
+global.setInterval = noop; global.setTimeout = (f, ms) => timers.push([f, ms]); global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const toasts = [];
+AO.toast = (...a) => toasts.push(a);
+// the real `AO.openEditor`, its toast and its hidden frame recorded; the frame's removal timer dropped
+const run = (f) => { toasts.length = 0; frames.length = 0; timers.length = 0; f();
+  timers.splice(0).filter(([, ms]) => ms !== 3000).forEach(([g]) => g());
+  return { toasts: toasts.slice(), frames: frames.slice() }; };
+console.log(JSON.stringify({
+  loud: run(() => AO.openEditor("vscode://file/r?windowId=_blank", "VS Code")),
+  quiet: run(() => AO.openEditor("vscode://file/r/a.py:1", "VS Code", true)),
+  pair: run(() => AO.openFile({ url: "vscode://file/r?windowId=_blank", label: "VS Code" }, "vscode://file/r/a.py:1")),
+}));
+"""
+
+
+@pytest.mark.unit
+def test_open_editor_toasts_unless_quiet_and_a_pair_toasts_once():
+    """TD-540 (test audit of #1483): the real `AO.openEditor` — a launch toasts once, a quiet one none,
+    and `AO.openFile`'s pair (§4.6 *The press is two launches*) sends both frames under one toast."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the opener is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "quiet_probe.js"
+    probe.write_text(QUIET_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    assert got["loud"] == {"toasts": [["opening in VS Code…", True]], "frames": ["vscode://file/r?windowId=_blank"]}
+    assert got["quiet"] == {"toasts": [], "frames": ["vscode://file/r/a.py:1"]}
+    assert got["pair"]["frames"] == ["vscode://file/r?windowId=_blank", "vscode://file/r/a.py:1"]
+    assert got["pair"]["toasts"] == [["opening in VS Code…", True]]
