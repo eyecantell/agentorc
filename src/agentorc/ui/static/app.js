@@ -151,14 +151,16 @@
   // `text/plain` is the text's. `upload(f, ctl)` is handed `ctl.progress(pct, last)`, which past a file's
   // first piece makes the label *Attaching <name> · n%* and shows `cancel`, the ✕, until `last`, and
   // `ctl.cancelled()`, true once the ✕ was pressed for this file; an upload that answers no path was
-  // cancelled and inserts nothing (TD-478). Answers `attach(files)`, the promise of the queue.
+  // cancelled and inserts nothing (TD-478). Answers `attach(files, put)`, the promise of the queue:
+  // with `put`, the terminal's paste of a file (TD-479), each path goes to `put` and not to the caret,
+  // and the composer need not be open.
   AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel }) {
     const label = button.lastChild, word = label.textContent;
     const shut = () => composer.classList.contains("hidden");
     let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
     let stopNow = () => {};
     if (cancel) cancel.addEventListener("click", () => { stopNow(); cancel.classList.add("hidden"); });
-    async function each(list) {
+    async function each(list, put) {
       button.disabled = true;
       for (const f of list) {
         label.textContent = `Attaching ${f.name}…`;
@@ -169,17 +171,20 @@
           progress: (pct, last) => { label.textContent = `Attaching ${f.name} · ${pct}%`; if (cancel) cancel.classList.toggle("hidden", stopped || !!last); },
           cancelled: () => stopped,
         };
-        try { const path = await upload(f, ctl); if (path) AO.insertAtCaret(compose, path); } catch (e) { fail(`Attach failed: ${e.message}`); }
+        try {
+          const path = await upload(f, ctl);
+          if (path) put ? put(path) : AO.insertAtCaret(compose, path);
+        } catch (e) { fail(`Attach failed: ${e.message}`); }
         stopNow = () => {};
         if (cancel) cancel.classList.add("hidden");
       }
       label.textContent = word; button.disabled = false;
-      compose.dispatchEvent(new Event("input")); compose.focus();
+      if (!put) { compose.dispatchEvent(new Event("input")); compose.focus(); }
     }
-    function attach(files) {
+    function attach(files, put) {
       const list = Array.from(files || []);
-      if (!list.length || shut()) return attaching;
-      attaching = attaching.then(() => each(list)).catch((e) => fail(`Attach failed: ${e.message}`));
+      if (!list.length || (!put && shut())) return attaching;
+      attaching = attaching.then(() => each(list, put)).catch((e) => fail(`Attach failed: ${e.message}`));
       return attaching;
     }
     button.addEventListener("click", () => input.click());
@@ -194,6 +199,40 @@
       e.preventDefault(); attach(cd.files);
     });
     return attach;
+  };
+
+  // The terminal's **Paste** (§4.5a *Copy / Paste*, TD-472): the clipboard as `clip.read()` gives it.
+  // An item carrying `text/plain` is the text's, handed to `text`, as before; one carrying no text and
+  // a file type (a screenshot: `image/png` first) is handed to `file` as a File named for the moment,
+  // for the attach road. A browser without `read()`, or one that refuses it, pastes text alone through
+  // `readText()`, and says so when that finds nothing; a clipboard it cannot read at all is a toast.
+  AO.clipPaste = async function (clip, { text, file, toast, now }) {
+    const blocked = () => toast("clipboard blocked (needs https or localhost)");
+    const plain = async (says) => {
+      let t;
+      try { t = await clip.readText(); } catch (e) { blocked(); return; }
+      if (t) text(t); else if (says) toast("this browser pastes text only");
+    };
+    if (!clip) { blocked(); return; }
+    if (typeof clip.read !== "function") { await plain(true); return; }
+    let items;
+    try { items = await clip.read(); } catch (e) { await plain(false); return; }
+    try {
+      for (const it of items || []) {
+        if (!(it.types || []).includes("text/plain")) continue;
+        const t = await (await it.getType("text/plain")).text();
+        if (t) text(t);
+        return;
+      }
+      for (const it of items || []) {
+        const types = it.types || [];
+        const type = types.includes("image/png") ? "image/png" : types.find((t) => !t.startsWith("text/"));
+        if (!type) continue;
+        const blob = await it.getType(type);
+        file(new File([blob], AO.attachName({ name: "", type }, now || new Date()), { type }));
+        return;
+      }
+    } catch (e) { blocked(); }
   };
 
   // One file up the attach road in pieces (§4.4 *Attachment drop*, TD-478): sliced by `piece` (the
@@ -3344,7 +3383,18 @@
     // right-click paste; the header buttons do the same for discoverability. Clipboard access
     // needs a secure context (https or localhost) — ssh -L to 127.0.0.1 qualifies.
     const copySel = () => { const t = term.getSelection(); if (t) navigator.clipboard.writeText(t).then(() => AO.toast("copied", true), () => AO.toast("clipboard blocked (needs https or localhost)")); return !!t; };
-    const pasteClip = () => readOnly ? AO.toast("watching: paste is off — Take over to type") : navigator.clipboard.readText().then((t) => { if (t && ws && ws.readyState === 1) term.paste(t); }, () => AO.toast("clipboard blocked (needs https or localhost)"));
+    // A screenshot (a file and no text) takes the attach road whether or not the composer is open, and
+    // its path is pasted here — a bracketed paste, so it lands in the tool's input unsent (TD-479)
+    let attachFiles = null;
+    const live = () => ws && ws.readyState === 1;
+    const pasteClip = () => {
+      if (readOnly) { AO.toast("watching: paste is off — Take over to type"); return; }
+      AO.clipPaste(navigator.clipboard, {
+        text: (t) => { if (live()) term.paste(t); },
+        file: (f) => attachFiles && attachFiles([f], (path) => { if (live()) term.paste(path); }),
+        toast: AO.toast,
+      });
+    };
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) { copySel(); return false; }
@@ -3430,8 +3480,9 @@
     // inserted at the composer's caret — Claude Code reads a path in a prompt — and nothing is sent
     // until Send. A drop on the terminal or the composer and an image pasted into the composer take
     // the same road; a paste that carries text is the text's, as before. Not while the composer is
-    // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*).
-    AO.wireAttach({
+    // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*). A screenshot
+    // pasted on the terminal takes it too, its path pasted there (`pasteClip` above, TD-479).
+    attachFiles = AO.wireAttach({
       button: $("#attach"), input: $("#attachfile"), composer: $("#composer"), compose, targets: [$("#term"), compose],
       fail: banner, cancel: $("#attachcancel"),
       upload: (f, ctl) => AO.uploadPieces(f, {
