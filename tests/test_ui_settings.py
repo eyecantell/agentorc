@@ -345,7 +345,15 @@ def test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file(client,
         bad = client.post("/api/settings/you", json={"file_link": {"wait": 5}})
         assert bad.status_code == 400 and "0 to 4" in bad.json()["detail"]
         assert client.post("/api/settings/you", json={"file_link": {"colour": 1}}).status_code == 400
-        tpl = {"label": "Zed", "url": "zed://ssh/{remote}{path}", "file": "zed://f/{remote}{path}:{line}"}
+        # merged field by field (TD-545): a save of the wait alone leaves the switch off, a field set to None
+        # clears that field alone
+        call_sync("set_settings", person={"file_link": None})
+        assert client.post("/api/settings/you", json={"file_link": {"folder_first": False}}).json()["ok"]
+        assert client.post("/api/settings/you", json={"file_link": {"wait": 3}}).json()["ok"]
+        assert call_sync("settings")["person"]["file_link"] == {"folder_first": False, "wait": 3}
+        assert client.post("/api/settings/you", json={"file_link": {"wait": None}}).json()["ok"]
+        assert call_sync("settings")["person"]["file_link"] == {"folder_first": False}
+        tpl ={"label": "Zed", "url": "zed://ssh/{remote}{path}", "file": "zed://f/{remote}{path}:{line}"}
         assert client.post("/api/settings/you", json={"open_in": tpl}).json()["ok"]
         assert call_sync("settings")["person"]["open_in"] == tpl
         assert 'name="file" value="zed://f/{remote}{path}:{line}"' in client.get("/settings").text
