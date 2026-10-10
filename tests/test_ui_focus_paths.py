@@ -189,6 +189,7 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
     boxNoLine: press({ ctrlKey: true }, BOX, "/w/a.py", null, null),
     tmpl: press({ ctrlKey: true }, "zed://ssh/km{path}:{line}", "/r/a.py", 12, 3),
     tmplNoLine: press({ ctrlKey: true }, "zed://ssh/km{path}:{line}", "/r/a.py", null, null),
+    tmplTwice: press({ ctrlKey: true }, "x://o?f={path}&l={line}&g={line}", "/r/a.py", 9, null),
     tmplBare: press({ ctrlKey: true }, "zed://ssh/km{path}", "/r/a.py", 12, null),
     tmplQuery: press({ ctrlKey: true }, "vscode://file{path}?windowId=_blank", "/r/a.py", 12, null),
     plain: press({}, FILE, "/r/a.py", 1, null),
@@ -263,6 +264,7 @@ def test_only_ctrl_or_cmd_opens_and_the_line_rides_on_every_vscode_form():
     # stands, and one of the person's own with a query is a template, not a `vscode` form
     assert got["tmpl"]["opened"] == [["zed://ssh/km/r/a.py:12", "the editor"]]
     assert got["tmplNoLine"]["opened"] == [["zed://ssh/km/r/a.py:1", "the editor"]]
+    assert got["tmplTwice"]["opened"] == [["x://o?f=/r/a.py&l=9&g=9", "the editor"]]
     assert got["tmplBare"]["opened"] == [["zed://ssh/km/r/a.py", "the editor"]]
     assert got["tmplQuery"]["opened"] == [["vscode://file/r/a.py?windowId=_blank", "the editor"]]
     assert got["plain"] == {"r": False, "opened": []} and got["none"] == {"r": False, "opened": []}

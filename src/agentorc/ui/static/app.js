@@ -3397,7 +3397,7 @@
     const path = String(resolved).split("/").map(encodeURIComponent).join("/");
     const vscode = file.startsWith("vscode://") && file.endsWith("{path}");
     const at = vscode ? `:${line || 1}${line && col ? `:${col}` : ""}` : "";
-    (open || AO.openEditor)(file.replace("{path}", path + at).replace("{line}", String(line || 1)), "the editor");
+    (open || AO.openEditor)(file.replace("{path}", path + at).replaceAll("{line}", String(line || 1)), "the editor");
     return true;
   };
   // The provider the page registers beside the web-links addon when the header has an editor button:
