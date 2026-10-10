@@ -3,7 +3,10 @@ record keeps `files` â€” newest first, a path once, the newest `RECENT_FILES` â€
 
 from __future__ import annotations
 
+import time
+
 import pytest
+from conftest import wait_for
 
 from agentorc.adapters.claude_code.hook import translate
 from sessionorc.client import LocalClient
@@ -57,5 +60,34 @@ async def test_the_record_keeps_the_newest_twenty_a_path_once(agent, tmp_path):
         got = (await person.call("list"))[0]["files"]  # on the pushed view too
         assert len(got) == RECENT_FILES and got[0]["path"] == f"/r/{RECENT_FILES + 4}.py"
         assert got[-1]["path"] == "/r/5.py"
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_stale_queued_edit_leaves_files_alone(agent, tmp_path):
+    """A queued edit stamped before the last live hook is dropped (TD-533): at the top it would read
+    newer than the edits after it. One stamped after the last live hook moves to the top as a live one does."""
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))[
+            "id"
+        ]
+        before = time.time()
+        await person.call("hook", session=sid, state="working", event="PostToolUse:Edit", file="/r/new.py")
+        # queued before that live edit: its adapter id still applies (the drain's marker), its file does not
+        agent.events.append(sid, {"state": "working", "file": "/r/old.py", "adapter_id": "uuid-1", "at": before})
+
+        async def drained():
+            return (await person.call("get", id=sid))["adapter_id"] == "uuid-1"
+
+        assert await wait_for(drained)
+        assert [f["path"] for f in (await person.call("get", id=sid))["files"]] == ["/r/new.py"]
+        # queued after the last live hook: applied, to the top
+        agent.events.append(sid, {"state": "working", "file": "/r/later.py", "at": time.time()})
+
+        async def moved():
+            return [f["path"] for f in (await person.call("get", id=sid))["files"]] == ["/r/later.py", "/r/new.py"]
+
+        assert await wait_for(moved)
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
