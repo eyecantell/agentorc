@@ -64,6 +64,7 @@ CONTEXT_WINDOWS = (
     ("claude-haiku-4-5", 200_000),
 )
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+CACHE_TTL_ENV = "CLAUDE_CODE_PROMPT_CACHE_TTL"  # the main conversation's cache lifetime (§4.2a, TD-458)
 log = logging.getLogger("agentorc.claude-code")
 
 
@@ -540,6 +541,12 @@ class ClaudeCodeAdapter:
             env[AT_COMPOSER_ENV] = "1"  # every launch lands at the composer: `startup` reads idle (TD-283, TD-339)
         if prof.config_dir:
             env["CLAUDE_CONFIG_DIR"] = str(prof.config_dir)
+        # a metered profile's prompt cache lives an hour (§4.2a, TD-458): the host agent's own key is the
+        # person's word and passes for either billing, as the tmux server may carry another environment
+        if ttl := os.environ.get(CACHE_TTL_ENV):
+            env[CACHE_TTL_ENV] = ttl
+        elif prof.metered:
+            env[CACHE_TTL_ENV] = "1h"
         # the prompt is typed at the composer by the host agent at the first idle, never passed (TD-339)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None)
 

@@ -232,6 +232,30 @@ def test_the_hook_command_falls_back_to_the_one_beside_the_interpreter(tmp_path,
     assert cc.hook_command() is None
 
 
+def test_a_metered_profiles_launch_pins_the_prompt_cache_to_an_hour(tmp_path, monkeypatch):
+    """§4.2a *A metered profile's prompt cache lives an hour* (TD-470): `1h` on a metered profile's
+    launch, nothing on a subscription's, and the host agent's own key passed for either billing; the
+    subagents' key is left to the tool."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("CLAUDE_CODE_PROMPT_CACHE_TTL", raising=False)
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "profiles.yml").write_text(
+        "default: paul\nprofiles:\n  paul: {account: paul, config_dir: ~/.claude}\n"
+        "  api: {account: key, billing: metered, config_dir: /tmp/cc-api}\n"
+    )
+    ad = ClaudeCodeAdapter(binary="claude")
+
+    def env(profile: str) -> dict:
+        return ad.launch(profile=profile, resume=None, prompt=None, unattended=True, cwd=tmp_path).env
+
+    assert env("api")["CLAUDE_CODE_PROMPT_CACHE_TTL"] == "1h"
+    assert "CLAUDE_CODE_PROMPT_CACHE_TTL" not in env("paul")
+    assert not any("SUBAGENT" in k for k in env("api"))
+    monkeypatch.setenv("CLAUDE_CODE_PROMPT_CACHE_TTL", "5m")  # the person's word, for either billing
+    assert env("api")["CLAUDE_CODE_PROMPT_CACHE_TTL"] == "5m"
+    assert env("paul")["CLAUDE_CODE_PROMPT_CACHE_TTL"] == "5m"
+
+
 def test_launch_argv_and_env(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
