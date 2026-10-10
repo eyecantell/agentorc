@@ -43,8 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
-| TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open — record half built (#1474); page half left |
 
 ---
 
@@ -626,52 +624,4 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-525: The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (ao-paul, Paul's idea and calls in conversation)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-10 (the designer; mockup `Focus.dc.html` and `FocusRail.dc.html`, shots `docs/mockups/reviews/2026-10-10-td525-*.png`) — (1) **recent files**: the files the session edited in this run, from the adapter's `PostToolUse` (`file` on an edit of the main thread; §4.2), kept on the record as `files` (twenty, newest first, a path once), drawn on the Session card repo-relative, each a file link by the pane's form, **M** while `git.files` holds it, absent until the first edit and on a tool whose hook reports none; reads are not listed (the transcript has them, and a list of every Read is noise). (2) **Open**: the editor button leaves the header's acts line for the right of the Session card's summary line, seen folded; the put-away rail gains **‹›**, the one glyph that acts. (3) Paul's question: the last-used window (§4.6) — with TD-524's `windowId` drop a file opens into the worktree's window once Open was pressed; a remembered press and the server's IPC sockets set aside, with the reasons in §4.6. Built by TD-527. Was: Open.
-**Blocked by:** TD-527
-**Location:** design §4.5 (Focus side panel, the **Session** card ~L423), §4.5a (the header's **VS Code** editor button row, the **Session** card row ~L68, **a path is a link**), §4.6 *A path in the pane is a link*, §5 `settings.yml` (the editor's label and template); mockup `Focus.dc.html`, `FocusRail.dc.html`
-
-**Why:** Paul, 2026-10-10: a "recent files" list on the side panel under Session, with an **Open** button. The **Session** card exists already (the last card, folded at first: profile, adapter id, tmux, directory, started, last, mode, run log, the stops, the grants and controllers); this extends it. Talking it over, Paul agreed that **Open** replaces the header's VS Code button rather than duplicating it, and that a browse-the-repo picker behind Open is not needed: VS Code's own Ctrl+P does that once the worktree is open.
-
-**Fix:** a design round settles:
-1. **Recent files.** The files this session edited (and perhaps read), newest first, each a file link as in the pane, perhaps with a mark for uncommitted change (`git diff --stat` against the worktree). The source should be the hooks the host agent already receives: Claude Code's PostToolUse carries each Edit/Write/Read's path. It should not be a screen scrape. Say what a session from a tool with no such hook shows.
-2. **Open.** The editor button moves into the card with its setting unchanged (label, template, or none). TD-501's *no editor button, no file links* keys on the setting (`open_in` kind `none`), not on the button's place. The card starts folded, so say where Open sits so that it is not hidden: on the card's summary line, or the card unfolded, or Open outside it. The put-away rail carries an Open mark, so the worktree is reachable with the panel collapsed.
-3. **Paul's question: can a file link open the worktree first when it is not yet open, then the file?** The browser cannot see VS Code's windows. Options: (a) the page remembers, per browser, that it pressed Open for this session (wrong once VS Code is closed), and on a first file link sends the folder link and then the file link (two protocol-handler launches, timing-dependent, perhaps two browser prompts); (b) the host agent asks the VS Code server on the host: each open remote window has an IPC socket (`/run/user/<uid>/vscode-ipc-*.sock`, 305 on kmaster on 2026-10-10, many stale) that the server's `remote-cli` `code --reuse-window <file>` can use, if the window holding the worktree can be told apart (unproven; a spike first); (c) none, relying on TD-524's `windowId` choice. Recommend one with its reasons.
-
-**Done when** the design says all three and the build entries it names are ledgered.
-
-**Related:** TD-524 (the remote file link, decided with this), TD-493 / TD-501 (#1456, the pane's file links).
-
-## TD-527: Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (the designer, TD-525's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — the record half is built in PR #1474 (grinder-ao-1, 2026-10-10): the claude-code hook's `file` on a main-thread edit (`EDIT_TOOLS`), the record's `files` (node-owned, `RECENT_FILES = 20`, newest first, a path once) kept by `_apply_event`, `tests/test_recent_files.py`. The page half is left, all under `src/agentorc/ui/`: Fix items 3–5 and 7, and item 6's card, header and rail tests.
-**Blocked by:** TD-526
-**Location:** design §4.5 item 4 (the **Session** card: recent files, the editor button on its summary line; the acts line without it; the rail's **‹›**), §4.5a **Focus side panel, Session card: VS Code**, **recent files**, **» put away** (the glyph), **a path is a link** (*where the Session card draws its editor button*), §4.2 (`file` on a `PostToolUse`), §5 `person.open_in`; `src/agentorc/adapters/claude_code/hook.py` (`file` on a main-thread `PostToolUse` of `Edit`, `Write`, `MultiEdit`, `NotebookEdit`: `tool_input.file_path` / `notebook_path`), `src/sessionorc/agent_tick.py` (`rpc_hook`: `files` kept — newest first, a path once, `RECENT_FILES = 20`, `{path, at}`), `src/sessionorc/models.py` (`files`), `src/agentorc/ui/templates/focus.html` (the header's editor button removed; the Session card's summary line and its row), `src/agentorc/ui/static/app.js` (the row kept current from the delta; the click by `AO.pathLink`'s form with the modifier not required; the rail glyph), `src/agentorc/ui/help.py` and §4.5a *The help text* (**a path is a link**'s last sentence: *without an editor button on the Session card there are no file links*), mockup `Focus.dc.html`, `FocusRail.dc.html` (#TD-525's shots)
-
-**Why:** TD-525: Paul wants the files a session touched one press away, beside the button that opens its worktree, and one editor button on Focus rather than two.
-
-**Fix:**
-1. The adapter: a `PostToolUse` of an edit on the main thread reports `file` (the tool's absolute path); a subagent's reports nothing, as the state rule. No read is reported.
-2. The record: `files: [{path, at}]`, the newest first, a path moved to the top when edited again, at most twenty; part of the pushed view and its delta; empty on a new record (a restart starts over).
-3. The Session card: a **recent files** row under *run log*, drawn only when non-empty — each path relative to the record's `repo` (else `dir`), a link by the page's `editor.file` form filled as `AO.pathLink` fills it (line `1`), opening on a plain click; hover the absolute path and the edit's time; **M** before a path the record's `git.files` holds (`gitinfo`'s porcelain lines, as the Git card draws them). Text without links where `editor.file` is not served.
-4. The editor button: gone from the header's acts line (`focus.html`), drawn at the right of the Session card's summary line with the same label and `href`, kept when the card is folded; `open_in: none` draws none. The rail: a **‹›** glyph after **✓**, drawn whenever the button is, its press the button's `href`, its hover *VS Code — opens the worktree*.
-5. The help: §4.5a *The help text* **a path is a link** — *without an editor button on the header* becomes *without an editor button on the Session card*; `help.py` follows word for word (`tests/test_help.py`). *» put away*'s paragraph is unchanged.
-6. Tests: the hook's `file` on each edit tool and not on a Read or a subagent's; the record's twenty, the move-to-top; the card's row from a view with `files` and `git.files`; the header without the button; the rail's glyph.
-7. On a scratch home: a session edits two files; the card shows them newest first with **M** on the uncommitted one; a click opens the file; the header has no VS Code button and the rail's **‹›** opens the worktree. Shots `docs/mockups/reviews/2026-10-10-td527-*.png` in the PR.
-
-**Done when** the Session card lists a run's edits as links with their marks, the editor button sits on its summary line and on the rail and nowhere else on Focus, the help says so, and the tests pin the hook, the record and the page.
-
-**Related:** TD-525 (the design), TD-524 / TD-526 (the file form's line and window), TD-501 (the pane's links), TD-408 (the rail), TD-156 (the Session card).
 
