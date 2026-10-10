@@ -24,6 +24,8 @@ def checkout(tmp_path: Path) -> Path:
     (wt / "out.txt").symlink_to("/etc/passwd")
     (wt / "in.txt").symlink_to(wt / "src" / "a.py")
     (tmp_path / "outside.txt").write_text("no\n")
+    (tmp_path / "repo-evil").mkdir()  # a sibling whose name starts with the repo's
+    (tmp_path / "repo-evil" / "f.txt").write_text("no\n")
     return wt
 
 
@@ -66,6 +68,10 @@ async def test_a_run_answers_only_as_a_regular_file_inside_the_checkout(agent, t
             "../../../../outside.txt": None,
             f"{repo}/top.md": str(repo / "top.md"),
         }
+        odd = [f"{repo}-evil/f.txt", "src/a\x00.py", "~nosuchuser-td501/x"]
+        assert (await person.call("paths", id=sid, runs=odd))["paths"] == dict.fromkeys(odd)  # a prefix is not a root
+        with pytest.raises(AgentError, match="runs, a list of strings"):
+            await person.call("paths", id=sid, runs=["src/a.py", 3])
         assert (await person.call("paths", id=sid, runs=["~/h.txt", "/etc/passwd"]))["paths"] == {
             "~/h.txt": None,  # home expanded, and outside the checkout
             "/etc/passwd": None,
