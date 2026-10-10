@@ -43,6 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
+| TD-532 | A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward | Medium | Open |
 
 ---
 
@@ -625,3 +626,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
+
+## TD-532: A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask and Paul's test)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.6 *A path in the pane is a link* (the paragraph that sets aside opening the worktree before the file, `docs/design/4.6-transport.md` ~L146), §4.5a **a path is a link** and the Session card's editor button; `src/agentorc/ui/static/app.js` `AO.pathLink` (~L3467) and `AO.openEditor` (~L461); the recent files' links of TD-527 (#1476, merged) use the same road
+
+**Why:** Paul, 2026-10-10, after TD-526's line fix worked: *any time we open a file from our worktree in vscode the worktree folder is opened as well*. TD-524/TD-525's round set this aside for two reasons. The page cannot see VS Code's windows, so it cannot know whether the worktree is open. And two launches in a row are two browser prompts. The first reason falls away if VS Code does not open the same folder twice. Paul tested one case on 2026-10-10: with the worktree already open, he pressed the header's VS Code button (the folder form, `windowId=_blank`) again, and VS Code **brought the existing window forward** and opened no second one. If that holds generally (for the remote, local and container forms alike; to confirm in the round), the page does not need to know: it can always send the folder first. That is a different case from the 2026-09-06 finding, where a folder sent *without* `_blank` replaced what a used window showed.
+
+**Fix:** a design round settles: (1) a file link sends the session's folder form first, exactly the editor button's link: a new window when none holds the worktree, the existing one brought forward when one does. After a short wait, it sends the file form, which carries no `windowId=_blank` since TD-526, so the file lands in the window just brought forward or opened. (2) The wait: how long, fixed or a setting. To confirm: how long a new remote window takes to connect, and whether a file link that lands before it goes to the previously used window, as the last-used rule (§4.6 ~L140) suggests. Say what the person sees when that happens. Consider skipping the folder launch when this page sent it for the same session moments ago. (3) The prompt: to confirm how each browser asks before handing a `vscode:` link to the editor, and whether allowing it for the site makes the two launches one press. Say so in the help. (4) A person's own template, a container node's form, and `open_in: none` each say what they do; the second launch applies only where a folder form exists. (5) The recent files list (TD-527) takes the same road. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (the Session card, #1476), TD-501 (the pane's links).
