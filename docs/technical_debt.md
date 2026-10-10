@@ -64,7 +64,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
-| TD-511 | `cards.pill_title`'s *waiting* and *seat on call* branches and `ending.clock`'s day prefix are pinned by no test — the pill hover §4.5a words in order | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 
 ---
@@ -1005,27 +1004,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** that test passes, and `ao doctor hooks` on kmaster, once live, prints no *does not resolve* line for the `+cadence` layers.
 
 **Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
-
-## TD-511: `pill_title`'s waiting and seat-on-call branches and `ending.clock`'s day prefix are pinned by no test
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_exit_words.py`, `src/agentorc/ui/cards.py` (`pill_title`), `src/agentorc/ending.py` (`clock`)
-
-**Why:** The test-audit of #1415 (TD-498 slice 2). §4.5a **state pill hover** (`docs/design/4.5a-controls.md:153`) words an order of seven texts; `test_the_pill_hover_takes_the_first_that_applies` pins the host note, the ending, *guessed*, *reported* and *observed*, but two of the seven moved from `card.html` into `pill_title` in this PR with no test of their own, and none existed before it either (`git grep "idle in every payload" 551475e0^ -- tests` is empty). Each probe below, run against `tests/test_ui*.py tests/test_cli*.py tests/test_exit_*.py` — **810 passed** every time:
-- `pill_title`'s `if d.get("state_class") == "waiting": return …` branch deleted: a waiting pill falls through to *reported by the tool*, and nothing fails.
-- `if d.get("seat"): return "a seat on call: read from its record, not from a screen"` deleted: a seat's pill reads *reported by the tool*.
-- `ending.clock`'s `("" if at.date() == today else at.strftime("%a "))` → `""`: the day is never said, so *killed by you · 12:31* on a record from Tuesday reads as today. Every case in the file is an instant of the same day as `NOW`. (The *bad* kind on a nonzero code was probed too and **is** caught.)
-
-**Fix:** In `test_the_pill_hover_takes_the_first_that_applies`, add a `state_class: waiting` view with a `wait_reason`, a `seat: True` view, and a seat that is also exited (the order the section words: seat before the ending); and one `clock`/`ending_hover` case on an instant two days before `now`, asserting the weekday prefix. Confirm each against its probe.
-
-**Done when** each probe in the Why fails a test.
-
-**Related:** TD-490, TD-498 (#1415).
 
 ## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
 

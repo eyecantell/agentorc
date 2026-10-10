@@ -97,9 +97,10 @@ def _view(rec, fleet=None, **kw):
 
 @pytest.mark.unit
 def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
-    """§4.5a's order: an unreachable host's reason, then the ending on an exited record (never
-    *guessed*: it is the tick's own reading), *guessed from the screen* on a scraped state,
-    *reported by the tool* on a hook one, and a `stalled?` the tick observed said as observed."""
+    """§4.5a's order: an unreachable host's reason, a *waiting* pill's reason, a seat on call, then the
+    ending on an exited record (never *guessed*: it is the tick's own reading), *guessed from the
+    screen* on a scraped state, *reported by the tool* on a hook one, and a `stalled?` the tick
+    observed said as observed."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     kill = {**_exited(how="kill", by="ao-r-manager-1"), "id": "ao-r-w-1"}
     v = _view(kill, [{"id": "ao-r-manager-1", "name": "manager-1"}])
@@ -119,6 +120,25 @@ def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
     assert _view({**idle, "confidence": "hook"})["pill_title"] == "reported by the tool"
     stalled = _view({**idle, "state": "stalled?", "confidence": "tick"})
     assert stalled["pill_title"] == "observed by the host agent, not reported by the tool"
+    # a *waiting* pill says its reason, and a seat on call is read from its record — before the ending
+    from agentorc.ui.cards import pill_title
+
+    waiting = {"state_class": "waiting", "wait_reason": "waiting · review #1302", "confidence": "hook"}
+    assert pill_title(waiting) == "waiting · review #1302 — idle in every payload, on someone else’s move"
+    seat = "a seat on call: read from its record, not from a screen"
+    assert pill_title({"seat": True, "confidence": "hook"}) == seat
+    assert pill_title({"seat": True, "state": "exited"}, "killed by you · 12:31") == seat
+    assert pill_title({"host_note": "restarting the node", "seat": True}) == "restarting the node"
+
+
+@pytest.mark.unit
+def test_an_ending_before_today_says_its_day():
+    """*Thu 12:31* once the instant is not today, so an ending from two days back never reads as today's."""
+    then = NOW - datetime.timedelta(days=2)
+    assert clock(then.isoformat(), NOW) == then.astimezone().strftime("%a %H:%M")
+    assert ending_hover(_exited(how="kill", at=then.isoformat()), None, NOW).endswith(
+        f" · {then.astimezone():%a %H:%M}"
+    )
 
 
 @pytest.mark.unit
