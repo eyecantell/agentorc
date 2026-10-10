@@ -274,7 +274,7 @@ def _resolves(command: str) -> bool:
 def layer_reading(profile: Profile) -> list[dict]:
     """Each settings layer written for `profile`, one per launch shape (plain, `+cadence`,
     `+unattended`, …): its path, and the commands it names — every hook's and the status line's,
-    dev-cadence's own line left out — with whether each resolves (design §4.7 **`ao doctor`**
+    dev-cadence's own lines left out, of any vintage (TD-507) — with whether each resolves (design §4.7 **`ao doctor`**
     *hooks*, TD-465). A layer is written at a launch, so a shape never launched has none."""
     out: list[dict] = []
     for p in sorted((paths.home() / "claude-hooks").glob(f"{profile.name}*.json")):
@@ -287,7 +287,8 @@ def layer_reading(profile: Profile) -> list[dict]:
         except (OSError, ValueError, AttributeError, TypeError, KeyError) as e:
             out.append({"path": str(p), "error": str(e) or type(e).__name__, "commands": []})
             continue
-        named = sorted({c for c in cmds if c and c != CADENCE_HOOK_LINE})
+        # dev-cadence's line of any vintage — a layer last written before its runner line changed keeps the old one
+        named = sorted({c for c in cmds if c and not any(m in c for m in CADENCE_WIRED_MARKERS)})
         out.append({"path": str(p), "commands": [{"command": c, "resolves": _resolves(c)} for c in named]})
     return out
 
