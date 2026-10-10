@@ -2379,7 +2379,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     rows: list[dict[str, Any]] = []
     for check in [c for c in doctor.CHECKS if c in wanted]:
         if check == "agent":
-            rows += doctor.agent(_version(), _this_promote(host), _build_ahead(host), node)
+            watch = None if node else service.watch_reading()  # the watch stands (§4.10, TD-497)
+            rows += doctor.agent(_version(), _this_promote(host), _build_ahead(host), node, watch)
         elif check == "tmux":
             rows += doctor.tmux(reading["tmux"])
         elif check == "hooks":
@@ -2973,28 +2974,33 @@ def cmd_decide(args: argparse.Namespace) -> int:
 def cmd_service(args: argparse.Namespace) -> int:
     if args.action == "install" and args.system:
         try:
-            target = service.install_system()
+            written = service.install_system()
         except (OSError, RuntimeError) as e:
             return fail(args, str(e), 1)
         return emit(
-            args, {"written": [target]}, lambda: print(f"wrote {target}; {service.TMUX_UNIT} enabled and started")
+            args,
+            {"written": written},
+            lambda: print(
+                f"wrote {', '.join(written)}; {service.TMUX_UNIT} and {service.WATCH_UNIT}.timer enabled and started"
+            ),
         )
     if args.action == "install":
         written = service.install(bind=args.bind, port=args.port, start=not args.no_start)
         status = service.status()
         try:
-            staged = service.stage_tmux_unit()  # the tmux server's system unit, root's (design §4.1, TD-495)
+            # the tmux server's and the watch's system units, root's (design §4.1, §4.10, TD-495, TD-497)
+            staged = [str(p) for p in service.stage_system_units()]
         except OSError as e:  # the units are installed and running: a stage that failed is said, not raised
-            print(f"agentorc: the tmux system unit could not be staged ({e})", file=sys.stderr)
-            staged = None
+            print(f"agentorc: the system units could not be staged ({e})", file=sys.stderr)
+            staged = []
         root = f"run once as root: {service.system_line()}" if staged else None
         return emit(
             args,
-            {"written": written, "status": status, "staged": str(staged) if staged else None, "root": root},
+            {"written": written, "status": status, "staged": staged, "root": root},
             lambda: print(
                 "wrote " + ", ".join(written) + "\n" + status + "\n"
                 "units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout"
-                + (f"\nstaged {staged}; {root}" if root else "")
+                + (f"\nstaged {', '.join(staged)}; {root}" if root else "")
             ),
         )
     if args.action == "uninstall":
@@ -3750,7 +3756,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--system",
         action="store_true",
-        help="as root: install the staged tmux server system unit (agentorc-tmux) and start it",
+        help="as root: install the tmux server's system unit (agentorc-tmux) and the watch's timer (agentorc-watch) "
+        "and start them",
     )
     p.set_defaults(fn=cmd_service)
 
