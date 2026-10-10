@@ -47,7 +47,18 @@ const v = {
   ],
   git: { files: ["M src/new file.py", "?? notes.txt"] },
 };
+// the Session card's row and term, and the rail, as elements the page's paint writes into
+const box = () => { const cls = new Set(["hidden"]); return { innerHTML: "", cls,
+  classList: { toggle: (c, f) => (f ? cls.add(c) : cls.delete(c)) } }; };
+const row = box(), dt = box();
+AO.paintRecent(v, editor, row, dt);
+const painted = { html: row.innerHTML, rowHidden: row.cls.has("hidden"), dtHidden: dt.cls.has("hidden") };
+AO.paintRecent({ dir: "/w/wt", files: [] }, editor, row, dt);
+const emptied = { html: row.innerHTML, rowHidden: row.cls.has("hidden"), dtHidden: dt.cls.has("hidden") };
 console.log(JSON.stringify({
+  painted, emptied,
+  railHtml: AO.railHtml({ state: "idle" }, true, 0, {}, editor),
+  railHtmlNone: AO.railHtml({ state: "idle" }, true, 0, {}, null),
   linked: AO.recentFiles(v, editor),
   text: AO.recentFiles(v, { url: "zed://x", label: "Zed", file: null }),
   none: AO.recentFiles({ dir: "/w/wt", files: [] }, editor),
@@ -108,6 +119,41 @@ def test_the_rails_last_glyph_is_the_editor_button_opening_the_worktree():
     assert [g["text"] for g in got["rail"]] == ["✓", "‹›"]
     assert last["href"] == "vscode://file/w/wt?windowId=_blank" and last["title"] == "VS Code — opens the worktree"
     assert [g["text"] for g in got["railNone"]] == ["✓"]  # no button, no glyph
+
+
+@pytest.mark.unit
+def test_the_paint_shows_the_row_with_the_first_edit_and_hides_it_again_with_none():
+    got = _probe()
+    assert not got["painted"]["rowHidden"] and not got["painted"]["dtHidden"]
+    assert got["painted"]["html"].count('<a class="editor"') == 4
+    assert got["emptied"] == {"html": "", "rowHidden": True, "dtHidden": True}
+
+
+@pytest.mark.unit
+def test_the_rails_last_child_is_the_editor_link_with_the_buttons_href():
+    got = _probe()
+    html = got["railHtml"]
+    assert html.startswith('<button class="railbtn g-ready"')  # ✓ opens its card
+    assert html.endswith(
+        '<a class="railbtn editor g-editor" href="vscode://file/w/wt?windowId=_blank" data-label="VS Code"'
+        ' title="VS Code — opens the worktree">‹›</a>'
+    ), html
+    assert "railbtn editor" not in got["railHtmlNone"]
+
+
+@pytest.mark.unit
+def test_focus_paints_the_row_and_the_rail_from_each_view_with_its_editor():
+    """The two call sites the probes cannot reach: Focus's render paints the row from every view, and
+    the rail is drawn with the page's editor, so the **‹›** glyph has a button to carry (TD-534)."""
+    js = (UI / "static" / "app.js").read_text()
+    focus = js[js.index("AO.focus = function") :]
+    render = focus[focus.index("    function render(v) {") :]
+    render = render[: render.index("\n    }\n")]
+    assert '      AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));' in render
+    rail = focus[focus.index("    function renderRail(v, ready) {") :]
+    rail = rail[: rail.index("\n    }\n")]
+    assert "      const html = AO.railHtml(railV, railReady, inboxN, lines, s.editor);" in rail
+    assert '$("#railglyphs")' in rail and "renderRail(v, ready);" in render
 
 
 def test_focus_draws_the_editor_button_on_the_session_cards_summary_and_not_the_header(client, tmp_path):  # noqa: F811
