@@ -1469,6 +1469,14 @@
       } else if (sum) sum.remove();
       const grid = $(".grid", sec);
       (g.ids || []).forEach((id) => { const c = $(`#card-${CSS.escape(id)}`); if (c && c.parentElement !== grid) grid.appendChild(c); });
+      // each member's lane count (TD-484): a sibling's claim moves this card's count with no delta of its own
+      Object.entries(g.lanes || {}).forEach(([id, html]) => {
+        const pill = $(`#card-${CSS.escape(id)} .r1 .pill`); if (!pill) return;
+        const old = $(".lanecount", pill);
+        if (old && old.outerHTML === html) return;
+        if (old) old.remove();
+        if (html) pill.insertAdjacentHTML("beforeend", html);
+      });
       // the team's + card (TD-379): drawn by the server on a defined team, kept as it is, gone with the definition
       const plus = $(".sc.plus", grid);
       if (g.plus && !plus) { const tpl = document.createElement("template"); tpl.innerHTML = g.plus.trim(); grid.appendChild(tpl.content.firstElementChild); }

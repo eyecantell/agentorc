@@ -877,6 +877,14 @@ def test_each_member_card_draws_its_own_lane_count_in_its_pill():
     html = ui.templates.get_template("card.html").render(s=v)
     pill = html[html.index('<span class="pill nog') :].split("</span></span>")[0]
     assert '<span class="lanecount k-pickable solid" title="13 entries in its lane, shared by 2 sessions">13/2' in pill
+    # …and so does every sibling's, from the groups payload every delta carries (TD-484): g2's claim
+    # reaches g1's pill with no delta of g1's own
+    heads = ui.render_heads(ui.team_groups([ui.view(s, fleet) for s in fleet], (), repos))
+    lanes = next(g["lanes"] for g in heads if "g1" in g["ids"])
+    title = "13 entries in its lane, shared by 2 sessions"
+    assert lanes["g1"] == f'<span class="lanecount k-pickable solid" title="{title}">13/2</span>'
+    assert lanes["g2"].endswith(">13/2</span>") and "solid" not in lanes["g2"]
+    assert lanes["m1"] == "" and lanes["g0"] == ""  # no lane, ended: the page takes any count away
     # out of work but waiting on you: *waiting*, and the count stays soft
     ask = {"id": "m-a", "from": "g1", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?"}
     v = ui.compact_in(ui.view(fleet[0], fleet, waits=ui.waits_of([ask])), fleet, repos)

@@ -390,6 +390,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-424, grinder-ao-1): the Due strip / Inbox board row's **Done** row said TD-338's pending mark was *not built*; TD-340 built it (#1144), as the *a control's look* and *Inbox row: pending* rows already said, so the row now reads *built — TD-340*.
 - 2026-10-08 (TD-421, the designer): the row *a URL is a link — Ctrl+click / Cmd+click* on the Focus pane. TD-422 builds it.
 - 2026-10-08 (TD-422, grinder-ao-2): *The help text* gains **a URL is a link** (Focus pane), the Help page's Focus paragraph, in the row's words.
+- 2026-10-09 (TD-484, grinder-ao-2): the row *card: compact* — the lane's count rides on the groups payload every delta carries, so a sibling's claim, a ledger change or a member gone moves every member's count at once; it was recomputed only for the one card whose own delta came, and a sibling read the old count until it had one.
 - 2026-10-08 (TD-423, grinder-ao-2): the row *Inbox page: the rail* — **Clear filters** always in place, disabled while nothing is picked or typed.
 - 2026-10-08 (TD-427, #1308; written 2026-10-09 by TD-461, grinder-ao-2): the row *Inbox page: find* — its count holds its line while empty.
 - 2026-10-08 (TD-408, the designer): the row *» put away / « (the rail)* on the Focus side panel, and the *keys* row names `s` for it on Focus. TD-412 builds it.

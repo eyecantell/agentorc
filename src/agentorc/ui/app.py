@@ -578,6 +578,7 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
     head = templates.get_template("group_head.html")
     summary = templates.get_template("team_summary.html")
     plus = templates.get_template("plus_card.html")
+    lanecount = templates.get_template("lanecount.html").module.span
     return [
         {
             "team": g["team"],
@@ -589,6 +590,11 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
             "summary": summary.render(g=g) if g.get("summary") and g["summary"].get("drawn") else "",
             # the team's + card (§4.5a *team card: + card*, TD-379): put in by the client when missing
             "plus": plus.render(g=g) if g["team"] and g.get("defined") else "",
+            # each member's lane count, by id (TD-484): a claim or a ledger change moves its siblings'
+            # counts too, so every delta patches every pill; "" takes the count away
+            "lanes": {m["id"]: str(lanecount(m.get("lane_count"))) for m in g.get("members") or []}
+            if g.get("summary")
+            else {},
         }
         for g in groups
     ]
