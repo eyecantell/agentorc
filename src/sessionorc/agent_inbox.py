@@ -818,7 +818,7 @@ class InboxMixin:
         """A bound that ran out (design §4.10): a `steer` **lapses** — `closed_reason: lapsed`,
         never `expired_at`, because nothing failed — and the sender is told by a `system` note that
         wakes it **uncharged**, so a spent budget cannot hold it past the bound it set itself. An
-        `ask` or a `conflict` expires, as it always has.
+        `ask` expires, as it always has.
 
         **An orphaned `steer` lapses to its default too** (§4.10 *An orphaned `steer` lapses to its
         default*, TD-271): the bound is the person's answer whoever is left to hear it, so the entry
@@ -852,8 +852,8 @@ class InboxMixin:
         the exit itself, because a resume carries mail forward and a worker resumed inside it still
         gets the note. One written **after** the record ended — a lapse's note or an orphan's answer
         left in a closed asker's mailbox (§4.10, TD-271) — runs from its own arrival instead, or a
-        team wound down a day before the bound would lose it at the next sweep. An open `ask`,
-        `steer` or `conflict` is untouched (`e.open`, above)."""
+        team wound down a day before the bound would lose it at the next sweep. An open `ask`
+        or `steer` is untouched (`e.open`, above)."""
         if e.open or e.owes_for(session_inbox=inbox and not person) or mail.MAIL_RETENTION is None:
             # `owes`: a question that was answered and not reported back is kept until it is
             # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's

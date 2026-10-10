@@ -26,6 +26,7 @@ from sessionorc.agent_common import (
 )
 from sessionorc.models import (
     ASK_KINDS,
+    FOLDED_KINDS,
     MAIL_KINDS,
     PERSON,
     SYSTEM,
@@ -35,6 +36,9 @@ from sessionorc.models import (
     Tally,
     now_iso,
 )
+
+# `--kind conflict` and a misplaced `--cites` are refused in the same words (§4.10, TD-462)
+CITES_ON_AN_ASK = "a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)"
 
 
 def _shots(shots: Any, kind: str) -> list[str]:
@@ -238,6 +242,8 @@ class MailMixin:
         The records are the org's one graph (§4.4a, step 5): an addressee on another host is its
         record here, its inbox the home's copy — landed whether or not its link is up, and said so."""
         records = self._graph()
+        if kind in FOLDED_KINDS:
+            raise RpcError(CITES_ON_AN_ASK)
         if kind not in MAIL_KINDS:
             raise RpcError(f"unknown message kind {kind!r}; kinds are: {', '.join(MAIL_KINDS)}")
         if pr is not None:
@@ -371,7 +377,7 @@ class MailMixin:
                 named = [replied.from_]  # a session answering a person answers into the person inbox
             # replies in a copied thread are copied to the same set (design §4.10): the thread's
             # copies — a copy that failed to land included, so the set is the one meant — and its
-            # other addressees, so the other lead of a `conflict` sees how it was settled
+            # other addressees, so the other controller of an `ask` to two sees how it was settled
             same_set = dict.fromkeys([*replied.copies, *replied.copies_failed, *replied.to, replied.from_])
             if overrule:
                 same_set = {overrule: None}
@@ -420,13 +426,8 @@ class MailMixin:
             raise RpcError(
                 f"{len(named)} addressees is more than the cap of {mail.RECIPIENT_CAP} (design §4.10: no broadcast)"
             )
-        # -- what a person is asked (design §4.10, 2026-09-19): alone, unbounded, never a conflict --
+        # -- what a person is asked (design §4.10, 2026-09-19): alone, unbounded --
         if PERSON in named:
-            if kind == "conflict":
-                raise RpcError(
-                    "a conflict never names the person: it is put to your controllers, and if they cannot "
-                    "settle it, ask the person about it with --kind ask (design §4.10)"
-                )
             if kind in ("ask", "steer") and len(named) > 1:
                 raise RpcError(
                     f"the person is asked alone: a {kind} naming the person names nobody else — send it to the "
@@ -510,14 +511,16 @@ class MailMixin:
             if (reason := mail.message_gate(records, sender, sid, controllers=self._ctl)) is not None:
                 raise RpcError(reason)
         cited: list[str] = []
-        if kind == "conflict":
-            if len(named) < 2:
-                raise RpcError("a conflict is an ask to two or more controllers at once (design §4.10)")
-            cited = [str(c) for c in (cites or [])]
+        if cites:
+            # an `ask` to two or more controllers names the `sends` it cannot reconcile (§4.10 *Two
+            # controllers disagree*, TD-462): accepted there and refused anywhere else
+            if kind != "ask" or len(named) < 2:
+                raise RpcError(CITES_ON_AN_ASK)
+            cited = [str(c) for c in cites]
             known = {e.id for e in me.sends} if me is not None else set()
-            if not cited or any(c not in known for c in cited):
+            if any(c not in known for c in cited):
                 raise RpcError(
-                    "a conflict cites the `sends` it cannot reconcile by id — the ids `ao status` prints for this "
+                    "an ask cites the `sends` it cannot reconcile by id — the ids `ao status` prints for this "
                     "session (design §4.10)"
                 )
         # -- copies: a controller's mail `about` its member reaches the member's other controllers --
@@ -751,7 +754,7 @@ class MailMixin:
             copies_failed=list(entry.copies_failed),
             pending=list(entry.pending),
             cites=list(entry.cites),
-            # every addressee's copy carries the answers — a `conflict` is read and picked between
+            # every addressee's copy carries the answers — an `ask` to two is read and picked between
             # sessions, so each controller's copy must hold them (§4.10 *Suggested answers*)
             answers=list(entry.answers),
             shots=list(entry.shots),
@@ -820,7 +823,7 @@ class MailMixin:
         has been away, so the refusal is a redirect to the channel with a `Due:` date.
 
         Two counts from 2026-10-04 (TD-324), each with its depth and per-sender depth: a question
-        (an `ask`, a `steer`, a `conflict`, a pass-up) is counted against the **open questions**, so
+        (an `ask`, a `steer`, a pass-up) is counted against the **open questions**, so
         one worker cannot fill the Inbox with asks that never lapse; anything else against the
         **FYIs**, every other entry still there, so a seat's notes never stop its next question."""
         if question:

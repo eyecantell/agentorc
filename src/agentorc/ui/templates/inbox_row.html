@@ -860,7 +860,7 @@
 {%- elif section == 'fyi' %}{{ fyi(e, section) }}
 {#- a snoozed entry that is no question (a note set aside through the RPC) is drawn as FYI draws it,
     with its snoozed line: it is never an `ask` row offering to decline it (TD-373) -#}
-{%- elif section == 'snoozed' and e.kind not in ('ask', 'steer', 'conflict') %}{{ fyi(e, section) }}<div class="row">{{ snoozed_says(e) }}</div>
+{%- elif section == 'snoozed' and e.kind not in ('ask', 'steer') %}{{ fyi(e, section) }}<div class="row">{{ snoozed_says(e) }}</div>
 {%- elif e.orphaned %}{{ orphaned(e, section) }}
 {%- elif e.kind == 'steer' %}{{ steer(e, section) }}
 {%- else %}{{ ask(e, section) }}

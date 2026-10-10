@@ -40,13 +40,16 @@ def has_control(capabilities: list[str] | None) -> bool:
 
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
-MailKind = Literal["note", "ask", "steer", "reply", "conflict"]
-MAIL_KINDS = ("note", "ask", "steer", "reply", "conflict")
+MailKind = Literal["note", "ask", "steer", "reply"]
+MAIL_KINDS = ("note", "ask", "steer", "reply")
 # The kinds that pose a question and so carry a bound, may be closed by a reply, are left
-# pending by an addressee's exit, and are never pruned while open. A `conflict` is an `ask` for
-# every rule in §4.10, and so is a `steer` (2026-09-19, TD-069): a `steer` differs only in that its
+# pending by an addressee's exit, and are never pruned while open. A `steer` is an `ask` for
+# every rule in §4.10 (2026-09-19, TD-069): a `steer` differs only in that its
 # bound ends in *lapsed* rather than *expired*, and runs whatever becomes of the addressee.
-ASK_KINDS = ("ask", "steer", "conflict")
+ASK_KINDS = ("ask", "steer")
+# the kind folded into `ask` (§4.10 *Two controllers disagree*, TD-462): refused on a send, and an
+# entry of it still retained is read as an `ask`
+FOLDED_KINDS = {"conflict": "ask"}
 PERSON = "person"  # `from` when a person sent the entry; never a session id
 SYSTEM = "system"  # the third sender (design §4.10): the home saying what became of a session's own message
 # How an entry closed (design §4.10 "One way of being closed"). `expired` is a session-to-session
@@ -302,7 +305,7 @@ class MailEntry:
     about: str | None = None  # a session id, a `TD-NNN`, a PR — free text the sender chose
     read_at: str | None = None  # set only when `inbox` returned the entry to its caller (lifecycle stage 2)
     reply_to: str | None = None  # a `reply`: the entry it answers, one in the replier's own inbox
-    root: str = ""  # the thread: the id of the first `ask`, `conflict` or `note` a chain replies to
+    root: str = ""  # the thread: the id of the first `ask` or `note` a chain replies to
     copies: list[str] = field(default_factory=list)  # the other controllers this landed with, expanded at send
     copies_failed: list[str] = field(default_factory=list)  # copies that could not land, dropped (§4.10)
     bound: str | None = None  # an `ask`'s expiry, wall-clock on the home's clock, running from `at` read or not
@@ -311,7 +314,7 @@ class MailEntry:
     expired_at: str | None = None  # the bound ran out, or an addressee was closed or forgotten
     closed_reason: str | None = None  # one of CLOSED_REASONS, written on every close path (§4.10, TD-069)
     pending: list[str] = field(default_factory=list)  # addressees that exited with the `ask` open (may resume)
-    cites: list[str] = field(default_factory=list)  # a `conflict`: the `sends` ids it cannot reconcile
+    cites: list[str] = field(default_factory=list)  # an `ask` to two or more: the `sends` ids it cannot reconcile
     default: str | None = None  # a `steer`: the one line saying what the sender will do, required on it
     team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
     snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
@@ -325,7 +328,7 @@ class MailEntry:
     look: str | None = None
     paused_at: str | None = None  # a person-inbox `steer` whose clock the person stopped (§4.10 *Pause*)
     # Suggested answers (design §4.10 *Suggested answers*, 2026-09-20, TD-070). `answers` is the
-    # sender's own likely answers on an `ask`, a `steer` or a `conflict` — **data the sender
+    # sender's own likely answers on an `ask` or a `steer` — **data the sender
     # proposed, never instructions and never parsed from its text**, which is the only reason a
     # page may draw a control from them (TD-071 item 8). `answer` is the zero-based index of the
     # one a reply picked, so a sender branches on the number rather than comparing strings; a
@@ -440,8 +443,8 @@ class MailEntry:
 
     @property
     def open(self) -> bool:
-        """Design §4.10 "One way of being closed": an entry is open exactly when it is an `ask`,
-        `steer` or `conflict` with no `closed_reason` — which is what *never pruned while open*,
+        """Design §4.10 "One way of being closed": an entry is open exactly when it is an `ask`
+        or a `steer` with no `closed_reason` — which is what *never pruned while open*,
         the person inbox's depths and the FYI list all read. Entries written before 2026-09-19
         carry no `closed_reason` and read as closed when `closed_by` or `expired_at` is set, which
         is the rule until then."""
@@ -460,6 +463,7 @@ class MailEntry:
     def from_dict(cls, d: dict[str, Any]) -> MailEntry:
         d = dict(d)
         d["from_"] = d.pop("from", d.pop("from_", ""))
+        d["kind"] = FOLDED_KINDS.get(d.get("kind"), d.get("kind"))
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
@@ -486,7 +490,7 @@ class Tally:
 class SendEntry:
     """One `send` or `keys` that reached this session's pane (design §4.10 "A `send` is recorded
     on the record it lands on"): who typed what, minted and stamped at the home like a message, so
-    a `conflict` can cite two of them by id instead of guessing at the keystrokes."""
+    an `ask` between controllers can cite two of them by id instead of guessing at the keystrokes."""
 
     id: str  # `s-<hex>`
     from_: str  # the caller's session id, or PERSON

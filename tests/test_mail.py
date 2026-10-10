@@ -268,11 +268,12 @@ async def test_copies_are_exempt_from_the_cap_and_never_sink_a_send(agent, tmp_p
             await person.call("kill", id=sid)
 
 
-async def test_sends_are_recorded_with_who_typed_and_a_conflict_cites_them(agent, tmp_path):
+async def test_sends_are_recorded_with_who_typed_and_an_ask_to_two_cites_them(agent, tmp_path):
     """Design §4.10 "A `send` is recorded on the record it lands on": every `send` and `keys`
-    that reached the pane is on the record as `sends` with `from`, bounded; a `conflict` names
-    two controllers and cites `sends` ids the sender holds, lands with one id in each inbox, and
-    its first reply closes it on every addressee's copy."""
+    that reached the pane is on the record as `sends` with `from`, bounded; an `ask` to two
+    controllers cites `sends` ids the sender holds (*Two controllers disagree*, TD-471), lands with
+    one id in each inbox, and its first reply closes it on every addressee's copy. `--cites` on an
+    `ask` to one, or on any other kind, is refused, and so is `--kind conflict`, in the same words."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         lead, lead2, worker = [await mk(n, unattended=True) for n in ("lead", "lead2", "w")]
@@ -292,13 +293,18 @@ async def test_sends_are_recorded_with_who_typed_and_a_conflict_cites_them(agent
         ]
         assert all(e["id"].startswith("s-") and e["at"] and e["verdict"] == "submitted" for e in sends)
         async with LocalClient(caller=worker) as w:
-            with pytest.raises(AgentError, match="two or more controllers"):
-                await w.call("msg", to=lead, text="?", kind="conflict", cites=[sends[0]["id"]])
+            both = [sends[0]["id"], sends[1]["id"]]
+            folded = r"a conflict is an `ask` to both controllers with `--cites` \(design §4\.10 \*Two controllers"
+            with pytest.raises(AgentError, match=folded):
+                await w.call("msg", to=[lead, lead2], text="?", kind="conflict", cites=both)
+            with pytest.raises(AgentError, match=folded):
+                await w.call("msg", to=lead, text="?", kind="ask", cites=both)  # an ask to one
+            with pytest.raises(AgentError, match=folded):
+                await w.call("msg", to=[lead, lead2], text="?", kind="note", cites=both)
             with pytest.raises(AgentError, match="cites the `sends`"):
-                await w.call("msg", to=[lead, lead2], text="?", kind="conflict", cites=["s-nope"])
-            got = await w.call(
-                "msg", to=[lead, lead2], text="main or branch?", kind="conflict", cites=[sends[0]["id"], sends[1]["id"]]
-            )
+                await w.call("msg", to=[lead, lead2], text="?", kind="ask", cites=["s-nope"])
+            got = await w.call("msg", to=[lead, lead2], text="main or branch?", kind="ask", cites=both)
+            assert got["entry"]["kind"] == "ask" and got["entry"]["cites"] == both
             assert got["delivered"] == [lead, lead2] and got["entry"]["bound"]
             # the fixed header of `ao inbox` names the caller of the most recent send
             assert (await w.call("inbox"))["sends"][-1]["from"] == "person"
@@ -977,8 +983,9 @@ async def test_every_reply_to_a_session_with_unread_mail_carries_the_count(agent
 async def test_an_ask_to_the_person_is_asked_alone_carries_no_bound_and_never_expires(agent, tmp_path):
     """Design §4.10 *What a person is asked* — **Needed**. An `ask` to the person carries no bound
     and never expires: `--bound` on one is refused and the refusal names `steer`; the person is
-    asked alone, so an `ask` or a `steer` naming the person names nobody else (a `note` may) and a
-    `conflict` never names the person; both refusals say what to do instead. No sweep, however
+    asked alone, so an `ask` or a `steer` naming the person names nobody else (a `note` may) — an
+    `ask` to two citing `sends` included (§4.10 *Two controllers disagree*); the refusals say what
+    to do instead. No sweep, however
     late, closes it."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
@@ -997,10 +1004,9 @@ async def test_an_ask_to_the_person_is_asked_alone_carries_no_bound_and_never_ex
             # a `note` may name both
             got = await c.call("msg", to=["person", other], text="fyi")
             assert sorted(got["delivered"]) == sorted(["person", other])
-            # a conflict never names the person: it goes to the controllers, and the ask is the way up
-            with pytest.raises(AgentError, match="a conflict never names the person") as e:
-                await c.call("msg", to=["person", other], text="settle this", kind="conflict", cites=["s-1"])
-            assert "--kind ask" in str(e.value)
+            # an ask to two that cites `sends` never names the person: it goes to the controllers
+            with pytest.raises(AgentError, match="asked alone"):
+                await c.call("msg", to=["person", other], text="settle this", kind="ask", cites=["s-1"])
         # nothing on the home's clock closes it, however late the sweep runs
         await agent._sweep_mail(datetime.now(UTC) + timedelta(days=30))
         held = [x for x in (await person.call("inbox"))["entries"] if x["id"] == ask["id"]][0]
@@ -1093,7 +1099,7 @@ async def test_every_close_path_writes_its_reason_and_the_fields_that_came_befor
     by whatever path — `replied`, `declined`, `asker_gone`, `lapsed`, `go_with_it`, `expired` — and
     the fields that existed before it are kept and still written: `replied` sets `closed_by` and
     `closed_at`; `expired` sets `expired_at`; the other four set `closed_at` alone. An entry is
-    open exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason`."""
+    open exactly when it is an `ask` or a `steer` with no `closed_reason`."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         lead, w = await mk("lead", unattended=True), await mk("w", unattended=True)
@@ -1789,7 +1795,7 @@ async def test_a_lapse_wakes_uncharged_across_a_resume_and_a_restart(agent, hook
 
 
 async def test_a_question_carries_its_likely_answers_cleaned_more_strictly_than_its_text(agent, tmp_path):
-    """Design §4.10 *Suggested answers*: an `ask`, a `steer` or a `conflict` may carry up to four
+    """Design §4.10 *Suggested answers*: an `ask` or a `steer` may carry up to four
     `answers`, each one line capped at `ANSWER_CAP` and cleaned **more strictly than displayed text
     is** — the tail's cleaning *and* every Unicode format character (`Cf`), because an answer
     becomes the label of something a person presses. One that cleans to nothing or repeats an
@@ -1840,8 +1846,8 @@ async def test_a_question_carries_its_likely_answers_cleaned_more_strictly_than_
         await person.call("kill", id=loner)
 
 
-async def test_a_conflicts_answers_reach_every_controllers_copy(agent, tmp_path):
-    """Design §4.10: a `conflict` never names the person, so its answers reach no button — they are
+async def test_an_ask_to_twos_answers_reach_every_controllers_copy(agent, tmp_path):
+    """Design §4.10: an `ask` to two controllers never names the person, so its answers reach no button — they are
     read and picked between sessions, which means **every addressee's copy must carry them**
     (`_copy`), the sender's `outbox` copy included."""
     async with LocalClient() as person:
@@ -1856,7 +1862,7 @@ async def test_a_conflicts_answers_reach_every_controllers_copy(agent, tmp_path)
                 "msg",
                 to=[lead, lead2],
                 text="two of you told me different things",
-                kind="conflict",
+                kind="ask",
                 cites=[sends[-1]["id"]],
                 answers=["do what l1 said", "do what l2 said"],
             )
@@ -1876,7 +1882,7 @@ async def test_a_conflicts_answers_reach_every_controllers_copy(agent, tmp_path)
 
 async def _contradicted(person, tmp_path):
     """Two controllers that each `send` one worker a contradicting instruction (TD-134): the
-    worker, both leads, and the two `sends` ids the worker's `conflict` cites."""
+    worker, both leads, and the two `sends` ids the worker's `ask` to both cites."""
     mk = _mk(person, tmp_path)
     lead, lead2, worker = [await mk(n, unattended=True) for n in ("lead", "lead2", "w")]
     for sid in (lead, lead2):
@@ -1891,7 +1897,7 @@ async def _contradicted(person, tmp_path):
 
 
 async def test_two_controllers_contradict_a_worker_and_the_first_reply_is_the_ruling(agent, tmp_path):
-    """TD-134, design §4.10 *A conflict, worked*: the worker raises one `conflict` citing both
+    """TD-134, design §4.10 *A disagreement, worked*: the worker puts one `ask` to both, citing both
     `sends`, never picking one; the first controller's `reply` closes every copy at that moment and
     lands in the worker's inbox as unread mail — what rings it once it has ended its turn (TD-153);
     the second controller's reply, arriving after the ruling, counts as a `note` on the same
@@ -1900,7 +1906,7 @@ async def test_two_controllers_contradict_a_worker_and_the_first_reply_is_the_ru
         lead, lead2, worker, cites = await _contradicted(person, tmp_path)
         async with LocalClient(caller=worker) as w:
             got = await w.call(
-                "msg", to=[lead, lead2], text="merge or keep the branch?", kind="conflict", cites=cites, about="TD-900"
+                "msg", to=[lead, lead2], text="merge or keep the branch?", kind="ask", cites=cites, about="TD-900"
             )
         cid = got["entry"]["id"]
         assert got["delivered"] == [lead, lead2]
@@ -1928,17 +1934,17 @@ async def test_two_controllers_contradict_a_worker_and_the_first_reply_is_the_ru
             await person.call("kill", id=sid)
 
 
-async def test_a_conflict_nobody_answers_goes_to_the_person_and_is_never_a_stalled_worker(agent, tmp_path):
-    """TD-134, design §4.10 *A conflict, worked*: with **no** reply by its bound the conflict
-    expires on every copy, and the worker asks the person itself — the conflict's id and the two
+async def test_an_ask_to_two_nobody_answers_goes_to_the_person_and_is_never_a_stalled_worker(agent, tmp_path):
+    """TD-134, design §4.10 *A disagreement, worked*: with **no** reply by its bound the ask to
+    both expires on every copy, and the worker asks the person itself — the ask's id and the two
     `sends` named in the text, an `ask` under *Needs you*, never a board line. Once the person
     answers, the worker owes an outcome and cannot declare itself out of work until it settles
-    it; it tells both controllers the ruling in one `note` (it holds no copy of its own conflict
+    it; it tells both controllers the ruling in one `note` (it holds no copy of its own ask
     to reply on), and settles the question with the outcome."""
     async with LocalClient() as person:
         lead, lead2, worker, cites = await _contradicted(person, tmp_path)
         async with LocalClient(caller=worker) as w:
-            got = await w.call("msg", to=[lead, lead2], text="merge or keep?", kind="conflict", cites=cites, bound=0.5)
+            got = await w.call("msg", to=[lead, lead2], text="merge or keep?", kind="ask", cites=cites, bound=0.5)
             cid = got["entry"]["id"]
             await asyncio.sleep(0.7)
             await agent._sweep_mail(datetime.now(UTC))
@@ -1946,7 +1952,7 @@ async def test_a_conflict_nobody_answers_goes_to_the_person_and_is_never_a_stall
             for sid in (lead, lead2):
                 copy = [e for e in (await person.call("inbox", id=sid))["entries"] if e["id"] == cid][0]
                 assert copy["expired_at"]
-            text = f"conflict {cid} expired unanswered: {cites[0]} says merge TD-900, {cites[1]} says keep it"
+            text = f"ask {cid} to both expired unanswered: {cites[0]} says merge TD-900, {cites[1]} says keep it"
             asked = (await w.call("msg", to="person", text=text, kind="ask", about=worker))["entry"]
             held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == asked["id"]][0]
             assert cid in held["text"] and all(c in held["text"] for c in cites)
@@ -2671,3 +2677,13 @@ async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_a
                     await c.call("msg", **params)
         await person.call("kill", id=builder)
         await person.call("kill", id=lead)
+
+
+def test_a_retained_conflict_entry_is_read_as_an_ask():
+    """Design §4.10 *Two controllers disagree* (TD-471): the `conflict` kind is folded into `ask`, and
+    an entry of that kind still retained in a store is read as an `ask` — open, owed and counted as one."""
+    from sessionorc.models import ASK_KINDS, MAIL_KINDS, MailEntry
+
+    assert "conflict" not in MAIL_KINDS and "conflict" not in ASK_KINDS
+    e = MailEntry.from_dict({"id": "m-1", "from": "w", "to": ["l1", "l2"], "kind": "conflict", "text": "?", "at": "x"})
+    assert e.kind == "ask" and e.open

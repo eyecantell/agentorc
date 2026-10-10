@@ -41,7 +41,7 @@ from .common import _age, _countdown, _instant, _iso, _left, host_name, template
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
-PERSON_ASK_KINDS = ("ask", "conflict")  # what reads as a question to the person; `steer` has its own rules
+PERSON_ASK_KINDS = ("ask",)  # what reads as a question to the person; `steer` has its own rules
 # design §4.5 screen 6 / §4.10 *Outcomes* (TD-079 step 2): **Waiting on them** is the fourth
 # section, under *Steering* and in neither number — it waits on a session, not on the person.
 # §4.9b (TD-075 step 2): **Answered for you** follows it, uncounted too — what a teammate answered
@@ -51,7 +51,7 @@ INBOX_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi", "snoozed")
 
 def _entry_open(e: dict[str, Any]) -> bool:
     """Design §4.10 *One way of being closed*, mirrored for the dicts the RPC hands the page: an
-    entry is open exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason` —
+    entry is open exactly when it is an `ask` or a `steer` with no `closed_reason` —
     and, for entries written before 2026-09-19, one with no `closed_by` and no `expired_at`."""
     if e.get("kind") not in (*PERSON_ASK_KINDS, "steer"):
         return False
@@ -1547,7 +1547,7 @@ OWING_CLOSES = ("replied", "go_with_it")
 # and `go_with_it` is a `steer`'s own close reason. The agent enforces the debt on that set, so a
 # narrower one here would leave a `steer`'s debt sitting in FYI, uncounted, while `ao progress
 # none` was still refusing its sender (review of PR #287).
-OWING_KINDS = ("ask", "steer", "conflict")
+OWING_KINDS = ("ask", "steer")
 
 
 def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> None:
@@ -1687,9 +1687,7 @@ def inbox_sections(
     person by definition. They carry no snooze of the Inbox's own: a board row's Snooze is §4.4's
     write-back, which moves its `Due:` date on the board itself.
 
-    - **Needs you** — the state rows, open `ask`s to the person (an open `conflict` too: it cannot be addressed to
-      the person, §4.10, but one written before that gate would still be a question nobody else
-      can answer) and **paused** `steer`s; oldest first.
+    - **Needs you** — the state rows, open `ask`s to the person and **paused** `steer`s; oldest first.
     - **Steering** — open `steer`s whose clock is running; soonest bound first, and a `steer`
       that somehow carries no bound last.
     - **FYI** — everything else: `note`s, `system` notes, replies, and every closed entry until
@@ -1835,8 +1833,8 @@ _FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
 
 
 def rail_kind(e: Mapping[str, Any]) -> str:
-    """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a `conflict`, a
-    passed-up question), *steering* (a `steer`), *session states* (every state row, alarms
+    """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a passed-up
+    question), *steering* (a `steer`), *session states* (every state row, alarms
     included), *board items*, *notes* (a `note`, a `system` note, a reply, answered-for-you, an
     outcome), *trail*."""
     row = e.get("row")
