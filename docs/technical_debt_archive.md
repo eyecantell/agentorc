@@ -8758,3 +8758,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
 
 **Resolved:** 2026-10-10 (PR #1439; live check read by grinder-ao-1) — with #1439 live (`c7182a4`), `ao doctor hooks` on kmaster reads *ok*, 0 warnings, 0 lacks. `grind+cadence.json` and `grind+cadence+unattended.json` read only their `agentorc-hook` commands, each `resolves: true`, so no *does not resolve* line is printed.
+
+## TD-520: A text paste with Ctrl+V on the Focus terminal is typed twice: `pasteClip` pastes it and the browser's own paste event reaches xterm.js as well
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-2, met while building TD-479)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (Focus: `term.attachCustomKeyEventHandler`, the Ctrl+V / Ctrl+Shift+V / Shift+Insert lines that call `pasteClip` and `return false`)
+
+**Why:** On a scratch home (`scripts/look_home.py`, headless Chromium under Playwright, clipboard permissions granted), `MARK` on the clipboard and Ctrl+V on a shell session's terminal put `MARKMARK` at the prompt — on `origin/main`'s `app.js` as on TD-479's. The key handler's `return false` stops xterm.js from handling the key, but not the browser's default: the keydown still raises a `paste` event on xterm's textarea, which xterm.js pastes itself, beside `pasteClip`'s `term.paste`. A file-only clipboard is not doubled (xterm's own handler takes text alone), so TD-479's screenshot paste uploads once. Not yet seen in a headed browser, where a person would see a pasted command twice — a `git commit -m "…"` pasted into a shell would run with its text doubled.
+
+**Fix:** Read the doubling in a headed Chrome and Firefox first. If it holds there, take one road: either `preventDefault()` the key events `pasteClip` handles (the custom handler gets the `KeyboardEvent`), or let the native `paste` event carry text and call `pasteClip` only for the file case. A node test against stubs, as `tests/test_attach.py` runs the page's functions, pins that one Ctrl+V pastes once.
+
+**Related:** TD-479 (the terminal's file paste), TD-472.
+
+**Resolved:** 2026-10-10 (PR #1449) — the three paste chords go through `AO.pasteKey`, which cancels the keydown and calls the one paste road; a node test pins one press, one paste. On a scratch home in headless Chromium, origin/main put `MARKMARK` at a shell prompt for each chord and the fix puts `MARK`; a file-only clipboard still uploads once. Not read in a headed browser (none on this host).
