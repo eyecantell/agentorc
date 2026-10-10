@@ -2356,6 +2356,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     wanted = list(dict.fromkeys(args.checks)) or list(doctor.CHECKS)
     if bad := [c for c in wanted if c not in doctor.CHECKS]:
         raise AgentError(f"no check {', '.join(bad)}: ao doctor runs {', '.join(doctor.CHECKS)}")
+    if args.probe is not None and os.environ.get("AGENTORC_SESSION"):
+        raise AgentError(
+            "ao doctor --probe launches a session: a person's own, refused to a session as `ao new` on "
+            "another is (design §4.7) — run `ao doctor` without it"
+        )
+    if args.probe is not None and "hooks" not in wanted:
+        raise AgentError("--probe is the hooks check's: ao doctor hooks --probe [<profile>]")
     try:
         host = call_sync("host")
     except AgentUnavailable:
@@ -2377,6 +2384,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             rows += doctor.tmux(reading["tmux"])
         elif check == "hooks":
             rows += doctor.hooks(reading["hooks"], datetime.now(UTC))
+            if args.probe is not None:
+                rows += [_probe(row) for row in _probe_rows(reading["profiles"], args.probe)]
         elif check == "identity":
             rows += doctor.identity(reading["identity"])
         elif check == "profiles":
@@ -2394,6 +2403,48 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     emit(args, {k: v for k, v in got.items() if k != "line"}, prose)
     return 0 if got["ok"] else 1
+
+
+def _probe_rows(profiles: list[dict[str, Any]], name: str) -> list[dict[str, Any]]:
+    """The profiles a probe launches: each the reading names, or the one `name` names."""
+    rows = [r for r in profiles if "profile" in r]
+    if not name:
+        return rows
+    if picked := [r for r in rows if r["profile"] == name]:
+        return picked[:1]
+    raise AgentError(f"no profile {name!r}: the profiles are {', '.join(r['profile'] for r in rows) or 'none'}")
+
+
+def _probe(row: dict[str, Any], wait: float = doctor.PROBE_WAIT, every: float = 0.5) -> dict[str, Any]:
+    """One scratch launch (design §4.7 `--probe`): the profile under its layer, in a temporary
+    directory, with no prompt; its record watched for the first hook (the SessionStart) up to `wait`;
+    then the pane killed and the record removed, whatever happened, and the directory with it."""
+    import shutil
+    import tempfile
+    import time
+
+    profile = str(row["profile"])
+    tmp = tempfile.mkdtemp(prefix=f"ao-probe-{profile}-")
+    sid = None
+    try:
+        s = call_sync("create", name=f"probe-{profile}", dir=tmp, adapter=str(row["adapter"]), profile=profile)
+        sid = str(s["id"])
+        start = time.monotonic()
+        tail: list[str] = []
+        while (took := time.monotonic() - start) < wait:
+            got = call_sync("explain", id=sid)
+            if got.get("last_hook"):
+                return doctor.probe(profile, took, [], wait)
+            tail = list(got.get("tail") or [])
+            time.sleep(every)
+        return doctor.probe(profile, None, tail[-5:], wait)
+    finally:
+        if sid:
+            with contextlib.suppress(AgentError):
+                call_sync("kill", id=sid)
+            with contextlib.suppress(AgentError):
+                call_sync("remove", id=sid)
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _version() -> str:
@@ -3529,6 +3580,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_identity)
     p = add("doctor", help="check the install: agent, tmux, hooks, identity, profiles, nodes, org (§4.7)")
     p.add_argument("checks", nargs="*", metavar="check", help=f"run only these: {', '.join(doctor.CHECKS)}")
+    p.add_argument(
+        "--probe",
+        nargs="?",
+        const="",
+        metavar="profile",
+        help="hooks: launch a scratch session of each profile (or this one) and wait 30s for its first hook; "
+        "a person's own",
+    )
     p.set_defaults(fn=cmd_doctor)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
