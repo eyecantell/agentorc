@@ -17,8 +17,8 @@ from datetime import UTC, datetime, timedelta
 from importlib import resources
 from typing import Any
 
+from agentorc import doctor, orgcheck, repoconfig, service, teamrun, teams
 from agentorc import org as orgmod
-from agentorc import orgcheck, repoconfig, service, teamrun, teams
 from agentorc.ending import closer_words, restart_words, waiting_words
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
@@ -2347,6 +2347,101 @@ def cmd_identity(args: argparse.Namespace) -> int:
     return emit(args, r, human)
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """`ao doctor [<check>…]` (design §4.7 **`ao doctor`**, TD-465 slice 2): the seven checks, in
+    order, a line each in `ao org check`'s verdict words, every lack naming its cure; then the count,
+    exit 1 on a lack. The host-side readings are the never-gated `doctor` RPC's; the build line and
+    the org are the client's own reads, as `ao promote status` and `ao org check` are. It writes
+    nothing and repairs nothing. With no host agent answering it stops at the first line, exit 3."""
+    wanted = list(dict.fromkeys(args.checks)) or list(doctor.CHECKS)
+    if bad := [c for c in wanted if c not in doctor.CHECKS]:
+        raise AgentError(f"no check {', '.join(bad)}: ao doctor runs {', '.join(doctor.CHECKS)}")
+    try:
+        host = call_sync("host")
+    except AgentUnavailable:
+        if not args.json:
+            print("lacking: agent — no host agent answering")
+        raise
+    try:
+        reading = call_sync("doctor")
+    except AgentError as e:
+        if "unknown method" not in str(e):
+            raise
+        raise AgentError(f"{e}: the running host agent predates `ao doctor` (the next promote brings it)") from e
+    node = host.get("mode") != "home"
+    rows: list[dict[str, Any]] = []
+    for check in [c for c in doctor.CHECKS if c in wanted]:
+        if check == "agent":
+            rows += doctor.agent(_version(), _this_promote(host), _build_ahead(host), node)
+        elif check == "tmux":
+            rows += doctor.tmux(reading["tmux"])
+        elif check == "hooks":
+            rows += doctor.hooks(reading["hooks"], datetime.now(UTC))
+        elif check == "identity":
+            rows += doctor.identity(reading["identity"])
+        elif check == "profiles":
+            rows += doctor.profiles(reading["profiles"])
+        elif check == "nodes":
+            rows += doctor.nodes(reading["nodes"], node)
+        else:
+            rows += _doctor_org(reading["files"], node)
+    got = doctor.summary(rows)
+
+    def prose() -> None:
+        for r in rows:
+            print(doctor.line(r))
+        print(got["line"])
+
+    emit(args, {k: v for k, v in got.items() if k != "line"}, prose)
+    return 0 if got["ok"] else 1
+
+
+def _version() -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("agentorc")
+    except PackageNotFoundError:
+        return "unknown version"
+
+
+def _this_promote(host: dict[str, Any]) -> dict[str, Any] | None:
+    """This repo's promote reading (`host.promotes`), by the name of the checkout the cwd is in; the
+    one reading when there is only one."""
+    promotes = host.get("promotes") or {}
+    main = _main_checkout(os.getcwd())
+    if main and (r := promotes.get(pathlib.Path(main).name)):
+        return r
+    return next(iter(promotes.values())) if len(promotes) == 1 else None
+
+
+def _build_ahead(host: dict[str, Any]) -> dict[str, Any]:
+    from sessionorc import build
+
+    return build.ahead(host.get("built_from") or {})
+
+
+def _doctor_org(files: dict[str, Any], node: bool) -> list[dict[str, Any]]:
+    """`ao org check`'s reading for the doctor's **org** line, and the two files' parse."""
+    if node:
+        return doctor.org(None, files, 0, node)
+    try:
+        org, notes = _org_notes("ao doctor")
+    except ValueError as e:
+        return doctor.org(None, files, 0, node, str(e))
+    got = orgcheck.check(
+        org,
+        notes,
+        hosts.local_host().name,
+        hosts.local_host().repos(),
+        list(hosts.nodes()),
+        files=teamrun.files_via(call_sync),
+        settings=settings_mod.read(),
+        repos_of=teamrun.repos_via(call_sync),
+    )
+    return doctor.org(got, files, len(org.teams), node)
+
+
 def cmd_td_add(args: argparse.Namespace) -> int:
     """`ao td add [--repo <name>] [--type debt|feature] ["<words>"]` (design §4.7 *Entries*, §4.9 *Add
     an entry to the ledger*; TD-218 slice 4): the terminal's form of **Hand to the techlead**. The
@@ -3432,6 +3527,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_whoami)
     p = add("identity", help="this host's identity mode, the connections it has classified, and its alarms (§4.8a)")
     p.set_defaults(fn=cmd_identity)
+    p = add("doctor", help="check the install: agent, tmux, hooks, identity, profiles, nodes, org (§4.7)")
+    p.add_argument("checks", nargs="*", metavar="check", help=f"run only these: {', '.join(doctor.CHECKS)}")
+    p.set_defaults(fn=cmd_doctor)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
     p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")

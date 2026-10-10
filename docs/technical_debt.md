@@ -774,7 +774,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (the designer, TD-111's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** In progress — slice 1, part (1), the never-gated `doctor` RPC with the adapter's `doctor_profiles`, is PR #1363 (grinder-ao-1, 2026-10-09). **Left:** (2) `cmd_doctor` with its verdicts, (3) `--probe`, (4) `ao --skill`'s line.
+**Status:** In progress — slice 1, part (1), the never-gated `doctor` RPC with the adapter's `doctor_profiles`, is PR #1363 (grinder-ao-1, 2026-10-09); slice 2, parts (2) and (4), `cmd_doctor` with `agentorc.doctor`'s verdicts and `ao --skill`'s line, is grinder-ao-2's (2026-10-09). **Left:** (3) `--probe`. The **agent** line's watch is TD-497's.
 **Location:** design §4.7 **`ao doctor`** (the whole of it), §4.8a (the never-gated reads), §4.2 (the layer, `confidence`, the queue); `src/agentorc/cli.py` (`cmd_doctor`, beside `cmd_identity`, `cmd_host`, `cmd_promote`, `cmd_gate` and the `org check` printing it reuses), `src/sessionorc/agent_identity.py` (the server read `_id_server` keeps; `rpc_identity`), `src/sessionorc/tmux.py` (`server_pid`), `src/agentorc/adapters/claude_code/__init__.py` (`hooks_file`, `hook_command`, `credentials_ok`, `usage_for`), `src/sessionorc/containers.py` (`host_status`), `src/agentorc/skill.md`
 
 **Why:** TD-111's read (2026-10-08): half the checks exist over five commands and the half that needs a probe does not; every *found live* entry cost a session an hour a line would have printed.

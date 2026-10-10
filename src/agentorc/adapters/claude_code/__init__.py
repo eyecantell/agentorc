@@ -766,7 +766,8 @@ class ClaudeCodeAdapter:
         """What `ao doctor` reads of each profile this adapter runs (design §4.7 **`ao doctor`**
         *hooks* and *profiles*, TD-465), for the host agent, which cannot read `profiles.yml`
         itself: the config dir, the credentials (`credentials_ok`: True, False for a dead refresh
-        token, None for none), a metered profile's key, and its settings layers (`layer_reading`).
+        token, None for none), a metered profile's key, its settings layers (`layer_reading`), and
+        the login line that cures a missing credential (`login`).
         `profiles.yml` that does not parse is one entry carrying `error` in its own words."""
         try:
             profs, _ = profiles_mod.load()
@@ -783,6 +784,8 @@ class ClaudeCodeAdapter:
                 "metered": prof.metered,
                 "credentials": None if prof.metered else self.credentials_ok(prof),
                 "layers": layer_reading(prof),
+                # the cure `ao doctor` prints for no credentials: the core names no tool (§4.3)
+                "login": f"CLAUDE_CONFIG_DIR={config_dir(prof)} claude",
             }
             if prof.metered:
                 row["key"] = self._key_set(prof)
