@@ -9336,4 +9336,4 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 
 **Related:** TD-537 (the build), TD-536 (the design), TD-290 (a UI change is verified by the grinder), TD-545.
 
-**Resolved:** 2026-10-10 (PR #PRNUM) — `tests/test_ui_settings_you.py` runs `AO.settings()` under node against a fake You form: what Save posts for `file_link` and a template's `file`, the editor pick's rows and the switch's wait, and Cancel's redraw. Each of the five mutations above fails it, as do the same two lines removed from Cancel.
+**Resolved:** 2026-10-10 (PR #1502) — `tests/test_ui_settings_you.py` runs `AO.settings()` under node against a fake You form: what Save posts for `file_link` and a template's `file`, the editor pick's rows and the switch's wait, and Cancel's redraw. Each of the five mutations above fails it, as do the same two lines removed from Cancel.
