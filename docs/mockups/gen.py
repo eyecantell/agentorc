@@ -751,7 +751,8 @@ def focus():
 <span class="d">⏺</span> Read(docs/technical_debt.md)
 <span class="d">⏺</span> Bash(pdm run test tests/test_scripts/test_recover_stuck_notices.py)
   <span class="g">412 passed in 38.2s</span>
-<span class="d">⏺</span> Edit(scripts/recover_stuck_notices.py)
+<span class="d">⏺</span> Edit(<span style="text-decoration: underline; cursor: pointer;" title="Ctrl+click opens it in your editor (Cmd+click on a Mac) — a path in the pane is a link (design §4.6, TD-493): underlined only when the host says the file is in the session's repo">scripts/recover_stuck_notices.py</span>)
+  The stuck notice is re-read at <span style="text-decoration: underline; cursor: pointer;" title="Ctrl+click opens it in your editor (Cmd+click on a Mac) — a path in the pane is a link (design §4.6, TD-493): underlined only when the host says the file is in the session's repo">scripts/recover_stuck_notices.py:42</span>; the test is in tests/, not a file I touched.
 
 <span class="d">⏺</span> Bash(gh pr create --base main --head td301-fix)
   <span style="text-decoration: underline; cursor: pointer;" title="Ctrl+click to open (Cmd+click on a Mac) — a URL in the pane is a link (design §4.6, TD-421); a plain click or a drag selects as before">https://github.com/ContractMatch/samscrape/pull/811</span>
