@@ -8,7 +8,7 @@ from conftest import run_hook
 
 import agentorc
 from agentorc.adapters.claude_code.guard import REASON, refuse
-from agentorc.adapters.claude_code.hook import translate
+from agentorc.adapters.claude_code.hook import refused_command, translate
 
 # the 2026-10-09 loop that killed `systemd --user`, as it was run
 THE_LOOP = (
@@ -131,8 +131,14 @@ def test_a_subagents_kill_is_refused_too(tmp_path, monkeypatch):
     assert json.loads(cp.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_another_tools_command_is_not_read():
-    assert translate({**bash("x"), "tool_name": "Read"})["event"] == "PreToolUse:Read"
+def test_another_tools_command_is_not_read(tmp_path, monkeypatch):
+    """Only `Bash` runs a command: a `command` on any other tool's input is never the guard's."""
+    other = {**bash("pkill -f sleep"), "tool_name": "Read"}
+    assert refused_command(other) is None
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    cp = run_hook("ao-x-y", other)
+    assert cp.returncode == 0 and cp.stdout == ""
+    assert translate(other)["event"] == "PreToolUse:Read"
 
 
 # The rule's words (design §4.8): the skill and every template brief that carries a never-list.
