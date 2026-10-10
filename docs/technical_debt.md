@@ -46,7 +46,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-521 | Focus below 720px scrolls sideways: the main column is as wide as the terminal's content (1444px at a 600px viewport) | Low | Open |
 
 ---
 
@@ -676,18 +675,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-## TD-521: Focus below 720px scrolls sideways: the main column is as wide as the terminal's content (1444px at a 600px viewport)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-10 (grinder-ao-2, met building TD-500)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.css` (`.page.focus { align-items: flex-start }` ~L468; the narrow rules' `.page.focus { flex-direction: column }` ~L540), `.focus .main`; design §4.5 *Phone layout*
-
-**Why:** on a scratch home (`scripts/look_home.py`) at a 600×900 viewport, `origin/main` at `35b4aaca` draws Focus's `.main` 1444px wide — the header, the acts line, the terminal and the composer all of it — and the page scrolls sideways; the panel stacks under it. In the narrow mode `.page.focus` is a column, and its `align-items: flex-start` keeps `.main` at its content's width instead of the page's, so the terminal's grid, once fit, holds it wide.
-
-**Fix:** in the narrow mode `.focus .main` takes the page's width (`align-self: stretch`, or `align-items: stretch` on the column) and the terminal fits to it; a check on a scratch home at 600px wide that `.main`'s width is the page's and `document.body.scrollWidth` the viewport's. **Done when** Focus at 600px wide has no sideways scroll and its terminal's columns fit the width.
-
-**Related:** TD-003 (the phone layout), TD-500 (where it was met).

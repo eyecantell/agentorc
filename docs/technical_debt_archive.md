@@ -8922,3 +8922,20 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Done when** a Focus of a session that printed `src/agentorc/cli.py:364` underlines it on hover and Ctrl+click opens VS Code at that file and line; `build/review` in the same pane's prose, and a path outside the checkout, never underline; `open_in: none` registers no provider and the hover asks nothing (the network tab is empty); a read-only Focus and a popped-out window link as the interactive one does; a node's record is asked through `read`; `pdm run test` covers the RPC's bounds and the provider's runs.
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
+
+## TD-521: Focus below 720px scrolls sideways: the main column is as wide as the terminal's content (1444px at a 600px viewport)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-2, met building TD-500)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Resolved:** 2026-10-10 (PR #1457) — the narrow block's `.page.focus` column is `align-items: stretch`: on a scratch home at 600px wide `documentElement.scrollWidth` read 600 (2488 before) and the terminal 70 columns (307 before); at 390px, 390 and 43; 1400px unchanged. Shot `docs/mockups/reviews/2026-10-10-td521-focus-600.png`; test in `tests/test_ui_focus_rail.py`.
+**Location:** `src/agentorc/ui/static/app.css` (`.page.focus { align-items: flex-start }` ~L468; the narrow rules' `.page.focus { flex-direction: column }` ~L540), `.focus .main`; design §4.5 *Phone layout*
+
+**Why:** on a scratch home (`scripts/look_home.py`) at a 600×900 viewport, `origin/main` at `35b4aaca` draws Focus's `.main` 1444px wide — the header, the acts line, the terminal and the composer all of it — and the page scrolls sideways; the panel stacks under it. In the narrow mode `.page.focus` is a column, and its `align-items: flex-start` keeps `.main` at its content's width instead of the page's, so the terminal's grid, once fit, holds it wide.
+
+**Fix:** in the narrow mode `.focus .main` takes the page's width (`align-self: stretch`, or `align-items: stretch` on the column) and the terminal fits to it; a check on a scratch home at 600px wide that `.main`'s width is the page's and `document.body.scrollWidth` the viewport's. **Done when** Focus at 600px wide has no sideways scroll and its terminal's columns fit the width.
+
+**Related:** TD-003 (the phone layout), TD-500 (where it was met).
