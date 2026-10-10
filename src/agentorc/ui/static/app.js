@@ -1995,6 +1995,30 @@
     return { retry: true, final: false, delay: Math.min(delay * 2, 10000), why };
   };
 
+  // **The terminal mark** (design §4.6 *Reconnect contract*, *Attach behaviour with another client
+  // present*; §4.5a; TD-474, TD-480): what the Focus terminal is doing, one mark at a time, in this
+  // order — the socket closed with a retry pending, past a three-second grace (`retryAt`: when the
+  // retry was scheduled, cleared by the next pane byte); another tmux client sizing the pane (the
+  // bridge's `{clients, window}` frame: more than one client and a window that is not this grid);
+  // a `working` session whose pane has drawn nothing for thirty seconds on an open socket (`lastByte`,
+  // counted up each second; never on `idle`, where silence is normal). Null when none holds.
+  AO.TERM_GRACE = 3000;
+  AO.TERM_SILENT = 30000;
+  AO.termMark = function (st, now) {
+    if (st.retryAt != null && now - st.retryAt >= AO.TERM_GRACE) {
+      return { kind: "reconnecting", text: "reconnecting…", title: "the terminal socket dropped and retries on its own — reload if it stays" };
+    }
+    const w = st.window, g = st.grid;
+    if (st.clients > 1 && w && g && (w[0] !== g[0] || w[1] !== g[1])) {
+      return { kind: "resized", text: "resized by another client", title: "another tmux client (a VS Code attach, a second tab) is sizing this pane — use one, or detach the other" };
+    }
+    if (st.open && st.state === "working" && st.lastByte != null && now - st.lastByte >= AO.TERM_SILENT) {
+      const n = Math.floor((now - st.lastByte) / 1000);
+      return { kind: "silent", text: `no output for ${n}s`, title: "the session reads working and the pane has drawn nothing — Transcript or `ao tail` say whether it is thinking or stuck" };
+    }
+    return null;
+  };
+
   // Deny's optional reason (design §4.5a, TD-117): one line beside Deny that goes back with the
   // refusal through the hook, for the session to read. Never required, so an empty box is a bare
   // Deny — the body carries no `reason` at all rather than an empty one.
@@ -3324,6 +3348,18 @@
     AO.termFont(term, fit);
     AO.terms.push({ term, fit });
     let ws, delay = 500, paneGone = false;
+    // The terminal mark's state (`AO.termMark`, above), redrawn each second and on each change
+    const mk = { retryAt: null, clients: 0, window: null, grid: null, open: false, state: s.state, lastByte: null };
+    const markEl = $("#ftermmark");
+    const tlog = (...a) => console.info("[agentorc] terminal", ...a, new Date().toISOString());
+    const drawMark = () => {
+      if (!markEl) return;
+      mk.grid = [term.cols, term.rows];
+      const m = AO.termMark(mk, Date.now());
+      markEl.classList.toggle("hidden", !m);
+      if (m && (markEl.textContent !== m.text || markEl.title !== m.title)) { markEl.textContent = m.text; markEl.title = m.title; }
+    };
+    setInterval(drawMark, 1000);
     // design §4.5 *Focus watches* (TD-096): an unattended session's attach is read-only. The server
     // decides and drops the keys (§4.6); the page learns it from the attach's first frame and only
     // says so — `mode` is the record's as last seen, and a change to it re-attaches.
@@ -3334,6 +3370,7 @@
     function endTerm(text) {
       paneGone = true;
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
+      mk.retryAt = null; mk.open = false; drawMark();
       term.write(`\r\n\x1b[90m[agentorc] ${text}\x1b[0m\r\n`);
     }
     function openTerm() {
@@ -3344,7 +3381,10 @@
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
       ws.binaryType = "arraybuffer";
       // the grid as it is now, not as it was at the dial: a refit while connecting sends nothing (TD-288)
-      ws.onopen = () => { ws.send(JSON.stringify({ resize: [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows] })); };
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ resize: [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows] }));
+        mk.open = true; mk.lastByte = Date.now(); tlog("open");
+      };
       // The backoff resets on pane output, never on open (TD-029): a connection the server accepts
       // and then ends is not a working terminal, and resetting there retried twice a second forever.
       ws.onmessage = (m) => {
@@ -3356,17 +3396,30 @@
             if (roLine) roLine.classList.toggle("hidden", !readOnly);
             return;
           }
+          // the bridge's reading of tmux's clients and window (§4.6), sent when it changes
+          if (c && "clients" in c) {
+            mk.clients = Number(c.clients) || 0; mk.window = Array.isArray(c.window) ? c.window : null;
+            tlog("clients", mk.clients, "window", mk.window, "grid", [term.cols, term.rows]); drawMark();
+            return;
+          }
         }
+        const t = Date.now();
+        if (mk.lastByte != null && t - mk.lastByte >= AO.TERM_SILENT) tlog(`output after ${Math.floor((t - mk.lastByte) / 1000)}s`);
+        mk.lastByte = t;
+        if (mk.retryAt != null) { mk.retryAt = null; drawMark(); }
         delay = 500; term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
       };
       let opened = false;
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
         if (paneGone) return;  // the push already ended it
+        mk.open = false;
+        tlog("closed", e.code, e.reason || "");
         // The rule is `AO.termClose` (above), so a test can reach it; this is what acts on it.
         const v = AO.termClose(e.code, opened, delay, e.reason);
         if (v.final) { endTerm(v.why); return; }
         term.write(`\r\n\x1b[90m[agentorc] terminal ${v.why} — retrying in ${Math.round(delay / 1000) || 1}s\x1b[0m\r\n`);
+        if (mk.retryAt == null) mk.retryAt = Date.now();  // held across retries until a pane byte
         setTimeout(openTerm, delay); delay = v.delay;
       };
     }
@@ -3908,6 +3961,7 @@
           endTerm("this session's pane is gone (see the banner).");
         }
         render(ev.session);
+        if (ev.session.state && ev.session.state !== mk.state) { mk.state = ev.session.state; drawMark(); }
         if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); }
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
