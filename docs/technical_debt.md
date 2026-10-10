@@ -43,7 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-523 | Ctrl+V on the Focus terminal makes the browser draw a *Paste* button the person must press: the page reads the clipboard by script (`clipboard.read()`) instead of the paste event's own data | Medium | Built (#1462); waits for Paul's look |
 | TD-524 | A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder | Medium | Designed 2026-10-10 — build TD-526 |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
 | TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Open |
@@ -629,23 +628,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-523: Ctrl+V on the Focus terminal makes the browser draw a *Paste* button the person must press: the page reads the clipboard by script (`clipboard.read()`) instead of the paste event's own data
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (grinder-ao-1, from Paul's answer to TD-479's look)
-**Owner:** grinder
-**Kind:** build
-**Status:** Built by PR #1462 (Ctrl+V reads the paste event; the UI check held in headless Chromium); merged 2026-10-10 (d748e38); waits for Paul's look in his own browser, sent as m-c34d930db6db — *Works* archives it
-**Blocked by:** decision (paul)
-**Location:** `src/agentorc/ui/static/app.js` (`AO.pasteKey` ~L286, which cancels the keydown and calls the paste road; Focus `pasteClip` ~L3598 and `AO.clipPaste`, which read `navigator.clipboard.read()` / `readText()`; `term.attachCustomKeyEventHandler` ~L3606), `tests/test_attach.py` (the node harness); design §4.5a **Copy / Paste**
-
-**Why:** Paul, 2026-10-10, answering TD-479's look (m-071d09fa4a08): *This works, but on hitting ctrl-v a white "paste" option (looks like a right click menu item) appears that must be pressed for the paste to happen. Is that desired/required?* It is neither. Since TD-520 (#1449), `AO.pasteKey` cancels Ctrl+V's keydown and the page reads the clipboard itself through the async Clipboard API. Firefox and Safari guard a script's clipboard read outside a paste event with exactly that one-time *Paste* button; Chrome asks a site permission once. A real paste event carries the clipboard in `event.clipboardData` (text and files alike) with no prompt in any browser. Every Ctrl+V on the terminal therefore costs a second press.
-
-**Fix:** let the paste chords (Ctrl+V, Ctrl+Shift+V, Shift+Insert) raise the browser's own `paste` event rather than cancelling their keydown. Catch it on the terminal's element in the capture phase, before xterm.js's textarea handler, `preventDefault()` + `stopPropagation()` so it is pasted once (TD-520's doubling stays fixed). Read `e.clipboardData`: a `text/plain` item pastes its text, a file and no text takes the attach road (TD-479). Keep the read-only toast first. Right-click and the header's **Paste** have no paste event, so they keep `AO.clipPaste`'s script read; a prompt there is the browser's and expected. Factor the pick of text vs file so the event road and `clipPaste` share it. Tests under node: a stub paste event with text pastes once and no `clipboard.read()` is called; one with a PNG and no text uploads once; the chords no longer `preventDefault()` their keydown. A UI check on a scratch home (headless Chromium, as #1448's): text and a PNG each pasted once with Ctrl+V. **Done when** the tests pass, and a look to Paul confirms Ctrl+V on the terminal pastes with no *Paste* button in his browser.
-
-**Related:** TD-479 (the file paste, whose look found it), TD-520 (#1449, the doubled paste whose fix moved Ctrl+V to the script read), TD-472.
 
 ## TD-524: A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder
 
