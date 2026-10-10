@@ -76,7 +76,8 @@ notify:                                       # §4.10 *Told on Telegram when no
   - **`vscode`** — the default, and what a missing file means:
     `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on
     the machine the person sits at, `vscode://file{path}?windowId=_blank`. The file form is each
-    without `?windowId=_blank` and with `:line` after the path (§4.6; TD-524).
+    without `?windowId=_blank` and with `:line` after the path (§4.6; TD-524), and a file link sends the
+    folder form a second before it (§4.6; TD-532).
   - **`cursor`** — **no preset**. A preset's form must be confirmed against the editor's own
     documentation before it ships; Cursor's (`cursor.com/docs/reference/deeplinks`) documents
     only its `cursor://anysphere.cursor-deeplink/…` prompt, command and rule links, not a form
