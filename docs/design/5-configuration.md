@@ -48,6 +48,7 @@ repos:                                        # per registered checkout, by its 
   agentorc: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .agentorc.yml); §6 *Pull*: the checkout follows origin, on when absent
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
+  file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a; default on)
   inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (drawn by the Inbox and the Repo page, picked on the Settings page's You)
@@ -77,7 +78,7 @@ notify:                                       # §4.10 *Told on Telegram when no
     `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on
     the machine the person sits at, `vscode://file{path}?windowId=_blank`. The file form is each
     without `?windowId=_blank` and with `:line` after the path (§4.6; TD-524), and a file link sends the
-    folder form a second before it (§4.6; TD-532).
+    folder form before it, as `person.file_link` says (§4.6; TD-532, TD-536).
   - **`cursor`** — **no preset**. A preset's form must be confirmed against the editor's own
     documentation before it ships; Cursor's (`cursor.com/docs/reference/deeplinks`) documents
     only its `cursor://anysphere.cursor-deeplink/…` prompt, command and rule links, not a form
@@ -85,9 +86,12 @@ notify:                                       # §4.10 *Told on Telegram when no
     cursor` is refused and named like any bad value; a Cursor user writes the form as a template,
     `{label: Cursor, url: "cursor://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank"}`,
     which is theirs to trust.
-  - **`{label: "…", url: "…"}`** — a template of the person's own, which is how any other editor
+  - **`{label: "…", url: "…", file: "…"}`** — a template of the person's own, which is how any other editor
     is reached (Zed, a JetBrains Gateway link: their remote forms are not the same shape, so they
-    are not presets).
+    are not presets). `file` is optional (TD-536): the file link's own form, for an editor whose file
+    link is not its folder link with `:{line}` after it; absent, the file form is `url` filled, as below.
+    It takes the same three words, must be `scheme://…` under the same refusals, and `{path}` in it is
+    the file; a `file` without `{path}` names no file, so it links none, as a `url` without one does.
   - **`none`** — removes the button everywhere.
 
   A template takes `{path}` (percent-encoded), `{line}` and `{remote}`, the host's `vscode_host`
@@ -97,7 +101,15 @@ notify:                                       # §4.10 *Told on Telegram when no
   *file*, and refusing the template would take the button from the one person who wrote a file link);
   the Settings page's note under *url* names the three —
   from `hosts.yml` — an ssh alias in the person's own `~/.ssh/config`, whatever editor reads it;
-  with no `{remote}` in it, a template is used as it stands on every host. **A template must be
+  with no `{remote}` in it, a template is used as it stands on every host. **`person.file_link`** is what
+  a file link sends, whatever the editor (§4.6 *A path in the pane is a link*; TD-536): **`folder_first`**,
+  on when absent — the session's folder link goes first, so the file lands in the worktree's window;
+  off, the file form alone, into the window holding its folder or else the last-used one — and
+  **`wait`**, the seconds between the two, `1` when absent, `0` to `4` (the browser's activation window
+  is five; a value outside is refused by `set_settings` as a terminal size outside its bounds is, and
+  the file read keeps the default). The Settings page's **You** card draws both under the editor pick
+  (§4.5a *Settings page: You, file link*). A command is not a setting: the page sends URLs and runs
+  nothing (§4.6). **A template must be
   `scheme://…`, and `javascript`, `data`, `vbscript` and `file` are refused as schemes** — the
   scheme being the part before `://`, parsed, never a substring (`vscode://file…` is scheme
   `vscode`). One that does not parse, or is refused, is named on the page when it is served and
