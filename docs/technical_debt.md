@@ -53,7 +53,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
 | TD-482 | PR #1354's `review_pr` assertion is vacuous: the claim it builds also matches an open PR by head branch, so dropping `review_pr` from `review_wait` fails nothing | Low | Open |
-| TD-483 | `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it | Low | Open |
 | TD-484 | A member's lane count goes stale on its siblings' cards until each gets a delta of its own | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
@@ -61,7 +60,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-490 | An `exited` pill says *guessed from the screen*, never why the session ended | Medium | Designed 2026-10-09 — build TD-498 |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
-| TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
@@ -822,22 +820,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Build the `review_pr` case on a claim whose ref names no open branch (say `ref: "TD-1"`, `review_pr=1302`) and assert *waiting · review #1302*. Re-run the mutation and see it fail.
 
 **Related:** PR #1354, TD-428.
-## TD-483: `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (the designer, from the fact-check of #1366)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *In a team's lanes* and *A member's own count*; `src/sessionorc/ledger.py` (`in_lanes`, ~L253 and ~L279: the `design_first_rest` key), `src/agentorc/ui/org.py` (~L83: `waits`, drawn as *· n wait on a build* on the repo facet's design line)
-
-**Why:** TD-418 retired *what waits on a build* — *blocked* says it, and the page's kinds since TD-428 put a designed entry waiting on its build under *blocked* — and the design's §4.4 (slice 8 of TD-464) carries only the retirement in its history; the code still computes the list (every `design-first` entry outside the team's lanes, `kind_of` still answering that word) and draws it as *n wait on a build*, a meaning the design no longer gives it.
-
-**Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
-
-**Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
-
 ## TD-484: A member's lane count goes stale on its siblings' cards until each gets a delta of its own
 
 **Priority:** Low
@@ -954,22 +936,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first, starting from the chosen mockups: the composer folds to one bar (*✎ Compose a prompt… · Attach · Send*) and the terminal takes the height down to it. A click on the bar, `c`, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal (a resize makes Claude Code repaint, one of TD-474's causes). It folds again on Send, or on Esc when empty, and a draft survives a fold. A Settings → You choice decides whether it starts folded or always open. The terminal also takes the height an unattended Focus leaves empty under it today. This is the anchor of a wider Focus-screen round: other changes Paul names join this entry before its design. **Done when** the design says the fold, the overlay and the setting, the build lands, and the shapes are drawn again from the built page.
 
 **Related:** TD-472 (paste on the terminal), TD-474 (the struggling-terminal mark, which takes the header room), TD-003 (the phone).
-
-## TD-492: TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; neither is a TD-464 PR
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (docs-audit-ao-1, auditing the docs of PRs #1368–#1381: PR #1376)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt_archive.md` `## TD-464`, its `**Resolved:**` line
-
-**Why:** the line reads *each slice its own PR … (#1325 §4.5a, #1343 §6, #1351 §4.10, …)*. `gh pr view 1325` is *TD-063, TD-078: the CI read — named flakes fixed and quiet; archive; file TD-463*, and `gh pr view 1343` is *TD-462: the conflict mail kind folded into an ask to both controllers with --cites; TD-471 builds it*. The slices are `git log origin/main --grep "TD-464 slice"`: slice 1 (§4.5a) is #1345 and slice 2 (§6) is #1350. The other eleven numbers it names (#1351, #1355, #1357, #1362, #1365–#1369, #1372, #1373) match their slice titles. The line also says *the last PR for §4 and the sections under 900 words* without a number; that PR is #1376 (slice 14).
-
-**Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
-
-**Related:** TD-464 (the pass), PR #1376 (archived it).
 
 ## TD-493: A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page
 

@@ -7877,7 +7877,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Owner:** designer
 **Kind:** design-first
 **Status:** Resolved
-**Resolved:** 2026-10-09 (the designer) — every section has had its pass, each slice its own PR with a Sonnet fact-check (#1325 §4.5a, #1343 §6, #1351 §4.10, #1355 §4.5, #1357 §4.9c, #1362 §4.4a, #1365 §4.8, #1366 §4.4, #1367 §4.9b, #1368 §4.9, #1369 §4.7, #1372 §4.8a/§4.2/§4.6, #1373 §5/§4.1/§4.3/§4.2a/§9/§10, and the last PR for §4 and the sections under 900 words). **Before: 192,692 words across `docs/design/`; after: 180,089.** What the pass took is in the history, one dated line per section; no rule and no number left the design, and the fact-checks found four stale sentences on the way (the §4.9 container paragraph, §4.9b's reader *Not built* list, §4.2a's *not built — TD-233*, §10's *Build list*), each corrected, and one leftover in the code (TD-483). The sections are now mostly rules: a third pass would have to merge rules restated across sections (the second bullet of *Why*), which this pass did not attempt — file it when a reader's cost asks for it.
+**Resolved:** 2026-10-09 (the designer) — every section has had its pass, each slice its own PR with a Sonnet fact-check (#1345 §4.5a, #1350 §6, #1351 §4.10, #1355 §4.5, #1357 §4.9c, #1362 §4.4a, #1365 §4.8, #1366 §4.4, #1367 §4.9b, #1368 §4.9, #1369 §4.7, #1372 §4.8a/§4.2/§4.6, #1373 §5/§4.1/§4.3/§4.2a/§9/§10, and the last, #1376, for §4 and the sections under 900 words). **Before: 192,692 words across `docs/design/`; after: 180,089.** What the pass took is in the history, one dated line per section; no rule and no number left the design, and the fact-checks found four stale sentences on the way (the §4.9 container paragraph, §4.9b's reader *Not built* list, §4.2a's *not built — TD-233*, §10's *Build list*), each corrected, and one leftover in the code (TD-483). The sections are now mostly rules: a third pass would have to merge rules restated across sections (the second bullet of *Why*), which this pass did not attempt — file it when a reader's cost asks for it.
 **Location:** `docs/design/` (the largest sections first: `wc -w docs/design/*.md | sort -n`), `docs/design-history.md` (where dated reasons go)
 
 **Why:**
@@ -8228,3 +8228,39 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Fix:** design: fold `conflict` into an `ask` with several addressees and `--cites`. Keep what the kind uniquely carries: the cited `sends` and the rule that it never names the person. Alternatively, write down why the kind earns its place before a second controller exists. Then a build entry. **Done when** the design has one kind fewer, or says why it keeps it.
 
 **Related:** TD-105 (archived; the evaluation), TD-039 (the conflict), TD-052 (mail).
+
+## TD-483: `design_first_rest` outlives its retirement (TD-418): `ledger.in_lanes` still produces it and the Org's repo facet still draws *n wait on a build* from it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (the designer, from the fact-check of #1366)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *In a team's lanes* and *A member's own count*; `src/sessionorc/ledger.py` (`in_lanes`, ~L253 and ~L279: the `design_first_rest` key), `src/agentorc/ui/org.py` (~L83: `waits`, drawn as *· n wait on a build* on the repo facet's design line)
+
+**Why:** TD-418 retired *what waits on a build* — *blocked* says it, and the page's kinds since TD-428 put a designed entry waiting on its build under *blocked* — and the design's §4.4 (slice 8 of TD-464) carries only the retirement in its history; the code still computes the list (every `design-first` entry outside the team's lanes, `kind_of` still answering that word) and draws it as *n wait on a build*, a meaning the design no longer gives it.
+
+**Fix:** drop the `design_first_rest` key from `in_lanes` and the *n wait on a build* clause from `org.py`'s design line; update the tests that pin either (`tests/test_ledger.py`, the org facet's tests); confirm against §4.4 *In a team's lanes* that the design line then reads *n design-first · k in <team>'s lanes* and nothing more. **Done when** the key and the clause are gone, the tests pass, and `grep -rn design_first_rest src tests` finds nothing.
+
+**Related:** TD-418 (the retirement), TD-428 (its build), TD-464 (the pass that found it).
+
+**Resolved:** 2026-10-09 (found done; PR #1389, TD-428 slice 6) — `ledger.in_lanes` no longer produces `design_first_rest` and `org.py`'s design line draws no *n wait on a build*; `tests/test_repo_facts.py` asserts the key absent and `tests/test_ui_team_summary.py` the facet's title without the clause. `grep -rn design_first_rest src` finds nothing (the one hit under `tests/` is that absence assertion).
+
+## TD-492: TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; neither is a TD-464 PR
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (docs-audit-ao-1, auditing the docs of PRs #1368–#1381: PR #1376)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/technical_debt_archive.md` `## TD-464`, its `**Resolved:**` line
+
+**Why:** the line reads *each slice its own PR … (#1325 §4.5a, #1343 §6, #1351 §4.10, …)*. `gh pr view 1325` is *TD-063, TD-078: the CI read — named flakes fixed and quiet; archive; file TD-463*, and `gh pr view 1343` is *TD-462: the conflict mail kind folded into an ask to both controllers with --cites; TD-471 builds it*. The slices are `git log origin/main --grep "TD-464 slice"`: slice 1 (§4.5a) is #1345 and slice 2 (§6) is #1350. The other eleven numbers it names (#1351, #1355, #1357, #1362, #1365–#1369, #1372, #1373) match their slice titles. The line also says *the last PR for §4 and the sections under 900 words* without a number; that PR is #1376 (slice 14).
+
+**Fix:** in the archive entry, `#1325` → `#1345`, `#1343` → `#1350`, and *the last PR* → `#1376`. Nothing else in the entry changes.
+
+**Related:** TD-464 (the pass), PR #1376 (archived it).
+
+**Resolved:** 2026-10-09 — TD-464's `**Resolved:**` reads #1345 for §4.5a's slice, #1350 for §6's, and #1376 for the last; checked against `git log origin/main --grep "TD-464 slice"`.
