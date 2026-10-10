@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Built — live check of #1439: `ao doctor hooks` once live |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
 | TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
 | TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Built (#1436); live check: no anchor fill after a promote's restart |
 
@@ -881,22 +880,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-514: Two `review_pr` reads in `ui/org.py` — the TDs-in-motion row's PR and the compact line's `→ #N` — are pinned by no test in the suite
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/org.py` (`motion_rows`: `pr = p.get("pr") or p.get("review_pr")`; `compact_line`: `pr = claims[0].get("pr") or claims[0].get("review_pr")`)
-
-**Why:** The test-audit of #1422 (TD-482). TD-482 pinned the `review_pr` source in `cards.py`'s `review_wait` only. `org.py` reads the tick's `review_pr` twice more, and the docstring of `motion_rows` names it as a source (*its own `pr`, the tick's `review_pr`, or else an open PR whose head branch names the reference*). Probe: both `or p.get("review_pr")` / `or claims[0].get("review_pr")` removed, then the whole `pytest -q tests` — every test passed (all dots, no F), as did `tests/test_ui_org.py tests/test_ui_team_summary.py tests/test_ui_work_row.py tests/test_ui.py` alone (156 passed). A claim whose PR the tick set but whose branch no open PR names draws no `review` row PR and no `→ #N`, unseen.
-
-**Fix:** Add one case each: a member with a `claimed` entry `{ref: 'TD-1', review_pr: 1302}` on a repo whose open PRs name no `td001` branch gives a `motion_rows` row with `pr == 1302` and a compact line ending `TD-1 → #1302`. **Done when** each probe fails a test.
-
-**Related:** TD-482 (#1422), TD-428.
 
 ## TD-515: `pill_title`'s order — a *waiting* pill's reason before a seat and the ending, a host note before all — is asserted in no case that holds two of its inputs
 
