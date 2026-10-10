@@ -70,12 +70,13 @@ notify:                                       # §4.10 *Told on Telegram when no
   is not read: the agent's `settings` read names it (`migrate`), and the Org's teams line — the
   Settings page too, once built — says *migrate: ui.yml is no longer read*. The UI reads
   `person:` through that read, at most every five seconds, before it serves a request, and keeps the
-  last answer when a read fails. What `person.open_in` takes is what `ui.yml` took, the editor button of the card, the
-  Focus header, *edit yml*, the Settings page's **Open file** and the Focus pane's file link (§4.6 *A path
-  in the pane is a link*: the same template with the file's path, served to the page as `editor.file`):
+  last answer when a read fails. What `person.open_in` takes is what `ui.yml` took, the editor button of the card and of the
+  Focus Session card, *edit yml*, the Settings page's **Open file**, the Focus pane's file link and the Session
+  card's recent files (§4.6 *A path in the pane is a link*: the same template with the file's path, served to the page as `editor.file`):
   - **`vscode`** — the default, and what a missing file means:
     `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on
-    the machine the person sits at, `vscode://file{path}?windowId=_blank`.
+    the machine the person sits at, `vscode://file{path}?windowId=_blank`. The file form is each
+    without `?windowId=_blank` and with `:line` after the path (§4.6; TD-524).
   - **`cursor`** — **no preset**. A preset's form must be confirmed against the editor's own
     documentation before it ships; Cursor's (`cursor.com/docs/reference/deeplinks`) documents
     only its `cursor://anysphere.cursor-deeplink/…` prompt, command and rule links, not a form
@@ -88,7 +89,7 @@ notify:                                       # §4.10 *Told on Telegram when no
     are not presets).
   - **`none`** — removes the button everywhere.
 
-  A template takes `{path}` (percent-encoded) and `{remote}`, the host's `vscode_host`
+  A template takes `{path}` (percent-encoded), `{line}` (the file form only: the printed line, else `1`; TD-524) and `{remote}`, the host's `vscode_host`
   from `hosts.yml` — an ssh alias in the person's own `~/.ssh/config`, whatever editor reads it;
   with no `{remote}` in it, a template is used as it stands on every host. **A template must be
   `scheme://…`, and `javascript`, `data`, `vbscript` and `file` are refused as schemes** — the
