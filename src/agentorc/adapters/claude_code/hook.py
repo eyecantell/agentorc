@@ -6,6 +6,8 @@ wait elapses, then prints the decision (or nothing, letting Claude Code draw its
 Every other event is fire-and-forget: socket first, `events/<session>.jsonl` if the agent is down.
 An error in the reply is the agent answering — a refusal (design §4.8a) or a bug — and is never
 queued: the tick applies the queue unjudged, so a queued refusal would be applied anyway (TD-115).
+A `PreToolUse` of `Bash` whose command the kill guard refuses (`guard.py`, design §4.3) prints a `deny`
+with its reason first, the hook's own decision, and is reported as any `PreToolUse` is.
 
 With `--statusline` it is the session's status line instead (design §4.4 *A report*, TD-233): it
 reports the account's limits the tool hands it as `usage_report`, keeps the context window and
@@ -37,6 +39,7 @@ from agentorc.adapters.claude_code import (
     displaced_status_line,
     usage_report,
 )
+from agentorc.adapters.claude_code.guard import refuse
 from sessionorc import paths
 from sessionorc.store import EventQueue
 
@@ -148,6 +151,25 @@ def describe_tool_input(tool: str, ti: dict[str, Any]) -> str:
         if v := ti.get(key):
             return str(v)[:200]
     return json.dumps(ti)[:200] if ti else ""
+
+
+def refused_command(payload: dict[str, Any]) -> str | None:
+    """The kill guard's reason for a `PreToolUse` of `Bash` (design §4.3), None for anything else."""
+    if payload.get("hook_event_name") != "PreToolUse" or payload.get("tool_name") != "Bash":
+        return None
+    command = (payload.get("tool_input") or {}).get("command")
+    return refuse(command) if isinstance(command, str) else None
+
+
+def deny(reason: str) -> dict[str, Any]:
+    """The `PreToolUse` decision that refuses the call, with the reason the session reads."""
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
 
 
 class Refused(Exception):
@@ -309,6 +331,11 @@ def main() -> int:
         payload = json.loads(sys.stdin.read() or "{}")
     except ValueError:
         return 0
+    if isinstance(payload, dict) and (reason := refused_command(payload)):
+        # the hook's own decision, before the host agent is asked anything: one it cannot reach still
+        # refuses, and the event below still reports `working` (design §4.3 *A kill the guard refuses*)
+        print(json.dumps(deny(reason)))
+        sys.stdout.flush()
     params = translate(payload, at_composer=os.environ.get(AT_COMPOSER_ENV) == "1")
     if params is None:
         return 0

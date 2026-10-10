@@ -7920,3 +7920,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Resolved:** 2026-10-09 (PR #1386) — `_finished_tell` and `_finished_more` (`src/sessionorc/agent_tick.py`) write the five lines, each only when non-empty; `_mark_team_start` keeps `teams.<team>.usage_at_start` at the home for `ao team start`'s creates (`team_start`), a schedule's start and rule 8's; `tests/test_finished_note.py` pins them. Design §4.9a *The home's note says more*.
 
 **Related:** TD-110 (the design), TD-240 / TD-241 (rule 9's note), TD-271 (open questions outlive their asker), TD-087 (usage readings), TD-410 (the manager seat seldom live).
+
+## TD-496: Build the process rule and the kill guard (TD-489): the line in `ao --skill` and every template brief, the claude-code adapter's `PreToolUse` deny by shape with its reason
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-489's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.8 *A repo's brief is a supplement* (the rule), §4.3 *A kill the guard refuses*, §4.2's table row; `src/agentorc/skill.md` (the Never list), `src/agentorc/briefs/*.md` (every template's never-list: anchor, auditor, designer, grinder, hunter, manager, manager_on_call, techlead; `entry.md` and the two `*.stage.md` supplements only where they carry one — the test over the directory says which), `src/agentorc/adapters/claude_code/hook.py` (`PreToolUse`), a new `src/agentorc/adapters/claude_code/guard.py`; `docs/briefs/**` untouched (held; grinder-ao-1's own line stays)
+
+**Why:** TD-489: a cleanup loop that killed each stray `sleep`'s parent killed `systemd --user` on 2026-10-09; no brief said never to signal a process the session did not start, and nothing refused it.
+
+**Fix:** as §4.8 and §4.3 say. (1) `skill.md`'s Never list and every template brief's never-list gain one line in §4.8's words: signal only a pid you started and still hold (`$!`, a background task's id), never a parent, never by matching a name across the machine (`pkill -f`, `killall`, `kill $(ps …)`); a helper you start gets a bound at birth (`timeout`). (2) `guard.py`: `refuse(command: str) -> str | None` — the reason for a command whose shape §4.3 lists, None otherwise; `hook.py`: on `PreToolUse` with `tool_name == "Bash"`, before the event is sent, a refused command prints `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": <reason>}}` and still reports the event. **Done when** tests pin each refused shape (`pkill -f x`, `killall sleep`, `kill -1`, `kill 1`, `kill $PPID`, `kill $(pgrep x)`, `` kill `ps …` ``, the 2026-10-09 loop verbatim) and each allowed one (`kill 12345`, `kill $PID`, `kill %1`, `kill $(cat x.pid)`, `timeout 600 sleep 90`, a `pkill` inside a quoted string the command only echoes), the printed decision's shape, that a `Bash` event is still sent, and that the skill and each template brief contain the sentence (a test over `src/agentorc/briefs/*.md`).
+
+**Related:** TD-489 (the design), TD-488 / TD-495 (the tmux unit), TD-336 (no prose in the argv — the other `pkill -f` lesson).
+
+**Resolved:** 2026-10-09 (PR #1395) — `src/agentorc/adapters/claude_code/guard.py`'s `refuse` reads a `Bash` command's shape (quoted text masked, each simple command's word found past assignments and wrappers) and returns §4.3's reason for `pkill`/`killall`, a `kill` of `-1`/`1`/`$PPID`, a `kill` of a `ps`/`pgrep` substitution, and a `kill` beside a `ppid` read; `hook.main` prints the `PreToolUse` deny before the event is sent and still reports it. `skill.md` and every template brief with a never-list carry §4.8's process rule. `tests/test_kill_guard.py` pins each shape, the decision, the event, and the sentence in each brief.

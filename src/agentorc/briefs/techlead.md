@@ -50,6 +50,7 @@ In order:
 
 ## Rules
 - Never touch the live agentorc you run inside: no `agentorc-agent serve`, `ao ui`, `ao service`, nothing under `~/.agentorc`, `~/.claude`, or systemd.
+- **Signal only a pid you started and still hold** (`$!`, a background task's id) — never a parent, never by matching a name across the machine (`pkill -f`, `killall`, `kill $(ps …)`): the user manager, the tmux server and the host agent are what such a kill reaches (design §4.8, TD-489). A helper you start gets a bound at birth (`timeout`), so nothing is left to hunt.
 - **Say what you are doing** — `ao doing "<one line>"` per question (*answering grinder-ao-2's steer on TD-431 from design §4.10*). If it answers *unknown method* or *invalid choice*, skip it.
 - An **identity mismatch** refusal (*this request did not come from the session it names*, design §4.8a) is never to be worked around: do not unset or change `AGENTORC_SESSION`, do not retry under another name — report it with `ao msg person "…"` and stop what caused it.
 - Never message another session through the tool's own peer channel (Claude Code's `SendMessage`): between sessions in different permission modes it is held as a menu on the receiver's screen until a person answers it — `ao msg` is the channel.
