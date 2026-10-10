@@ -3391,7 +3391,7 @@
   // The rail's glyphs (§4.5 *The panel put away*, TD-412): one per side card that has something to
   // say, in the panel's order — `card` is the `data-side` a press opens ("" for needs-you, whose
   // prompt is the identity line's, never the panel's), `title` the card's heading and its line.
-  AO.railGlyphs = function (v, ready, inboxN, lines) {
+  AO.railGlyphs = function (v, ready, inboxN, lines, editor) {
     const g = [], ln = lines || {};
     if (v.state === "needs-you") g.push({ card: "", text: "!", title: "Needs you — the prompt is on the identity line" });
     if (v.doing && v.doing.text) g.push({ card: "working", text: "✎", title: `Working — ${v.doing.text}` });
@@ -3399,6 +3399,9 @@
     if (reports) g.push({ card: "reports", text: String(reports), title: `Reports — ${ln.reports || reports}` });
     if (inboxN) g.push({ card: "inbox", text: String(inboxN), title: `Inbox — ${ln.inbox || inboxN}` });
     if (ready) g.push({ card: "ready", text: "✓", title: "Ready to close — every check passes" });
+    // last, the editor button whenever the Session card draws it (TD-525): its press opens the
+    // worktree as the button does, so it carries the button's `href` and brings no card back
+    if (editor && editor.url) g.push({ card: "editor", text: "‹›", title: `${editor.label} — opens the worktree`, href: editor.url, label: editor.label });
     return g;
   };
   // **» put away** / **«** and the glyphs (§4.5a, TD-412): `side` gains `rail` and the choice is
@@ -3450,20 +3453,44 @@
   };
   // …and the press, `AO.paneLink`'s shape: no modifier, nothing; else the editor's file form filled
   // with the host's resolved path, percent-encoded with `/` kept (§5, TD-011), and handed to the
-  // protocol handler as the header's editor button is. On every `vscode` form — a `vscode://` URL that
+  // protocol handler as the Session card's editor button is. On every `vscode` form — a `vscode://` URL that
   // ends at `{path}`: local, ssh-remote, container — the line rides after the path, `:line[:col]` as
   // printed and `:1` where none was, since VS Code opens a remote path as a file only when it ends in
   // `:digits` (TD-524, TD-526); a template's `{line}` takes the line (`1` where none was) and a
   // template without it is filled as it stands.
-  AO.pathLink = function (event, file, resolved, line, col, open) {
-    if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
+  AO.fileUrl = function (file, resolved, line, col) {
     const path = String(resolved).split("/").map(encodeURIComponent).join("/");
     const vscode = file.startsWith("vscode://") && file.endsWith("{path}");
     const at = vscode ? `:${line || 1}${line && col ? `:${col}` : ""}` : "";
-    (open || AO.openEditor)(file.replace("{path}", path + at).replaceAll("{line}", String(line || 1)), "the editor");
+    return file.replace("{path}", path + at).replaceAll("{line}", String(line || 1));
+  };
+  AO.pathLink = function (event, file, resolved, line, col, open) {
+    if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
+    (open || AO.openEditor)(AO.fileUrl(file, resolved, line, col), "the editor");
     return true;
   };
-  // The provider the page registers beside the web-links addon when the header has an editor button:
+  // The Session card's **recent files** (§4.5 item 4, §4.5a, TD-525): the record's `files`, newest
+  // first, each drawn relative to the session's directory (else its repo) with the absolute path and
+  // the edit's time on hover, **M** before one `git.files` holds (its porcelain lines, relative to the
+  // worktree), and a link by the editor's file form at line 1 — the `a.editor` handler opens it on a
+  // plain click. No file form, no links: the paths are text. "" when the run has edited nothing.
+  AO.recentFiles = function (v, editor) {
+    const files = v.files || [];
+    if (!files.length) return "";
+    const under = (p, root) => (root && p.startsWith(root.replace(/\/+$/, "") + "/") ? p.slice(root.replace(/\/+$/, "").length + 1) : null);
+    const changed = new Set(((v.git && v.git.files) || []).map((f) => String(f).slice(String(f).indexOf(" ") + 1)));
+    const file = editor && editor.file;
+    return files.map((f) => {
+      const p = String(f.path || ""), inDir = under(p, v.dir), rel = inDir ?? under(p, v.repo) ?? p;
+      const mark = inDir !== null && changed.has(inDir) ? '<span class="fmark" title="changed in the worktree">M</span> ' : "";
+      const title = esc(`${p}${f.at ? ` — edited ${String(f.at).slice(0, 16).replace("T", " ")}Z` : ""}`);
+      const name = file
+        ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}" data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`
+        : `<span title="${title}">${esc(rel)}</span>`;
+      return `<div>${mark}${name}</div>`;
+    }).join("");
+  };
+  // The provider the page registers beside the web-links addon when the Session card has an editor button:
   // a row with candidates asks the `paths` route once — the answer kept by the row's text until
   // `clear` (a re-attach) — and the runs the host resolved are links; a failed ask is no link and is
   // remembered nowhere, so the next hover asks again.
@@ -3572,7 +3599,7 @@
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
-    // **a path is a link** (TD-501): only where the header draws its editor button
+    // **a path is a link** (TD-501): only where the Session card draws its editor button
     const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor.file) : null;
     if (pathLinks) term.registerLinkProvider(pathLinks);
     term.open($("#term")); fit.fit();
@@ -4029,6 +4056,9 @@
         $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
+      const rf = AO.recentFiles(v, s.editor);
+      $("#frecent").innerHTML = rf;
+      $("#frecent").classList.toggle("hidden", !rf); $("#frecentdt").classList.toggle("hidden", !rf);
       renderReports(v);
       renderInbox(v);
       renderGrants(v);
@@ -4057,8 +4087,10 @@
     function renderRail(v, ready) {
       if (v) { railV = v; railReady = !!ready; }
       const lines = { reports: $("#reportscount").textContent, inbox: $("#inboxcount").textContent };
-      const html = AO.railGlyphs(railV, railReady, inboxN, lines)
-        .map((x) => `<button class="railbtn g-${x.card || "needs"}" type="button" data-rail="${x.card}" title="${esc(x.title)}">${esc(x.text)}</button>`)
+      const html = AO.railGlyphs(railV, railReady, inboxN, lines, s.editor)
+        .map((x) => x.href
+          ? `<a class="railbtn editor g-${x.card}" href="${esc(x.href)}" data-label="${esc(x.label)}" title="${esc(x.title)}">${esc(x.text)}</a>`
+          : `<button class="railbtn g-${x.card || "needs"}" type="button" data-rail="${x.card}" title="${esc(x.title)}">${esc(x.text)}</button>`)
         .join("");
       const el = $("#railglyphs");
       if (el && el.innerHTML !== html) el.innerHTML = html;
