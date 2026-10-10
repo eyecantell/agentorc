@@ -66,6 +66,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
 | TD-511 | `cards.pill_title`'s *waiting* and *seat on call* branches and `ending.clock`'s day prefix are pinned by no test — the pill hover §4.5a words in order | Medium | Open |
+| TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 
 ---
 
@@ -1041,3 +1042,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** each probe in the Why fails a test.
 
 **Related:** TD-490, TD-498 (#1415).
+
+## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, found on #1421)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Open
+**Location:** `scripts/check_cadence.py` (the `ledger` row; a SYNCED FILE, dev-cadence's), `tests/test_ledger.py`
+
+**Why:** On #1421 (TD-461) an archive edit written as `open(a, "w").write(open(a).read() + entry)` truncated the file before reading it: the archive went from 8,363 lines to 22, its header and every entry from TD-011 to TD-455 gone. `pdm run pytest tests/test_ledger.py` passed (11 passed), and the cadence check's `ledger` row reads only that the PR names its TD and touches a ledger file. Only the Sonnet fact-check caught it, by reading the diff's `@@ -1,8363 +1,22 @@`. The archive is append-only by its own header ("appended in resolution order", "Each keeps its original TD number forever"), so a PR that deletes archived entries is never right.
+
+**Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
+
+**Related:** TD-461 (#1421).
