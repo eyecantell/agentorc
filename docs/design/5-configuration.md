@@ -89,7 +89,12 @@ notify:                                       # §4.10 *Told on Telegram when no
     are not presets).
   - **`none`** — removes the button everywhere.
 
-  A template takes `{path}` (percent-encoded), `{line}` (the file form only: the printed line, else `1`; TD-524) and `{remote}`, the host's `vscode_host`
+  A template takes `{path}` (percent-encoded), `{line}` and `{remote}`, the host's `vscode_host`
+  — `{line}` is the file form's (the printed line, else `1`; TD-524), and **a folder form drops it with the one
+  `:` before it**, so `zed://ssh/{remote}{path}:{line}` opens the directory as `zed://ssh/host/dir` from the
+  editor button, *edit yml* and Settings' **Open file** (TD-528: filling `1` would hand the handler a
+  *file*, and refusing the template would take the button from the one person who wrote a file link);
+  the Settings page's note under *url* names the three —
   from `hosts.yml` — an ssh alias in the person's own `~/.ssh/config`, whatever editor reads it;
   with no `{remote}` in it, a template is used as it stands on every host. **A template must be
   `scheme://…`, and `javascript`, `data`, `vbscript` and `file` are refused as schemes** — the

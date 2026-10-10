@@ -353,6 +353,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-10 (TD-528, the designer): **Settings page: You** — the *url* note's words, `{line}` among them. Built by TD-529.
 - 2026-10-10 (TD-524 and TD-525, the designer): **Focus header: VS Code** becomes **Focus side panel, Session card: VS Code**, on the summary line; a **recent files** row; the rail's **‹›**; *a path is a link* names every `vscode` form and `:1`. The help's *a path is a link* paragraph still says *on the header* — TD-527 rewords it with the move. Built by TD-526 and TD-527.
 - 2026-10-10 (TD-523, grinder-ao-2; Paul, answering TD-479's look, asked why Ctrl+V on the terminal drew a white *Paste* button to press): **Copy / Paste** — the keys paste from the browser's own paste event, caught before xterm.js pastes it, in place of the script read TD-520 (#1449) had moved them to; the menu's Paste and right-click keep the script read, having no event.
 - 2026-10-10 (TD-501, grinder-ao-2): *The help text* gains **a path is a link** (Focus pane), the Help page's Focus paragraph, in TD-501's words.
@@ -1072,6 +1073,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-10 (TD-528, the designer; found by #1467's review): a folder form drops a template's `{line}` with the `:` before it; the Settings note names it. Built by TD-529.
 - 2026-10-10 (TD-524 and TD-525, the designer): `person.open_in` names the Session card in the header's place and the recent files; the `vscode` file form is each form without `windowId=_blank` and with `:line`; a template takes `{line}`. Built by TD-526 and TD-527.
 - 2026-10-09 (TD-491, the designer): `person.composer` — folded | open. Built by TD-500.
 - 2026-10-09 (TD-489, the designer): `notify:`'s comment says the watch reads it too. Built by TD-497.
