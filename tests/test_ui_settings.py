@@ -379,6 +379,7 @@ def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess
         page = client.get("/settings").text
         assert 'class="setrow setbalance" data-was="null"' in page
         assert re.search(r'name="balance_prs" value=""[^>]* disabled', page)
+        assert "the techlead's queue past its bound</label>" in page  # the seat by its role (TD-428 slice 7)
         assert "no live member: a team with none is not read" in page and "open PRs: could not look (no line)" in page
         assert post({"balance": {"prs": "8", "oldest": "2d", "review": True}}).json()["ok"]
         assert call_sync("settings")["teams"]["bal-team"] == {"balance": {"prs": 8, "oldest": "2d", "review": True}}

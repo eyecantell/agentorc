@@ -41,7 +41,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-418 | The Org page is cluttered: mine and show command runs out of place, the rollup's bars unaligned, a team header of three lines that says its session count and its flow twice, the lanes line in the repo facet | Medium | Designed 2026-10-08 (five mockup rounds with Paul) — the build is TD-428 |
 | TD-419 | A Focus attachment is never deleted: `~/.agentorc/attachments/<session>/` outlives the session's close and its Forget | Low | Designed 2026-10-09 — TD-469 builds it |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
-| TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Open |
+| TD-428 | Build TD-418: the Org page declutter — + New ▾, the filter words, the rollup, the one-row team header and its *i* panel, the waiting pill, each member's own lane count, the seven kinds, the techlead's name | Medium | Built — live check of #1399 |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
 | TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Designed 2026-10-09 — TD-470 builds it |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
@@ -614,8 +614,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** feature
 **Added:** 2026-10-08 (ao-paul, the design of TD-418)
 **Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (page chrome) merged in #1333, slice 2 (rollup and summary) in #1342, slice 3 (the team header and its *i* panel) in #1348, slice 4 (the waiting pill) in #1354, slice 5 (each member's own lane count) in #1358, slice 6 (the seven kinds) in its PR (grinder-ao-2, 2026-10-09); slice 7 open
+**Kind:** live-check #1399
+**Status:** Built — every slice merged: slice 1 (page chrome) in #1333, slice 2 (rollup and summary) in #1342, slice 3 (the team header and its *i* panel) in #1348, slice 4 (the waiting pill) in #1354, slice 5 (each member's own lane count) in #1358, slice 6 (the seven kinds) in #1389, slice 7 (the techlead's name and the help text) in #1399; what is left is the live read of *Done when* after the promote
 **Location:** `src/agentorc/ui/templates/` (`base.html`, `org.html`, `rollup.html`, `group_head.html`, `team_summary.html`, `lanes_line.html`, `card.html`, `plus_card.html`, `help_mark.html`, `settings.html`, `repo.html`, `repo_part.html`), `static/app.css`, `static/app.js`, `ui/org.py` (`lanes_line`'s *wait on a build*), `ui/cards.py`, `ui/repo.py` (`LEDGER_LISTS`), `ui/app.py`, `ui/help.py`; `sessionorc/ledger.py` (`kind_of`, `KINDS`, `in_lanes`, `design_first_rest`), `agentorc/teamrun.py` (`lane_kinds`, `repo_lanes`), `agentorc/cli.py` (`ao repo`, the `design-first` key near line 1454)
 
 **Why:** TD-418 is designed (§4.1, §4.2 *Waiting*, §4.4 *Repo facts*, §4.5 screen 1 and *The card's anatomy*, §4.5a, §4.7, §4.9c *What is shown*, each marked *built by TD-428*). The mockup and the scripts that made it are in `docs/mockups/reviews/2026-10-08-org-declutter*` and `org-declutter-src/` — `after.js` is the change list applied to a captured page, a guide to the DOM, not code to copy.

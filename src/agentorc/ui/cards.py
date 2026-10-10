@@ -1019,11 +1019,15 @@ def group_place(members: list[dict[str, Any]]) -> str:
 def prs_waiting(members: Collection[dict[str, Any]], now: datetime | None = None) -> dict[str, Any] | None:
     """Design §4.5a **team header** → *PRs waiting* (§4.9b *The reader*, TD-093): the held PRs
     put in front of the team's reader and not yet answered, from each record's `prs_waiting` — the
-    seat's, in practice — as `{n, age}` of the oldest. A count and a time, never the entries. None
-    when nothing waits, or when no record carries the field (a host agent older than it)."""
-    got = [m["prs_waiting"] for m in members if isinstance(m.get("prs_waiting"), dict)]
-    n = sum(int(w.get("n") or 0) for w in got if isinstance(w.get("n"), int))
+    seat's, in practice — as `{n, age, by}` of the oldest. A count and a time, never the entries; `by`
+    names the seat by its role, as its card is titled (*the techlead*, §4.5 *The page names a seat by
+    its role*). None when nothing waits, or when no record carries the field (a host agent older than it)."""
+    holding = [m for m in members if isinstance(m.get("prs_waiting"), dict)]
+    holding = [m for m in holding if isinstance(m["prs_waiting"].get("n"), int)]
+    got = [m["prs_waiting"] for m in holding]
+    n = sum(int(w.get("n") or 0) for w in got)
     if n <= 0:
         return None
     oldest = min((str(w["oldest"]) for w in got if w.get("oldest")), default="")
-    return {"n": n, "age": _age(oldest, now or datetime.now(UTC))}
+    by = sorted({str(m.get("role") or m.get("name") or "seat") for m in holding if m["prs_waiting"].get("n")})
+    return {"n": n, "age": _age(oldest, now or datetime.now(UTC)), "by": " and the ".join(by)}

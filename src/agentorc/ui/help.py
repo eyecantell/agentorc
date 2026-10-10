@@ -59,7 +59,8 @@ HELP: tuple[Help, ...] = (
         "the fold",
         "*n sessions* on a team's card, and a click on its header",
         (
-            "Shows or hides a team's cards and its summary; a stopped team's are folded away by default. "
+            "Shows or hides a team's cards and its summary; a stopped team's are folded away by default, and its "
+            "summary draws only the facets that hold something. "
             "Press it to see what the team left — its repo's numbers, the claims still held, what each member "
             "last said it was doing — to read their mail, or to Forget them. It changes nothing on any record; "
             "which teams you have unfolded is remembered in this browser."
@@ -78,16 +79,28 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "definition",
+        "the Definition line",
+        "a team's help panel",
+        (
+            "Says where this team is defined and how its shape is changed: Members… adds or removes a member, "
+            "Open file opens the file that defines it, and Flow on Settings → goes to the flow it follows. Open "
+            "it when the team should be shaped differently — another member, another flow — rather than run "
+            "differently. It changes nothing by itself, and a team a repo defines is changed by a pull request "
+            "to that repo, so its Members… is disabled with the reason."
+        ),
+    ),
+    Help(
         "not-concluded",
         "not concluded",
-        "a live team's header",
+        "a live team's help panel, its Definition line",
         (
             "Says why this team has no Start yet: one clause for each session that keeps it from reading "
             "concluded — one that is working, one idle that has not declared, one that crashed or wants a "
             "restart, one waiting on your answer to its question. Read it to see what to wait for, or which "
             "session to message or close, before the team can be started again. It is read from the sessions' "
             "records and your Inbox each time the page is drawn and is nothing "
-            "to press: Wind down and Stop now are the controls beside it."
+            "to press: Wind down and Stop now, on the team's header, are the controls for it."
         ),
     ),
     Help(
@@ -120,8 +133,8 @@ HELP: tuple[Help, ...] = (
         (
             "Starts a session of your own in this team, and changes no definition: the New session form "
             "opens with the team picked and Role at Interactive, so the session gets the team's host, repo, "
-            "manager and reader. Press it to work beside the team — on its repo, under its manager, its held "
-            "PRs read by its reader. Nothing is written to org.yml and no member is added: for a permanent "
+            "manager and techlead. Press it to work beside the team — on its repo, under its manager, its held "
+            "PRs read by its techlead. Nothing is written to org.yml and no member is added: for a permanent "
             "member, Members…."
         ),
     ),
@@ -222,7 +235,7 @@ HELP: tuple[Help, ...] = (
         (
             "A member's pull request that fails the repo's cadence check after the host agent told the member "
             "once, or that failed when it was already merged, which no new report cures. The row names the failed"
-            " checks, and beside review says whether the reader's reply was seen or the review is only recorded. "
+            " checks, and beside review says whether the techlead's reply was seen or the review is only recorded. "
             "Open the member to see what it is doing about it. Snooze sets the row aside. Dismiss removes it and "
             "keeps the reading on the record; a later failing read brings it back. The row leaves by itself when "
             "a later read passes."
@@ -233,7 +246,7 @@ HELP: tuple[Help, ...] = (
         "merged without its read",
         "an Inbox row",
         (
-            "Two pull requests of one member that touched held paths and merged with no reply from the reader "
+            "Two pull requests of one member that touched held paths and merged with no reply from the techlead "
             "they wait for. The first such merge is a note under FYI and one line to the member; this row is the "
             "second. The host agent undoes nothing: read what merged, and revert it if it should not stand. Open "
             "the member to tell it so. Dismiss removes the row and keeps the two on the record, so the next such "
@@ -346,7 +359,7 @@ HELP: tuple[Help, ...] = (
         "Settings page: Teams",
         (
             "Stops this team's unattended members taking a new claim while its repo is over a line you draw: more "
-            "open pull requests than a number, the oldest open longer than a time, or the reader's queue past its "
+            "open pull requests than a number, the oldest open longer than a time, or the techlead's queue past its "
             "bound. Turn it on when the team opens pull requests faster than they are read and merged, and set "
             "each line against the numbers under it, which are today's; a field left empty draws no line. Work in "
             "hand goes on and nothing is paused or closed, and turning it off removes a standing mark, which the "
@@ -412,6 +425,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "start",
         "wind-down",
         "stop-now",
+        "definition",
         "not-concluded",
         "forget-all",
         "fold",
@@ -438,6 +452,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "wind-down",
             "stop-now",
             "fold",
+            "definition",
             "not-concluded",
             "forget-all",
             "plus",

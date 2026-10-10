@@ -1311,7 +1311,7 @@ def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     assert '<button class="btn sm ghost" disabled title="defined in r&#39;s .agentorc.yml' in repo
     assert ">Open file</a>" in repo and "/r/.agentorc.yml" in repo
     panel = repo[repo.index('class="note secinfo helppanel"') :]
-    assert panel.index('<div class="defline"><b>Definition</b>') < panel.index("Open file")
+    assert panel.index('<div class="defline"><b>Definition</b>') < panel.index(">Open file</a>")
     assert "Flow on Settings →" in panel and repo.index("helppanel") < repo.index("changed by PR")
     assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
     ui_dir = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"

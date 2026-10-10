@@ -2690,7 +2690,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if not bal:
                     raise HTTPException(
                         400,
-                        "balance draws at least one line: open PRs, the oldest or the reader's queue — or turn it off",
+                        "balance draws at least one line: open PRs, the oldest or the techlead's queue"
+                        " — or turn it off",
                     )
             change["balance"] = bal
         flow = str(body.get("flow") or "") if "flow" in body else None

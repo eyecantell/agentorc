@@ -121,7 +121,7 @@
           <label title="{{ help_title('balance') }}"><input type="checkbox" name="balance_on"{% if t.balance.on %} checked{% endif %}> no new claim over a line</label>
           <label>open PRs above <input class="input setnum" name="balance_prs" value="{{ t.balance.prs }}" inputmode="numeric" autocomplete="off"{% if not t.balance.on %} disabled{% endif %}></label>
           <label>oldest open longer than <input class="input setnum" name="balance_oldest" value="{{ t.balance.oldest }}" placeholder="2d" autocomplete="off" spellcheck="false"{% if not t.balance.on %} disabled{% endif %}></label>
-          <label><input type="checkbox" name="balance_review"{% if t.balance.review %} checked{% endif %}{% if not t.balance.on %} disabled{% endif %}> the reader's queue past its bound</label>
+          <label><input type="checkbox" name="balance_review"{% if t.balance.review %} checked{% endif %}{% if not t.balance.on %} disabled{% endif %}> the techlead's queue past its bound</label>
         </span>
         <span class="note setnow">{% if t.balance.mark %}<span class="setover">{{ t.balance.mark }}</span><br>{% endif %}{% if not t.balance.live %}no live member: a team with none is not read<br>{% endif %}now — {% for line in t.balance.now %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</span>
       </div>
