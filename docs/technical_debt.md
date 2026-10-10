@@ -78,6 +78,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | Open |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
+| TD-502 | `tests/test_kill_guard.py` pins no `--`, no `sudo` inside a search substitution and no wrapper but `sudo`/`timeout`/`nice`: six of the guard's branches go back unseen | Medium | Open |
+| TD-503 | No test reaches the pane cgroup through the create path: `_start` can drop its `self._pane_cgroup(sid)` call and the suite stays green | Medium | Open |
+| TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
+| TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 
 ---
 
@@ -1248,3 +1252,81 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Focus of a session that printed `src/agentorc/cli.py:364` underlines it on hover and Ctrl+click opens VS Code at that file and line; `build/review` in the same pane's prose, and a path outside the checkout, never underline; `open_in: none` registers no provider and the hover asks nothing (the network tab is empty); a read-only Focus and a popped-out window link as the interactive one does; a node's record is asked through `read`; `pdm run test` covers the RPC's bounds and the provider's runs.
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
+
+## TD-502: `tests/test_kill_guard.py` pins no `--`, no `sudo` inside a search substitution and no wrapper but `sudo`/`timeout`/`nice`: six of the guard's branches go back unseen
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/adapters/claude_code/guard.py` (`kill_targets`, `KILL_OF_A_SEARCH`, `WRAPPERS`, `WRAPPER_VALUES`), `tests/test_kill_guard.py` (`REFUSED`, `ALLOWED`)
+
+**Why:** The test-audit of #1395 (TD-496), mutation by mutation in a worktree, each followed by `pytest -q tests/test_kill_guard.py` — **52 passed** every time:
+- `kill_targets`' `elif rest[0] == "--": return rest[1:]` changed to `return []`: `kill -- -1` is then passed by the guard (no target is read), and no test has a `--`.
+- `kill_targets`' trailing `if rest and rest[0] == "--": rest = rest[1:]` removed: `kill -9 -- -1` reads `--` as the target and passes.
+- `KILL_OF_A_SEARCH`'s `(?:sudo\s+)?` removed: `kill $(sudo pgrep x)` is passed; no case in `REFUSED` has a `sudo` inside the substitution.
+- `WRAPPERS` cut to `{"sudo", "timeout", "nice"}`: `env pkill x`, `nohup killall x`, `exec pkill x`, `command pkill x`, `setsid`, `time`, `xargs` stop being seen through; `REFUSED` has only sudo, timeout, nice.
+- `WRAPPER_VALUES["xargs"]` emptied: `xargs -n 1 pkill x` reads `1` as the command word and passes; the xargs and env value-options have no case either.
+The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as a command word*, and the docstring of `command_word` says wrappers are skipped; the tests pin three of the ten.
+
+**Fix:** One `REFUSED` row per branch: `kill -- -1`, `kill -9 -- -1`, `kill $(sudo pgrep x)`, `env pkill x`, `nohup killall x`, `xargs -n 1 pkill x`, `env -u X pkill x`; re-run each mutation above and see it fail.
+
+**Done when** each mutation in the Why fails `tests/test_kill_guard.py`.
+
+**Related:** TD-496 (#1395), TD-489 (the guard's design).
+
+## TD-503: No test reaches the pane cgroup through the create path: `_start` can drop its `self._pane_cgroup(sid)` call and the suite stays green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_start`, `_pane_cgroup`), `tests/test_tmux_unit.py` (`test_the_create_path_makes_the_pane_cgroup_only_under_the_unit`)
+
+**Why:** The test-audit of #1392 (TD-495 slice 1). `test_the_create_path_makes_the_pane_cgroup_only_under_the_unit` is named for the create path, but it calls `agent.tmux.new_session(...)` and then `agent._pane_cgroup("ao-unit")` itself; no create RPC and not `_start` runs. Probe: in the worktree, `_start`'s line `self._pane_cgroup(sid)` replaced with `pass`, then `pytest -q tests/test_tmux_unit.py tests/test_agent.py tests/test_identity.py` — **103 passed**. `grep -rn "_pane_cgroup\|cgroup_root" tests/` finds only `test_tmux_unit.py`. The TD-495 entry's Done-when says the pane cgroup is made *after `new-session`* on the create path; today nothing would notice it is never made.
+
+**Fix:** Make the test create through the real path (`agent.rpc_new` or `agent._start` with `cgroup_root` on a temp dir and `proc.cgroup` patched to the unit's), assert the `pane-<sid>` directory holds the pane pid, then the same with the user-manager cgroup and see none made; confirm by the probe above.
+
+**Done when** the probe in the Why fails the suite.
+
+**Related:** TD-495 (#1392).
+
+## TD-504: `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/cli.py` (`cmd_service`), `tests/test_service.py`
+
+**Why:** The test-audit of #1396 (TD-495 slice 2). `test_ao_service_install_prints_the_root_line_only_when_staged` covers the root line and the non-root refusal of `--system`. Two branches of `cmd_service` no test reaches (each probe: `pytest -q tests/test_service.py tests/test_cli.py` — **94 passed**): (1) the `--system` success `emit` (`wrote {target}; agentorc-tmux enabled and started` and `{"written": [target]}`) — its print replaced with `print("x")`; (2) `except OSError` around `service.stage_tmux_unit()` ("the units are installed and running: a stage that failed is said, not raised") — changed to `except ZeroDivisionError`, so an unwritable home would make `ao service install` crash after it restarted the units, as the review round on #1396 ("failures refuse, never crash") meant to prevent.
+
+**Fix:** Patch `stage_tmux_unit` to raise `OSError` and assert exit 0 and the stderr line; patch `install_system` to return a path and assert `--json` `written` and the text.
+
+**Done when** both probes in the Why fail `tests/test_service.py`.
+
+**Related:** TD-495 (#1396).
+
+## TD-505: `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_kill_guard.py` (`test_another_tools_command_is_not_read`), `src/agentorc/adapters/claude_code/hook.py` (`refused_command`)
+
+**Why:** The test-audit of #1395. The test builds `bash("x")` with `tool_name: "Read"` and asserts `translate(...)["event"] == "PreToolUse:Read"` — `translate` knows nothing of `refused_command`, so the test passes whatever the guard does. Probe: `refused_command`'s `or payload.get("tool_name") != "Bash"` replaced with `or False` (every tool's `command` read), `pytest -q tests/test_kill_guard.py` — **52 passed**. The name promises that a non-`Bash` tool's command is not read; nothing asserts it.
+
+**Fix:** Call `refused_command` (or `run_hook`) with `{**bash('pkill x'), 'tool_name': 'Read'}` and assert None / no stdout; confirm by the probe above.
+
+**Done when** the probe in the Why fails the test.
+
+**Related:** TD-496 (#1395).
