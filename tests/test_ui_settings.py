@@ -324,8 +324,8 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
 def test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file(client, subprocess_agent):
     """§4.5a *Settings page: You, file link* (TD-536, built by TD-537): the switch on and one second until
     set, under the editor pick and absent under `none`; written through `set_settings`, the wait refused
-    outside 0–4 in its words, the wait input disabled with the switch off; a template's **file** saved and
-    a refused one named."""
+    outside 0–4 in its words, the wait input drawn disabled with the switch off; a template's **file** saved
+    and a refused one named. The form's own script — what Save posts, the toggles — is `test_ui_settings_you.py`'s."""
     from sessionorc.client import call_sync
 
     try:
