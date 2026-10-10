@@ -8517,3 +8517,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-496 (#1395).
 
 **Resolved:** 2026-10-09 (PR #1434) — `tests/test_kill_guard.py::test_another_tools_command_is_not_read` gives a `Read` input carrying `pkill -f sleep` to `refused_command` (None) and to the hook through `run_hook` (no stdout); the probe in the Why now fails it.
+
+## TD-506: The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-1, TD-428's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/team_summary.html` (the `bseg` links of both bars: `{{ b.n }} {{ b.label }}` inside a `flex-basis: {{ b.pct }}%` segment), `src/agentorc/ui/static/app.css` (`.bseg`), and the Repo page's bars if they share the rule; design §4.5a row *Repo facet* (*the counts inside*)
+
+**Why:** on the live Org page of 2026-10-09 (e708109, 1600 and 1400 wide) the ledger held 4 High of 64 open, so the High segment is ~6% of the bar and its centred text *4 High* overflows both sides: the number is cut off and the word clipped. The count is still on the segment's hover (`title`), but the bar reads wrong at a glance. The mockup's after-shot had 9 High and never showed it.
+
+**Fix:** a segment whose words do not fit draws the count alone, and one too narrow for the count draws nothing inside (its hover keeps *n label*) — measured on render, or by a width threshold on `pct`; both bars, light and dark. Test: a facet with 4 High of 64 renders no clipped text (the segment's `scrollWidth` ≤ its `clientWidth` in a Playwright check on a scratch home), and 26 Medium still reads *26 Medium*. **Done when** the narrow segment reads cleanly on a scratch home with a ledger of 4 / 26 / 34, a UI check on the PR.
+
+**Related:** TD-428 (the declutter, whose live check found it), TD-418 (the design).
+
+**Resolved:** 2026-10-10 (PR #1437) — the priority word is its own `<span class="bw">` and every `.bar .bseg` wraps behind a full-height `::before`, so a word that does not fit, then a count, falls to a clipped second line; the hover keeps both. UI check on a scratch home with 4 / 26 / 34: *4* alone at 1400 and 1600 (light and dark), *4 High* whole at 900, *26 Medium* whole throughout; a forced 22px segment with *126* draws nothing inside. §4.5a and §4.5 say so.
