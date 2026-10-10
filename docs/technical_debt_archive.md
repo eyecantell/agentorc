@@ -8589,3 +8589,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-484 (#1424), TD-428.
 
 **Resolved:** 2026-10-10 (PR #1440) — `tests/test_ui_team_summary.py::test_sync_groups_patches_every_members_lane_count_from_the_groups_payload` reads `syncGroups`' `g.lanes` block step by step (pill, compare, remove, insert), and `test_each_member_card_draws_its_own_lane_count_in_its_pill` gains a *No team* member whose group carries `lanes == {}`; both probes in the Why now fail a test.
+
+## TD-518: `AO.cutRows`' join rule is pinned in only one of its conditions: a row that is not full, one ending in a space, and one that begins with whitespace are each joined to the row above and the tests stay green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`AO.cutRows`, the `cut` function's final `return`), `tests/test_ui_focus_links.py` (`CUT_PROBE`, `test_a_url_tmux_cut_across_rows_is_one_link_from_every_row`, `test_two_rows_that_merely_meet_at_the_width_stay_two`)
+
+**Why:** The test-audit of #1428 (TD-494). The comment states the rule: a row reads as wrapped *when the row above is full to its last column and it begins with a URL character that starts no `scheme://` of its own*. `CUT_PROBE`'s four screens are a 200-character URL in full rows, two rows that meet at the width with a scheme on the second, a full row of prose, and a short URL after words. Every row above a joined row in them is full with a non-space last cell, and every joined row begins with a word character, so three conditions are carried by nothing. Probes, each `pytest -q tests/test_ui_focus_links.py` — **passes** for: (1) `tail !== "" &&` removed from the `return` (a row whose last cell is empty, i.e. not full, joins the next: a URL ending a short line is read as continuing into the line below); (2) `!/\\s/.test(tail) &&` removed (a full row whose last cell is a written space); (3) `urlChar.test(head) &&` removed (an indented row after a full one, whose head begins with a space). Only removing the `!scheme.test(head)` condition fails a test. The change's whole point (§4.6) is that a row with no wrap mark is *one line* unless the rule says otherwise, and the short-row case is the common one.
+
+**Fix:** Add screens to `CUT_PROBE`: a URL ending a row that is not full, then a row of path-like words (`bar/baz`), expecting the first link to end on its own row; a full row whose last cell is a space then `foo/bar`; a full row then an indented `    foo/bar`. **Done when** the three probes in the Why each fail a test.
+
+**Related:** TD-494 (#1428), TD-493.
+
+**Resolved:** 2026-10-10 (PR #1443) — `tests/test_ui_focus_links.py::test_a_row_is_joined_only_below_a_full_row_and_only_when_it_begins_with_a_url_character` reads three new `CUT_PROBE` screens (a URL ending a row that is not full, a full row ending in a written space, an indented URL under a full row); each of the three probes in the Why now fails it, and the fourth condition still fails `test_two_rows_that_merely_meet_at_the_width_stay_two`.

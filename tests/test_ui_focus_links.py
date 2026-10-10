@@ -152,12 +152,19 @@ for (let i = 0; i < url.length; i += cols) wrapped.push(url.slice(i, i + cols));
 const meet = ["x".repeat(cols - 22) + "https://a.example/abcd", "https://b.example/efgh and more"];
 const prose = ["y".repeat(cols - 4) + "word", "next line, no link"];
 const short = url.slice(0, 120), tail = ["see " + short.slice(0, cols - 4), short.slice(cols - 4) + " done"];
+const unfull = ["see https://example.com/foo", "bar/baz qux"];
+const spaced = ["x".repeat(cols - 23) + "https://a.example/abcd ", "efgh/ij"];
+const indent = ["x".repeat(cols - 22) + "https://a.example/abcd", "    https://b.example/efgh"];
 const one = screen(wrapped, cols), two = screen(meet, cols), three = screen(prose, cols), four = screen(tail, cols);
+const five = screen(unfull, cols), six = screen(spaced, cols), seven = screen(indent, cols);
 console.log(JSON.stringify({
   url, short, wrapped: [one(1), one(2), one(3)],
   meet: [two(1), two(2)],
   prose: [three(1), three(2)],
   tail: [four(1), four(2)],
+  unfull: [five(1), five(2)],
+  spaced: [six(1), six(2)],
+  indent: [seven(1), seven(2)],
 }));
 """
 
@@ -197,3 +204,20 @@ def test_two_rows_that_merely_meet_at_the_width_stay_two():
     assert got["meet"] == [[first], [second]]
     # prose that fills a row and goes on: joined, and still no link, since the regex finds none
     assert got["prose"] == [[], []]
+
+
+@pytest.mark.unit
+def test_a_row_is_joined_only_below_a_full_row_and_only_when_it_begins_with_a_url_character():
+    # TD-518: each of the join rule's three other conditions, alone, keeps two rows two
+    got = _cut_probe()
+    # the row above is not full: a URL ending a short line does not run on into the words below it
+    foo = {"text": "https://example.com/foo", "range": {"start": {"x": 5, "y": 1}, "end": {"x": 27, "y": 1}}}
+    assert got["unfull"] == [[foo], []]
+    # the row above is full, but its last cell is a written space: the URL before it ends there
+    abcd = {"text": "https://a.example/abcd", "range": {"start": {"x": 58, "y": 1}, "end": {"x": 79, "y": 1}}}
+    assert got["spaced"] == [[abcd], []]
+    # the row above is full to its last column, and the next begins with whitespace: two links, and
+    # the first row's link is not joined to the indented one below it
+    first = {"text": "https://a.example/abcd", "range": {"start": {"x": 59, "y": 1}, "end": {"x": 0, "y": 2}}}
+    second = {"text": "https://b.example/efgh", "range": {"start": {"x": 5, "y": 2}, "end": {"x": 26, "y": 2}}}
+    assert got["indent"] == [[first], [second]]

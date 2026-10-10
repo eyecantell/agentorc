@@ -61,7 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
 | TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Built (#1436); live check: no anchor fill after a promote's restart |
 | TD-517 | `rpc_paths` resolves its roots with `realpath`, and no test has a root that is a symlink: dropping that line leaves `test_paths_rpc.py` green though every path of a symlinked checkout would read as not a file | Medium | Open |
-| TD-518 | `AO.cutRows`' join test (`test_ui_focus_links.py`) pins three of the rule's conditions by no case: a row not full to its last column, one whose last cell is a space, and one that begins with whitespace each join with the row above and every test stays green | Medium | Open |
 | TD-519 | `"paths"` can leave `identity.READS` and no test fails: the Focus pane's file check would be refused under `enforce` for a caller the socket cannot place, and only the suite's `off` mode runs | Low | Open |
 
 ---
@@ -950,22 +949,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Add a case to `test_a_run_answers_only_as_a_regular_file_inside_the_checkout` (or beside it): `dir` given as a path through a symlink to the worktree, and `src/a.py` answers with the resolved file. **Done when** the probe in the Why fails the test.
 
 **Related:** TD-501 (#1429), TD-493.
-
-## TD-518: `AO.cutRows`' join rule is pinned in only one of its conditions: a row that is not full, one ending in a space, and one that begins with whitespace are each joined to the row above and the tests stay green
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (`AO.cutRows`, the `cut` function's final `return`), `tests/test_ui_focus_links.py` (`CUT_PROBE`, `test_a_url_tmux_cut_across_rows_is_one_link_from_every_row`, `test_two_rows_that_merely_meet_at_the_width_stay_two`)
-
-**Why:** The test-audit of #1428 (TD-494). The comment states the rule: a row reads as wrapped *when the row above is full to its last column and it begins with a URL character that starts no `scheme://` of its own*. `CUT_PROBE`'s four screens are a 200-character URL in full rows, two rows that meet at the width with a scheme on the second, a full row of prose, and a short URL after words. Every row above a joined row in them is full with a non-space last cell, and every joined row begins with a word character, so three conditions are carried by nothing. Probes, each `pytest -q tests/test_ui_focus_links.py` — **passes** for: (1) `tail !== "" &&` removed from the `return` (a row whose last cell is empty, i.e. not full, joins the next: a URL ending a short line is read as continuing into the line below); (2) `!/\\s/.test(tail) &&` removed (a full row whose last cell is a written space); (3) `urlChar.test(head) &&` removed (an indented row after a full one, whose head begins with a space). Only removing the `!scheme.test(head)` condition fails a test. The change's whole point (§4.6) is that a row with no wrap mark is *one line* unless the rule says otherwise, and the short-row case is the common one.
-
-**Fix:** Add screens to `CUT_PROBE`: a URL ending a row that is not full, then a row of path-like words (`bar/baz`), expecting the first link to end on its own row; a full row whose last cell is a space then `foo/bar`; a full row then an indented `    foo/bar`. **Done when** the three probes in the Why each fail a test.
-
-**Related:** TD-494 (#1428), TD-493.
 
 ## TD-519: `"paths"` is in `identity.READS` and no test says it must be: removing it leaves the suite green
 
