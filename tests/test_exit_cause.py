@@ -12,6 +12,7 @@ from sessionorc.agent import HostAgent
 from sessionorc.client import LocalClient
 from sessionorc.models import Session
 from sessionorc.store import HostStore
+from sessionorc.tmux import PaneInfo
 
 SHELL = ["bash", "--norc", "--noprofile"]
 
@@ -49,7 +50,7 @@ async def test_a_dead_pane_ends_with_its_status_and_is_observed(agent, tmp_path)
         await c.call("remove", id=s["id"])
 
 
-async def test_a_kill_says_who_pressed_it(agent, tmp_path):
+async def test_a_kill_says_who_pressed_it(agent, tmp_path, monkeypatch):
     async with LocalClient() as c:
         a = await c.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=SHELL)
         killed = await c.call("kill", id=a["id"])
@@ -62,11 +63,65 @@ async def test_a_kill_says_who_pressed_it(agent, tmp_path):
         c2 = await c.call("create", name="c", dir=str(tmp_path), adapter="shell", argv=SHELL)
         rec = await agent.rpc_kill(c2["id"], caller="ao-repo-manager-1", killer={"by": "tick", "why": "x"})
         assert rec["ended"]["by"] == "ao-repo-manager-1"
-        # a second kill of an exited record keeps the first one's words
-        again = await c.call("kill", id=a["id"])
-        assert again["ended"] == killed["ended"]
+        # a second kill of an exited record keeps the first one's words: the person's later press
+        # never rewrites a manager's kill, nor its time (TD-508)
+        first = dict(rec["ended"])
+        monkeypatch.setattr("sessionorc.agent.now_iso", lambda: "2099-01-01T00:00:00Z")
+        again = await c.call("kill", id=c2["id"])
+        assert again["ended"] == first and again["ended"]["by"] == "ao-repo-manager-1"
         for x in (a, b, c2):
             await c.call("remove", id=x["id"])
+
+
+def test_a_dead_pane_keeps_the_tools_end_and_refreshes_its_own_code(agent, tmp_path):
+    """`_observe` over a dead pane (TD-509): the tool's own end, its hook landed first, keeps its
+    words; a pane's own end takes tmux's status once it arrives, as `exit_code` does."""
+    now = datetime.now(UTC)
+    tool = Session(id="ao-x-t", name="t", kind="agent", dir=str(tmp_path), adapter="shell", state="exited")
+    tool.ended = {"how": "tool", "at": "2026-10-09T12:00:00Z", "reason": "logout"}
+    pane = Session(id="ao-x-p", name="p", kind="agent", dir=str(tmp_path), adapter="shell", state="working")
+    for status in (None, 3):
+        for s in (tool, pane):
+            agent._observe(s, PaneInfo(s.id, 0, "bash", 1, dead=True, dead_status=status), [], now)
+    assert tool.ended == {"how": "tool", "at": "2026-10-09T12:00:00Z", "reason": "logout"}
+    assert tool.exit_code == 3
+    assert pane.state == "exited" and pane.confidence == "tick"
+    assert pane.ended["how"] == "pane" and pane.ended["code"] == 3
+
+
+async def test_closing_an_exited_record_keeps_its_end_and_is_the_ticks(agent, tmp_path):
+    """A close is among the `tick` readings (§4.2), and an exited record closed keeps how it ended
+    (TD-509): `set_state` clears `ended` only for a run that came back."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="k", dir=str(tmp_path), adapter="shell", argv=SHELL)
+        killed = await c.call("kill", id=s["id"])
+        closed = await c.call("close", id=s["id"])
+        assert closed["state"] == "closed" and closed["confidence"] == "tick"
+        assert closed["ended"] == killed["ended"]
+        await c.call("remove", id=s["id"])
+
+
+async def test_a_forgotten_hosts_records_close_as_the_ticks_and_keep_their_end(agent):
+    from test_link import record
+
+    ended = {"how": "pane", "at": "2026-10-09T12:00:00Z", "code": 0}
+    agent._take_records("laptop", [record("ao-x-v", state="exited", ended=ended)], whole=True)
+    async with LocalClient() as c:
+        await c.call("forget_host", host="laptop")
+    held = agent.remote["laptop"]["ao-x-v"]
+    assert held.state == "closed" and held.confidence == "tick" and held.ended == ended
+
+
+async def test_a_failed_last_tick_write_is_never_a_failed_tick(agent, monkeypatch):
+    tried = []
+
+    def refuse(rec):
+        tried.append(rec["last_tick"])
+        raise OSError("read-only")
+
+    monkeypatch.setattr(agent.host_store, "save", refuse)
+    await agent.tick()  # completes: the write's failure is logged, not raised
+    assert tried
 
 
 async def test_the_stop_time_kill_is_the_ticks(agent, tmp_path):

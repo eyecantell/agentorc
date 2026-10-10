@@ -8145,3 +8145,48 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-419 (the design), TD-002 (the attach), TD-096.
 
 **Resolved:** 2026-10-09 (PR #1375) — `_prune_runs` takes the tick's `live_ids` (records neither exited nor closed) and, after the logs, unlinks each file older than `runs_keep_days` in every `attachments/<session>/` not among them, removing the folder once empty; `0` keeps all. `tests/test_attachment_life.py`.
+
+## TD-508: `test_a_kill_says_who_pressed_it`'s *a second kill keeps the first one's words* assertion all but cannot fail
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_exit_cause.py` (`test_a_kill_says_who_pressed_it`, last assertion), `src/sessionorc/agent.py` (`rpc_kill`'s `if s.state != "exited":`)
+
+**Why:** The test-audit of #1401 (TD-490). The test ends `again = await c.call("kill", id=a["id"])` / `assert again["ended"] == killed["ended"]` under the comment *a second kill of an exited record keeps the first one's words*. Both kills are the person's, so `by` is `person` both times and `at` is `now_iso()` at one-second resolution: a second kill that **overwrote** `ended` writes the same dict unless the two calls straddle a second. Probe: `rpc_kill`'s `if s.state != "exited":` replaced with `if True:`, `pytest -q tests/test_exit_cause.py tests/test_agent_paths.py tests/test_balance.py` — **55 passed**. The guard is the line that keeps a manager's kill from being rewritten as the person's by a later press, and nothing would catch it going.
+
+**Fix:** Kill `b` as `ao-repo-manager-1`, then kill it again as the person (no caller), and assert `ended["by"]` is still the manager's (and, if wanted, that `at` is unchanged with `now_iso` patched forward); confirm with the probe above.
+
+**Done when** the probe in the Why fails the test.
+
+**Related:** TD-490 (#1401).
+
+**Resolved:** 2026-10-09 (PR #1414) — `test_a_kill_says_who_pressed_it` kills the manager-killed record again as the person with `now_iso` patched forward and asserts `ended` unchanged, `by` the manager's; the probe fails it.
+
+## TD-509: TD-490's `ended` / `confidence: tick` has five branches no test would see go
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_exit_cause.py`, `src/sessionorc/agent_tick.py` (`_observe`, `_note_tick`), `src/sessionorc/models.py` (`set_state`), `src/sessionorc/agent.py` (`rpc_close`), `src/sessionorc/agent_link.py` (`rpc_forget_host`)
+
+**Why:** The test-audit of #1401. Each probe below is one line changed in the worktree, `pytest -q tests/test_exit_cause.py tests/test_agent_paths.py tests/test_balance.py` — **55 passed** every time:
+- `_observe`'s `if s.state != "exited" or s.ended is None:` → `if True:`. Design §4.2's `SessionEnd` row and the code comment say *the tool's own end, when its hook landed first, keeps its words*; this is the ordinary clean exit (the hook, then the pane dies), and `test_the_tools_own_end_keeps_its_reason` never runs a tick over the dead pane, so `how: tool` turning into `how: pane` goes unseen.
+- `set_state`'s `if state not in ("exited", "closed"):` → `("exited",)`: closing an exited record would drop its `ended`; no test closes an exited record and checks `ended` (`test_containers.py`'s forget-host test closes one and asserts neither `ended` nor `confidence`).
+- `rpc_close`'s and `rpc_forget_host`'s `confidence="tick"` → `"scraped"`: §4.2 lists *a close* among the `tick` readings, and `ao status` / the card mark `~` a `scraped` state alone, so a closed record would show the guess mark; `test_only_a_scraped_state_is_marked_a_guess` feeds hand-made records and never a closed one.
+- `_observe`'s `elif s.ended.get("how") == "pane": s.ended["code"] = ...` → `pass`: the refresh for *tmux's status lags its dead flag*; `test_a_dead_pane_ends_with_its_status_and_is_observed` asserts `ended["code"] == exit_code` after waiting for `exit_code == 3`, so it catches the probe only on a runner where tmux's status lagged at first sight; here the status was present and it passed (its own comment says the lag is runner-dependent), which leaves the branch to chance.
+- `_note_tick`'s `except OSError` → another exception class: the docstring says *a failed write is a weaker ending, never a failed tick*; no test makes the write fail.
+
+**Fix:** In `tests/test_exit_cause.py`: drive `_observe` with a `PaneInfo(dead=True, dead_status=None)` and then `3` on a record whose `ended` is `how: tool` (kept) and on one whose `ended` is `how: pane` (code refreshed); close an exited record and assert `ended` kept and `confidence == "tick"`; `forget_host` a node's record likewise; patch `HostStore.save` to raise `OSError` and assert `tick()` completes. Confirm each with its probe.
+
+**Done when** each probe in the Why fails a test.
+
+**Related:** TD-490 (#1401), TD-498.
+
+**Resolved:** 2026-10-09 (PR #1414) — four tests in `tests/test_exit_cause.py`: a dead pane under `_observe` keeps a `how: tool` end and refreshes a `how: pane` code; a closed exited record keeps `ended` with `confidence: tick`; a forgotten host's exited record likewise; a `HostStore.save` raising `OSError` leaves `tick()` complete. Each of the five probes fails a test.
