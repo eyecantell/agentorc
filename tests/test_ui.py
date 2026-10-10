@@ -190,6 +190,36 @@ def test_terminal_bridge(client, subprocess_agent, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def test_the_term_socket_sends_the_clients_frame_for_the_real_window(client, subprocess_agent, tmp_path, monkeypatch):
+    """The `/term/` route wires `watch_clients` to a real tmux reading (design §4.6 *Attach behaviour
+    with another client present*, TD-522): the socket carries `{clients, window}` for the session's own
+    window, the attach counted among its clients. Read faster than the route's 5 s so a reading taken
+    before the attach's resize is followed by the one after it."""
+    import functools
+
+    from agentorc.ui import app as ui_app
+
+    monkeypatch.setattr(ui_app, "watch_clients", functools.partial(ui_app.watch_clients, every=0.2))
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "clients"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    tmux = Tmux(socket_name=subprocess_agent.sock_name)
+    with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        words: list = []
+        frames = lambda: [w for w in words if "clients" in w]  # noqa: E731
+        deadline = time.time() + 8
+        while time.time() < deadline and not any(f["window"] == [100, 20] and f["clients"] >= 1 for f in frames()):
+            ws.send_text("\r")  # pane bytes keep `pane_bytes` returning while the words collect
+            pane_bytes(ws, words)
+        assert frames(), "no {clients, window} frame reached the page"
+        assert all(set(f) == {"clients", "window"} for f in frames())
+        got = frames()[-1]
+        out = tmux.run("display", "-p", "-t", f"={sid}:", "#{session_attached} #{window_width} #{window_height}")
+        n, w, h = (int(x) for x in out.stdout.split())
+        assert got == {"clients": n, "window": [w, h + 1]} == {"clients": 1, "window": [100, 20]}
+    client.post(f"/api/sessions/{sid}/kill")
+
+
 def test_bridge_argv_shapes():
     from agentorc.ui.pty_bridge import attach_argv, scroll_argv
 

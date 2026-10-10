@@ -8953,3 +8953,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Why:** Paul's screenshot of 2026-10-08: the rollup's PRs in motion read 93 opened / 92 closed for the day while ao-grind's repo facet, the only live team's, read 85 / 85. A later capture the same evening read 84 / 83 in both. §4.5a says the rollup sums over every live team; with one live team the two should agree, or the page should say what else is counted (another repo, a stopped team's, a different window edge).
 
 **Fix:** find what the rollup sums that the facet does not (read both builders against §4.5a), then either make them agree or label the rollup's scope on the page. **Done when** the two numbers agree with one live team, or the difference is named where it is shown.
+
+## TD-522: The `/term` route's wiring of `watch_clients` (TD-480) is held by no test: the terminal mark's *resized by another client* can never reach a page and the suite passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1451)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (`read_clients` and `watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))` in the `/term/` websocket route, ~L3558-3581), `tests/test_ui_term_mark.py`, `tests/test_ui.py` (`pane_bytes`)
+
+**Why:** TD-480 (#1451) added three pieces: `clients_argv`/`clients_frame`/`watch_clients` in `pty_bridge.py`, the page's `AO.termMark`, and the route's `read_clients` closure plus the `watcher` task that joins them. The first two are tested, each on its own (`test_the_bridge_reads_clients_and_window_through_tmux`, `test_the_bridge_sends_a_frame_when_the_reading_changes_and_nothing_else`, the node probe), and the page's side reads the frame by string (`'if (c && "clients" in c)'`). The route's own wiring is held by nothing. Probe on `origin/main` at `73235b88`: in `app.py` replace the line `watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))` with `watcher = asyncio.ensure_future(asyncio.sleep(0))` and run `pytest tests/test_ui.py tests/test_ui_term_mark.py`: **74 passed**. With that line gone the bridge never sends a `{clients, window}` frame, so *resized by another client* never draws and the person is back to the three causes they could not tell apart. `tests/test_ui.py` gained `pane_bytes(ws, words)`, which collects the attach's text frames, but its one caller asserts only `not [w for w in words if "read_only" in w]`; no test reads a `clients` word off a real `/term/` socket, and `read_clients`'s argv (the `-it` filter, the socket name and, for a node, the `docker exec` prefix shared with the scroll command) is run by none.
+
+**Fix:** one test in `tests/test_ui.py` beside the existing `/term/` socket tests, on a private tmux socket: attach, and assert the first text frame the socket sends is `{"clients": n, "window": [w, h]}` for the session's real window (`watch_clients`' first reading is always sent), collected through `pane_bytes(ws, words)`. Verify it fails with the `watcher` line replaced as above. **Done when** that revert fails a test.
+
+**Related:** TD-480 (the build), TD-474 (the design), #1451.
+
+**Resolved:** 2026-10-10 (PR #1460) — `test_the_term_socket_sends_the_clients_frame_for_the_real_window` (`tests/test_ui.py`) attaches a shell session through the real `/term/` socket at 100×20 and reads `{"clients": 1, "window": [100, 20]}` off it, equal to tmux's own reading of the session. The probe in the Why (`watcher = asyncio.ensure_future(asyncio.sleep(0))`) fails it.
