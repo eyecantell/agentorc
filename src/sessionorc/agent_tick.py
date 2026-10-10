@@ -80,6 +80,7 @@ from sessionorc.models import (
     PERSON,
     PR_CLOSED,
     RECENT_FILES,
+    RECENT_LINKS,
     SYSTEM,
     Pending,
     Session,
@@ -156,6 +157,7 @@ class TickMixin:
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
         await self._refresh_context(snapshot_at)
+        await self._refresh_links(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
@@ -3180,6 +3182,51 @@ class TickMixin:
                 live.context = reading
                 self.store.save(live)
 
+    async def _refresh_links(self, now: datetime) -> None:
+        """Each live record's printed URLs (design §4.2 *The record's `links`*, §4.3 `links`, TD-543): the
+        adapter's read of the transcript from the record's cursor, in a thread, once per LINKS_EVERY,
+        attended records too. A URL is kept once at its newest time, newest first, `RECENT_LINKS` of
+        them; the cursor starts again at 0 for a new tool session. An adapter without the read, or a
+        read that fails, leaves the field as it was."""
+        every = agent_common.LINKS_EVERY
+        due = []
+        for s in self.sessions.values():
+            if not (s.adapter_id and s.dir) or s.state == "closed":
+                continue
+            if now - self._links_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) <= every:
+                continue
+            try:
+                fn = getattr(adapters.get(s.adapter), "links", None)
+            except KeyError:
+                fn = None
+            if fn:
+                tool, cursor = self._links_cursor.get(s.id, ("", 0))
+                due.append((s, fn, str(s.adapter_id), cursor if tool == s.adapter_id else 0))
+        if not due:
+            return
+        results = await asyncio.gather(
+            *(asyncio.to_thread(fn, tool, Path(s.dir), s.profile, cursor=cursor) for s, fn, tool, cursor in due),
+            return_exceptions=True,
+        )
+        for (s, _, tool, _), result in zip(due, results, strict=True):
+            self._links_checked[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None or not isinstance(result, tuple) or len(result) != 2:
+                continue
+            found, cursor = result
+            self._links_cursor[s.id] = (tool, int(cursor))
+            newest: dict[str, str] = {}
+            for x in [*live.links, *({"url": k.url, "at": k.at or ""} for k in found)]:
+                url, at = str(x.get("url") or ""), str(x.get("at") or "")
+                if url and (url not in newest or at > newest[url]):
+                    newest[url] = at
+            merged = [
+                {"url": u, "at": a or None} for u, a in sorted(newest.items(), key=lambda kv: kv[1], reverse=True)
+            ][:RECENT_LINKS]
+            if merged != live.links:
+                live.links = merged
+                self.store.save(live)
+
     async def _refresh_usage(self) -> None:
         """Ask each account a live agent session's profile names for its usage, once per account
         (§4.2a, TD-122), in a thread, and only on demand (§4.4 *Usage*, TD-233 slice 3): when its
@@ -3706,6 +3753,8 @@ class TickMixin:
             self._derived_at,
             self._model_checked,
             self._context_checked,
+            self._links_checked,
+            self._links_cursor,
             self._pre_limited,
             self._last_hook,
             self._hook_state,

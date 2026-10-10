@@ -25,7 +25,7 @@ from pathlib import Path
 from agentorc import profiles as profiles_mod
 from agentorc.profiles import Profile
 from sessionorc import paths
-from sessionorc.adapters import ExternalSession, LaunchSpec, Transcript
+from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Transcript
 from sessionorc.models import Confidence, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
@@ -697,6 +697,22 @@ class ClaudeCodeAdapter:
             return transcript_mod.read(
                 p, before=before, turns=turns, raw=raw, subagents=p.with_suffix("") / "subagents"
             )
+        except OSError:
+            return None
+
+    def links(self, session_id: str, cwd: Path, profile: str = "", *, cursor: int = 0) -> tuple[list[Link], int] | None:
+        """The http/https URLs the session printed past byte `cursor` — its text and its tool results,
+        never a person's prompt or a loopback host — and the new cursor (design §4.3 `links`, §4.2
+        *The record's `links`*, TD-543). None when there is no file, or the profile is unknown."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        p = self.transcript_path(session_id, cwd, prof)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.links(p, cursor)
         except OSError:
             return None
 

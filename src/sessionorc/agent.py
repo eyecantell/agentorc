@@ -530,6 +530,10 @@ class HostAgent(
         self._derived_at: dict[str, datetime] = {}
         self._model_checked: dict[str, datetime] = {}
         self._context_checked: dict[str, datetime] = {}  # the context reading's cadence (TD-190)
+        self._links_checked: dict[str, datetime] = {}  # the links read's cadence (TD-543)
+        # the links read's byte cursor per record, with the tool session it is into (TD-543): in memory,
+        # so a restart reads the transcript again from 0 and the merge drops what the record holds
+        self._links_cursor: dict[str, tuple[str, int]] = {}
         # When a `kill` or a `close` destroyed a pane, so a tick holding a pane list taken before
         # it does not observe a session that is already gone (TD-063). Dropped as soon as a
         # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.

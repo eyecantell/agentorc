@@ -24,11 +24,14 @@ and every other line type is skipped.
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from sessionorc.adapters import Transcript, TranscriptEntry
+from sessionorc.adapters import Link, Transcript, TranscriptEntry
 
 CHUNK = 256 * 1024  # bytes read per step backwards
 HEAD = 64 * 1024  # bytes read from the file's start for its first timestamp
@@ -253,6 +256,83 @@ def _entries(
         target.count += len(inner)
         target.entries.extend(inner[: max(0, SIDECHAIN_CAP - len(target.entries))])
     return out, prompts, last_at
+
+
+# A URL as the session printed it (design §4.2 *The record's `links`*, TD-543): `http(s)://` to the first
+# whitespace, closing bracket or quote, and a sentence's trailing punctuation off its end.
+URL_RE = re.compile(r"https?://[^\s<>\[\]{}\"'`]+")
+URL_TRAIL = ".,;:)"
+LOOPBACK_NAMES = frozenset({"localhost", "0.0.0.0"})
+
+
+def _loopback(url: str) -> bool:
+    """Whether the URL's host is this machine's: `localhost`, `0.0.0.0`, or a loopback address."""
+    try:
+        host = (urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return True  # a URL that does not parse is no link either
+    if not host or host in LOOPBACK_NAMES or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def urls_in(text: str) -> list[str]:
+    """The http/https URLs in `text`, in order, a loopback host's left out."""
+    out = []
+    for m in URL_RE.finditer(text):
+        url = m.group(0).rstrip(URL_TRAIL)
+        if "://" in url and url.split("://", 1)[1] and not _loopback(url):
+            out.append(url)
+    return out
+
+
+def _line_links(d: dict[str, Any]) -> list[str]:
+    """The URLs one top-level entry printed: an `assistant` entry's text blocks, a `user` entry's
+    tool results. A person's prompt, a thought, a call's input and a subagent's entry hold none."""
+    if d.get("isSidechain") or d.get("isCompactSummary"):
+        return []
+    content = (d.get("message") or {}).get("content")
+    if not isinstance(content, list):
+        return []
+    texts: list[str] = []
+    if d.get("type") == "assistant":
+        texts = [str(b.get("text") or "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
+    elif d.get("type") == "user":
+        texts = [
+            _result_text(b.get("content")) for b in content if isinstance(b, dict) and b.get("type") == "tool_result"
+        ]
+    return [u for t in texts for u in urls_in(t)]
+
+
+def links(path: Path, cursor: int = 0) -> tuple[list[Link], int]:
+    """The URLs the transcript printed past byte `cursor`, oldest first, and the cursor after its last
+    whole line (design §4.3 `links`, TD-543) — read forwards from the cursor as `spend` reads, never the
+    whole file each pass. A cursor past the file's end means the tool rewrote it: read from 0. A line
+    still being written is left for the next read. Raises OSError when the file cannot be read."""
+    with path.open("rb") as f:
+        size = f.seek(0, 2)
+        start = cursor if 0 <= cursor <= size else 0
+        f.seek(start)
+        out: list[Link] = []
+        pos = start
+        while pos < size:
+            line = f.readline()
+            if not line.endswith(b"\n"):
+                break
+            pos += len(line)
+            if b"http" not in line:
+                continue
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(d, dict):
+                at = str(d["timestamp"]) if d.get("timestamp") else None
+                out.extend(Link(url=u, at=at) for u in _line_links(d))
+    return out, pos
 
 
 def _subagent(directory: Path, call_id: str) -> TranscriptEntry | None:
