@@ -43,7 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
-| TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
+| TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448 |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
@@ -641,8 +641,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** feature
 **Added:** 2026-10-09 (the designer, TD-472's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1448
+**Status:** Built — PR #1448 (grinder-ao-2, 2026-10-10): `AO.clipPaste` reads `clipboard.read()`; a file and no text goes up the attach road whether or not the composer is open and its path is pasted into the terminal; checked on a scratch home with a shell session (the path at bash's prompt as a bracketed paste, unsent). A file dropped on the terminal still goes to the composer's caret, as §4.5a's Attach row says. **To read once #1448 is live:** a screenshot copied to the clipboard and pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its `~/.agentorc/attachments/<session>/paste-…png` path in the tool's prompt, unsent — the person's own press, so a look
 **Location:** design §4.5a *Copy / Paste* and *Attach / drop / paste*, §4.4 *Attachment drop*; `src/agentorc/ui/static/app.js` (`pasteClip` ~L3266 — the one road every terminal paste takes: Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click, the header's Paste; `AO.wireAttach` ~L152 and its `shut()` rule; `AO.attachName` ~L131; the Focus wiring ~L3353)
 
 **Why:** TD-472: `pasteClip` reads `navigator.clipboard.readText()`, so a clipboard holding only an image pastes nothing and says nothing, while the same screenshot pasted into the composer is attached; the terminal is where a person's eyes are.
