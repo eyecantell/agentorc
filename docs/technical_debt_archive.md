@@ -7938,3 +7938,21 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Related:** TD-489 (the design), TD-488 / TD-495 (the tmux unit), TD-336 (no prose in the argv — the other `pkill -f` lesson).
 
 **Resolved:** 2026-10-09 (PR #1395) — `src/agentorc/adapters/claude_code/guard.py`'s `refuse` reads a `Bash` command's shape (quoted text masked, each simple command's word found past assignments and wrappers) and returns §4.3's reason for `pkill`/`killall`, a `kill` of `-1`/`1`/`$PPID`, a `kill` of a `ps`/`pgrep` substitution, and a `kill` beside a `ppid` read; `hook.main` prints the `PreToolUse` deny before the event is sent and still reports it. `skill.md` and every template brief with a never-list carry §4.8's process rule. `tests/test_kill_guard.py` pins each shape, the decision, the event, and the sentence in each brief.
+
+## TD-499: PR #1379's wiring test leaves two `view(..., waits=…)` call sites of `app.py` unpinned: the Org page's cards and `/api/sessions`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1379)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (the `org` handler's `vs = sorted((view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) ...` and `api_sessions`' `[view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]`); `tests/test_ui_waiting_wiring.py`
+
+**Why:** TD-481's docstring says *every surface that builds its own views must hand `view` the repo reading and the person-inbox waits … or that surface reads idle while the Org card reads waiting*, and PR #1379 pins three surfaces (`heads`, `person_states`, the Repo page). Two more call sites pass `waits=waits` and nothing pins them. Probes on `origin/main` (`tests/test_ui_waiting_wiring.py tests/test_ui_org.py` at 51 passed; the 801 tests matching `-k "ui or app or card or inbox or repo or api"`): deleting `, waits=waits` from the `org` handler's `view(...)` call, then from `api_sessions`' (one at a time), each left 801 passed. The same probe on `heads`' call (`app.py` 838) and the Repo page's (1198) each fails one test of the module, as that PR says. So the Org page itself, the surface the docstring names as the reference, and the JSON the page's script reads, could go back to *idle* for a session that waits on the person's ask and no test would notice.
+
+**Fix:** Extend `tests/test_ui_waiting_wiring.py`'s stub: `GET /` (the Org page) renders g3's card with `pill s-waiting` and not `s-idle`, and `GET /api/sessions` returns `pill_word == "waiting"` for g1 and g3. Re-run the two deletions and see each fail.
+
+**Related:** PR #1379, TD-481, TD-428, TD-274.
+
+**Resolved:** 2026-10-09 (PR #1397) — `tests/test_ui_waiting_wiring.py` gains `test_the_org_pages_cards_read_waiting` (g1's and g3's cards carry `s-waiting` and `data-pill="waiting"`, never `s-idle`) and `test_api_sessions_reads_waiting` (`pill_word` *waiting* for g1 and g3); deleting `, waits=waits` from the `org` handler's call, then from `api_sessions`', each fails one test.
