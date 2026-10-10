@@ -86,6 +86,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     LANE_NEWS_NAMED,  # noqa: F401
     LAUNCH_KEYS,  # noqa: F401
     LEASE_TTL,  # noqa: F401
+    LINKS_EVERY,  # noqa: F401
     MODEL_EVERY,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401

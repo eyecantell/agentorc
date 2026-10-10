@@ -42,7 +42,7 @@ def test_the_url_rule_ends_at_whitespace_a_bracket_or_a_quote_and_drops_trailing
     got = transcript_mod.urls_in(
         "Opened https://github.com/o/r/pull/12. See (https://docs.x.org/a/b), [CI](https://ci.x/run/9) "
         '"https://q.example/x?y=1" `https://tick.example/z` <https://angle.example/p>; and https://w.org/A_(b) '
-        "http://plain.example/path:"
+        "http://plain.example/path: **https://bold.example/b** is it https://q.example/end?"
     )
     assert got == [
         "https://github.com/o/r/pull/12",
@@ -53,8 +53,11 @@ def test_the_url_rule_ends_at_whitespace_a_bracket_or_a_quote_and_drops_trailing
         "https://angle.example/p",
         "https://w.org/A_(b",  # a trailing `)` is punctuation, as the entry's rule says
         "http://plain.example/path",
+        "https://bold.example/b",  # Markdown's bold off its end
+        "https://q.example/end",  # a question's mark is the sentence's
     ]
-    # a loopback host is this machine's, never a link worth keeping; a bare scheme is no URL
+    # a loopback host is this machine's, never a link worth keeping; a bare scheme is no URL (a bracketed
+    # IPv6 host ends at its bracket, so `[::1]` leaves one)
     assert (
         transcript_mod.urls_in(
             "http://localhost:8080/x http://127.0.0.1/y http://[::1]:9/z http://0.0.0.0:5000/ "

@@ -259,9 +259,10 @@ def _entries(
 
 
 # A URL as the session printed it (design §4.2 *The record's `links`*, TD-543): `http(s)://` to the first
-# whitespace, closing bracket or quote, and a sentence's trailing punctuation off its end.
+# whitespace, bracket or quote, and a sentence's trailing punctuation — Markdown's `**` too — off its end. A
+# bracketed IPv6 host ends at its bracket and is dropped with the bare scheme left (review of TD-544).
 URL_RE = re.compile(r"https?://[^\s<>\[\]{}\"'`]+")
-URL_TRAIL = ".,;:)"
+URL_TRAIL = ".,;:)*!?"
 LOOPBACK_NAMES = frozenset({"localhost", "0.0.0.0"})
 
 
