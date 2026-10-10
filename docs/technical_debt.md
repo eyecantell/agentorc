@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
@@ -883,24 +882,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Focus of a session that printed `src/agentorc/cli.py:364` underlines it on hover and Ctrl+click opens VS Code at that file and line; `build/review` in the same pane's prose, and a path outside the checkout, never underline; `open_in: none` registers no provider and the hover asks nothing (the network tab is empty); a read-only Focus and a popped-out window link as the interactive one does; a node's record is asked through `read`; `pdm run test` covers the RPC's bounds and the provider's runs.
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
-
-## TD-504: `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/cli.py` (`cmd_service`), `tests/test_service.py`
-
-**Why:** The test-audit of #1396 (TD-495 slice 2). `test_ao_service_install_prints_the_root_line_only_when_staged` covers the root line and the non-root refusal of `--system`. Two branches of `cmd_service` no test reaches (each probe: `pytest -q tests/test_service.py tests/test_cli.py` — **94 passed**): (1) the `--system` success `emit` (`wrote {target}; agentorc-tmux enabled and started` and `{"written": [target]}`) — its print replaced with `print("x")`; (2) `except OSError` around `service.stage_tmux_unit()` ("the units are installed and running: a stage that failed is said, not raised") — changed to `except ZeroDivisionError`, so an unwritable home would make `ao service install` crash after it restarted the units, as the review round on #1396 ("failures refuse, never crash") meant to prevent.
-
-**Fix:** Patch `stage_tmux_unit` to raise `OSError` and assert exit 0 and the stderr line; patch `install_system` to return a path and assert `--json` `written` and the text.
-
-**Done when** both probes in the Why fail `tests/test_service.py`.
-
-**Related:** TD-495 (#1396).
 
 ## TD-505: `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch
 

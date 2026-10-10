@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from agentorc import service
@@ -221,6 +223,35 @@ def test_ao_service_install_prints_the_root_line_only_when_staged(tmp_path, monk
     monkeypatch.setattr(service.os, "geteuid", lambda: 1000)
     assert cli.main(["service", "install", "--system"]) == 1
     assert "root's to install" in capsys.readouterr().err
+
+
+def test_ao_service_install_says_a_failed_stage_and_still_succeeds(monkeypatch, capsys):
+    from agentorc import cli
+
+    monkeypatch.setattr(service, "install", lambda **kw: ["u.service"])
+    monkeypatch.setattr(service, "status", lambda: "agentorc-agent: active")
+
+    def unwritable():
+        raise OSError("read-only home")
+
+    monkeypatch.setattr(service, "stage_system_units", unwritable)
+    assert cli.main(["--json", "service", "install"]) == 0
+    out = capsys.readouterr()
+    assert "the system units could not be staged (read-only home)" in out.err
+    reply = json.loads(out.out)
+    assert reply["staged"] == [] and reply["root"] is None
+
+
+def test_ao_service_install_system_names_what_it_wrote(monkeypatch, capsys):
+    from agentorc import cli
+
+    monkeypatch.setattr(service, "install_system", lambda: ["/etc/systemd/system/agentorc-tmux.service"])
+    assert cli.main(["--json", "service", "install", "--system"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"written": ["/etc/systemd/system/agentorc-tmux.service"]}
+    assert cli.main(["service", "install", "--system"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("wrote /etc/systemd/system/agentorc-tmux.service; ")
+    assert f"{service.TMUX_UNIT} and {service.WATCH_UNIT}.timer enabled and started" in out
 
 
 def test_the_watch_reads_as_not_loaded_on_a_host_without_systemd(monkeypatch):

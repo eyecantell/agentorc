@@ -8477,3 +8477,23 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Resolved:** 2026-10-09 (PR #1428) — `AO.cutRows` in `src/agentorc/ui/static/app.js` hands the web-links addon a view where a row is wrapped when the row above is full to its last column and it begins with a URL character that starts no `scheme://`; §4.6 *A URL in the pane is a link* carries the rule and its one ambiguity; `tests/test_ui_focus_links.py` drives the vendored addon on a fake screen. The mechanism was not tmux's repaint (a shell line wider than the pane reached xterm marked wrapped, and linked whole before the fix) but a program printing its own rows; the scratch-home check is on the PR.
 
 **Related:** TD-421 / TD-422 (the URL link), TD-493 (a path as a link), TD-174 (the mouse is the browser's).
+
+## TD-504: `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/cli.py` (`cmd_service`), `tests/test_service.py`
+
+**Why:** The test-audit of #1396 (TD-495 slice 2). `test_ao_service_install_prints_the_root_line_only_when_staged` covers the root line and the non-root refusal of `--system`. Two branches of `cmd_service` no test reaches (each probe: `pytest -q tests/test_service.py tests/test_cli.py` — **94 passed**): (1) the `--system` success `emit` (`wrote {target}; agentorc-tmux enabled and started` and `{"written": [target]}`) — its print replaced with `print("x")`; (2) `except OSError` around `service.stage_tmux_unit()` ("the units are installed and running: a stage that failed is said, not raised") — changed to `except ZeroDivisionError`, so an unwritable home would make `ao service install` crash after it restarted the units, as the review round on #1396 ("failures refuse, never crash") meant to prevent.
+
+**Fix:** Patch `stage_tmux_unit` to raise `OSError` and assert exit 0 and the stderr line; patch `install_system` to return a path and assert `--json` `written` and the text.
+
+**Done when** both probes in the Why fail `tests/test_service.py`.
+
+**Related:** TD-495 (#1396).
+
+**Resolved:** 2026-10-09 (PR #1430) — `tests/test_service.py`: `test_ao_service_install_says_a_failed_stage_and_still_succeeds` (`stage_system_units`, which replaced `stage_tmux_unit`, raises `OSError`: exit 0, the stderr line, `staged: []`) and `test_ao_service_install_system_names_what_it_wrote` (`--json` `written` and the text); each probe in the Why now fails one of them.
