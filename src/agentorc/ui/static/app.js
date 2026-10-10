@@ -1995,6 +1995,20 @@
     return { retry: true, final: false, delay: Math.min(delay * 2, 10000), why };
   };
 
+  // The **restarted** chip goes when `RESTART_WINDOW` passes its newest entry (§4.5a, TD-487), whether or
+  // not a delta re-draws its card: each carries the instant as `data-until`, and a minute's look hides
+  // the ones past it. The next render, which derives it again, agrees.
+  AO.restartedExpired = function (until, now) {
+    const t = Date.parse(until || "");
+    return Number.isFinite(t) && now >= t;
+  };
+  setInterval(() => {
+    const now = Date.now();
+    document.querySelectorAll(".badge.restarted[data-until]").forEach((b) => {
+      if (AO.restartedExpired(b.dataset.until, now)) b.classList.add("hidden");
+    });
+  }, 60000);
+
   // **The terminal mark** (design §4.6 *Reconnect contract*, *Attach behaviour with another client
   // present*; §4.5a; TD-474, TD-480): what the Focus terminal is doing, one mark at a time, in this
   // order — the socket closed with a retry pending, past a three-second grace (`retryAt`: when the
@@ -3687,6 +3701,13 @@
       if (bc) {
         bc.classList.toggle("hidden", !v.brief_changed);
         bc.title = (v.brief_changed && v.brief_changed.full) || "";
+      }
+      const rs = $("#frestarted");  // §4.5a **restarted** chip (TD-487): the view's words, its hover
+      if (rs) {
+        rs.classList.toggle("hidden", !v.restarted);
+        rs.title = (v.restarted && v.restarted.hover) || "";
+        rs.textContent = (v.restarted && v.restarted.text) || "";
+        rs.dataset.until = (v.restarted && v.restarted.until) || "";
       }
       // …and the usage gate's pause (§4.5a **paused · usage**, TD-100): written and cleared by the
       // host agent's tick while a person may be watching, so it rides the delta too.

@@ -78,6 +78,10 @@
       <span class="meta">{{ s.profile_line }}{% if s.context_short %} · <span class="context{% if s.context_over %} over{% endif %}"
             title="context {{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% if s.context_over %} — over it{% endif %}{% endif %} — what this session's last turn sent (design §6 rule 5)">{{ s.context_short }}</span>{% endif %}</span>
       <span class="grow"></span>
+      {# design §4.5a **restarted** chip (TD-485, TD-487): where this run came from, in the short form;
+         the full words, every entry in the window and the count toward the ceiling on hover. A mark,
+         never pressable, never in the slot #}
+      {% if s.restarted %}<span class="badge restarted" data-until="{{ s.restarted.until }}" title="{{ s.restarted.hover }}">{{ s.restarted.short }}</span>{% endif %}
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
             title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}
       {% if s.findings_line %}<span class="meta">{{ s.findings_line }}</span>{% endif %}

@@ -76,6 +76,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     pill_title,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
+    restarted_view,  # noqa: F401
     review_wait,  # noqa: F401
     seat_held_words,  # noqa: F401
     seat_occupant,  # noqa: F401
