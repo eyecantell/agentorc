@@ -25,13 +25,13 @@ from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, has_co
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
-TEXT_CAP = 4096  # bytes of `text`; a `conflict` cites `sends` by id rather than quoting them
+TEXT_CAP = 4096  # bytes of `text`; an `ask` to two cites `sends` by id rather than quoting them
 THREAD_BOUND: int | None = 40  # entries per thread before a send is refused; measured: no thread past 2
 PAIR_BOUND: int | None = 300  # reply-less entries between one pair inside PAIR_WINDOW; measured: 48 in 8 h
 PAIR_WINDOW = timedelta(hours=24)  # the rolling window a reply-less pair is counted in
 MAILBOX_DEPTH: int | None = 100  # unread entries an inbox holds before a send to it is refused; measured: 19
 # The person inbox's depths are two counts from 2026-10-04 (TD-324), each with its own figures.
-# **Questions** — the open `ask`s, `steer`s and `conflict`s (`MailEntry.open`) — refuse a question to
+# **Questions** — the open `ask`s and `steer`s (`MailEntry.open`) — refuse a question to
 # the person, and a pass-up, so one worker cannot fill the Inbox with questions that never lapse.
 PERSON_INBOX_DEPTH: int | None = 200  # open questions the person inbox holds before one more is refused
 # …and of those, how many one sender may hold there: 100 since 2026-09-28 (Paul), 20 before, when a
@@ -47,8 +47,8 @@ PERSON_FYI_SENDER_DEPTH: int | None = 500  # so one looping sender leaves the ot
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down
-# Suggested answers (§4.10 *Suggested answers*, 2026-09-20, TD-070): how many an `ask`, a `steer`
-# or a `conflict` may carry, and how long each may be. They are a field of their own and do not
+# Suggested answers (§4.10 *Suggested answers*, 2026-09-20, TD-070): how many an `ask` or a `steer`
+# may carry, and how long each may be. They are a field of their own and do not
 # count toward `TEXT_CAP`. Each is cleaned **more strictly than displayed text is** (the tail's
 # cleaning and also every Unicode format character), because an answer becomes the label of
 # something a person presses.

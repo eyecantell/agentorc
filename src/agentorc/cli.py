@@ -31,6 +31,8 @@ from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.gitinfo import work_left
 from sessionorc.models import (
+    CITES_ON_AN_ASK,
+    FOLDED_KINDS,
     GRANTS,
     STATE_RANK,
     context_over,
@@ -355,7 +357,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             if (doing := s.get("doing")) and doing.get("text"):
                 print(f"{'':<{w}}      doing {_age(str(doing.get('at') or ''))} ago: {doing['text']}")
             # Mail (design §4.10): the unread count and the marks — never a body, which `ao inbox`
-            # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
+            # fetches — and the last few `sends`, by id, so an `ask` to two can cite who typed what.
             if unread := s.get("unread"):
                 # the bell stopped after rings answered with nothing read (§4.10, TD-347)
                 held = f" · doorbell held · {h['rings']} unread rings" if (h := s.get("doorbell_held")) else ""
@@ -2779,9 +2781,9 @@ def _left(iso: str) -> str:
 
 def _open_entry(e: dict[str, Any]) -> bool:
     """Design §4.10 *One way of being closed*, for the dicts the RPC hands this command: open
-    exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason` — and, for entries
+    exactly when it is an `ask` or a `steer` with no `closed_reason` — and, for entries
     written before 2026-09-19, with no `closed_by` and no `expired_at`."""
-    if e.get("kind") not in ("ask", "steer", "conflict"):
+    if e.get("kind") not in ("ask", "steer"):
         return False
     if e.get("closed_reason"):
         return False
@@ -2807,7 +2809,7 @@ def _inbox_status(e: dict[str, Any]) -> str:
     failed — else how long is left on its bound, or that the person has paused its clock. An `ask`
     to the person carries no bound at all, and says so."""
     parts = ["read" if e.get("read_at") else "unread"]
-    if e.get("kind") in ("ask", "steer", "conflict"):
+    if e.get("kind") in ("ask", "steer"):
         when = e.get("closed_at") or e.get("expired_at") or ""
         if e.get("closed_reason") == "replied" or e.get("closed_by"):
             parts.append(f"closed by {e.get('closed_by') or 'a reply'}")
@@ -3247,6 +3249,14 @@ def _refs(value: str) -> list[str]:
     return [r.strip() for r in value.split(",") if r.strip()]
 
 
+def _msg_kind(value: str) -> str:
+    """`ao msg --kind`: a folded kind is refused in the RPC's own words, naming §4.10, before
+    argparse's bare *invalid choice* (TD-471)."""
+    if value in FOLDED_KINDS:
+        raise argparse.ArgumentTypeError(CITES_ON_AN_ASK)
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ao", description="agentorc — sessions in tmux, one view")
     ap.add_argument("--json", action="store_true", help="print the RPC result as JSON (every subcommand; TD-018)")
@@ -3637,7 +3647,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("words", nargs="*", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
     p.add_argument(
         "--kind",
-        choices=["note", "ask", "steer", "reply", "conflict"],
+        type=_msg_kind,
+        choices=["note", "ask", "steer", "reply"],
         help="default: note (reply with --reply-to)",
     )
     p.add_argument("--about", help="the reference it concerns: a session id, a TD-NNN, a PR")
@@ -3648,7 +3659,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="a steer's or an ask's bound in seconds (default: the host agent's; an ask to the person takes none)",
     )
-    p.add_argument("--cites", help="a conflict: the `sends` ids it cannot reconcile, comma-separated")
+    p.add_argument("--cites", help="an ask to two or more: the `sends` ids it cannot reconcile, comma-separated")
     p.add_argument(
         "--pr", type=int, metavar="N", help="an ask: the pull request it puts in front of its reader (design §4.9b)"
     )

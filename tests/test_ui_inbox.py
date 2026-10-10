@@ -2680,7 +2680,7 @@ def test_every_row_kind_has_its_rail_kind():
     *trail* — one per row, from the row's own fields."""
     from agentorc.ui.app import rail_kind
 
-    assert rail_kind({"kind": "ask"}) == rail_kind({"kind": "conflict"}) == "questions"
+    assert rail_kind({"kind": "ask"}) == "questions"
     assert rail_kind({"kind": "note", "passed_up": "ao-t"}) == "questions"
     assert rail_kind({"kind": "steer"}) == "steering"
     for k in ("note", "reply"):

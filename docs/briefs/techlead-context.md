@@ -113,8 +113,8 @@ person is `docs/user_attention.md`.
 
 §4.10. Kinds: `note` (weighed, no reply owed), `ask` (blocks the asker; to the person it never
 expires), `steer` (*I will do X unless told otherwise* — it carries a default and a bound, and
-the sender goes on at the bound), `reply`, `conflict`. **An `ask` is only for when going on would
-be wrong**; anything with a sensible default is a `steer`; anything already written down is
+the sender goes on at the bound), `reply`; two controllers that disagree are one `ask` to both with
+`--cites`. **An `ask` is only for when going on would be wrong**; anything with a sensible default is a `steer`; anything already written down is
 neither — it is read. A question the person answered **owes an outcome** (`--outcome
 done|blocked|dropped --for <id>`), and so does work the person handed a session. Mail types
 nothing into a pane except the doorbell's fixed line, which carries a count and no sender's

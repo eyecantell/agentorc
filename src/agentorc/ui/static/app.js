@@ -854,7 +854,7 @@
   // carries no bound at all and never expires; `system` is a sender and is never replied to
   // (design §4.10, 2026-09-19, TD-069 step 0).
   AO.mailEntry = function (e, owner) {
-    const ask = e.kind === "ask" || e.kind === "steer" || e.kind === "conflict";
+    const ask = e.kind === "ask" || e.kind === "steer";
     let st = "";
     if (ask) {
       st = e.closed_reason === "lapsed" ? "lapsed · the sender went with its default"

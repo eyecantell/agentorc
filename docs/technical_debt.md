@@ -47,7 +47,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
-| TD-471 | Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs | Low | Open |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-473 | An attachment is at most 4 MiB: the file rides base64 on one RPC line, so a slide deck, a Word file or a PDF of any size is refused | Medium | Designed 2026-10-09 — build TD-478 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
@@ -729,22 +728,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in `launch`: when `CLAUDE_CODE_PROMPT_CACHE_TTL` is in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"]` is that value for either billing (the tmux session does not inherit the host agent's environment: `new-session -e` carries each key, `tmux.py` L133); else when `prof.metered`, `"1h"`; else nothing; nothing for the subagent key. Tests: a metered profile's launch carries `1h`, a subscription's carries nothing, either with the key in the environment (monkeypatched) carries that value. **Done when** a metered profile's session starts with the key and the tests pass.
 
 **Related:** TD-458 (the design), TD-151 (metered profiles), TD-459 / TD-467 (the doorbell's `CACHE_LIFETIME`), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
-
-## TD-471: Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (the designer, TD-462's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.10 *Two controllers disagree*, *A disagreement, worked*, the kinds table; §4.7 *Mail*; `src/sessionorc/agent_mail.py` (the `conflict` gates at ~L423–L427 and ~L513–L520, the person gate; the first-reply close on every copy, which stays), `src/sessionorc/mail.py` (comments at L28, L34, L51; `MailEntry.open`), `src/agentorc/cli.py` (`--kind` choices at ~L3424, `--cites` help at ~L3435, the kind lists at ~L2599 and ~L2625), `src/agentorc/ui/inbox.py` (`PERSON_ASK_KINDS` L44, `OWING_KINDS` L1520, the docstrings at L54, L1660, L1808), `src/agentorc/ui/static/app.js` (L854), `src/agentorc/briefs/grinder.md` (*Two controllers telling you opposite things*), `src/agentorc/skill.md` (the kinds line, L47), `docs/briefs/techlead-context.md` (a held path: the techlead's read), `tests/test_mail.py`, `tests/test_cli.py`, `tests/test_ui_inbox.py`
-
-**Why:** TD-462: no session has sent a `conflict` since the kind was built, every brief and row renderer carries it as its own kind, and §4.10 already said it is an `ask` for every rule.
-
-**Fix:** (1) `agent_mail`: `--kind conflict` refused with *a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)*; `--cites` accepted on an `ask` whose `to` names two or more sessions and refused otherwise with the same words; the gate *an `ask` to two or more never names the person* in place of the conflict's; the first-reply close on every copy unchanged; an entry whose stored `kind` is `conflict` read as `ask` wherever a kind is tested (`MailEntry.open`, the open-question counts, the rows); (2) the lists: `cli.py`'s choices and kind tuples, `inbox.py`'s `PERSON_ASK_KINDS` and `OWING_KINDS`, `app.js` L854 — each drops `conflict`; (3) the words: `grinder.md`'s bullet says `--kind ask --cites`, `skill.md`'s kinds line (L47) drops `conflict` and says `--cites` goes on an `ask` to two or more, `techlead-context.md` L116 likewise (a held path: the techlead reads the PR; `director.md`'s *open conflict* is §10's question, not the kind); (4) tests: an `ask` to two controllers with `--cites` lands in both and closes on the first reply; `--cites` on an `ask` to one refused; `--kind conflict` refused; the person gate on an `ask` to two. **Done when** no file under `src/` or `docs/briefs/` names the `conflict` kind, the four tests pass, and `ao msg --kind conflict` is refused naming §4.10.
-
-**Related:** TD-462 (the design), TD-039 (the conflict), TD-105 (archived; the evaluation), TD-052 (mail).
 
 ## TD-472: An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road
 
