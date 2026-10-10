@@ -73,6 +73,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     group_place,  # noqa: F401
     host_volatile,  # noqa: F401
     next_act,  # noqa: F401
+    pill_title,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
     review_wait,  # noqa: F401

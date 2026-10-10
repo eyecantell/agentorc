@@ -13,7 +13,7 @@ from typing import Any
 
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
-from agentorc.ending import NO_CLOSER, closer_words, waiting_words
+from agentorc.ending import NO_CLOSER, closer_words, ending_hover, exit_words, waiting_words
 from agentorc.org import ANCHOR_WHEN, MANAGER_WHEN
 from sessionorc import hosts, identity, mail, naming, work
 from sessionorc.adapters import short_model
@@ -479,10 +479,38 @@ def view(
     # how long a closed card stays (§4.5 row 6, TD-266): said only where the reap's own clock is set
     d["closed_keep"] = closed_keep() if state == "closed" and s.get("closed_at") else ""
     # who closed it (§4.5 row 5 (b), TD-265): a session named by its name where the fleet holds it
-    d["closer_text"] = closer_words(s, {str(o.get("id")): str(o.get("name") or "") for o in fleet or []})
+    names = {str(o.get("id")): str(o.get("name") or "") for o in fleet or []}
+    d["closer_text"] = closer_words(s, names)
+    # an exit, and how (§4.5 row 5 (b), TD-490): the record's `ended` in `ending.exit_words`' words
+    d["exit_text"] = exit_words(s, names, now) if state == "exited" else ""
+    # the ending with its time: the pill's hover where nothing outranks it, and always the Focus end banner's first line
+    d["ending_text"] = ending_hover(s, names, now)
+    d["pill_title"] = pill_title(d, d["ending_text"])
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d
+
+
+def pill_title(d: Mapping[str, Any], ending: str = "") -> str:
+    """design §4.5a **state pill hover** (TD-490): what the state rests on, one text, the first that
+    applies — an unreachable host's reason, a *waiting* pill's reason, a seat on call, the ending on
+    `exited` and `closed` (row 5 (b)'s words and the time: both are the tick's own readings, never
+    *guessed*), *guessed from the screen* on a `scraped` state, *reported by the tool* on a `hook` one,
+    and on another state of the tick's own (`stalled?`) that the host agent observed it (§4.2). The
+    card, the Inbox row and the Focus header draw this one text."""
+    if d.get("host_note"):
+        return str(d["host_note"])
+    if d.get("state_class") == "waiting":
+        return f"{d.get('wait_reason') or ''} — idle in every payload, on someone else’s move"
+    if d.get("seat"):
+        return "a seat on call: read from its record, not from a screen"
+    if ending:
+        return ending
+    if d.get("scraped"):
+        return "guessed from the screen"
+    if d.get("confidence") == "tick":
+        return "observed by the host agent, not reported by the tool"
+    return "reported by the tool"
 
 
 def _clock(iso: Any) -> str:
@@ -832,9 +860,11 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         )
     elif state in ("exited", "closed"):
         if state == "exited":
-            code = d.get("exit_code")
-            kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
-            full = text
+            # an exit, and how (TD-490): `ending.exit_words`, and the time on hover as the pill says it
+            ended = d.get("ended") if isinstance(d.get("ended"), dict) else {}
+            code = ended.get("code") if ended else d.get("exit_code")
+            kind, text = ("bad" if code else ""), d.get("exit_text") or "exited"
+            full = d.get("pill_title") if str(d.get("pill_title") or "").startswith(text) else text
         else:
             # who closed it (§4.5 row 5 (b), TD-265): the record's closer in `ending.closer_words`' words
             kind, text = "ok", d["closer_text"]

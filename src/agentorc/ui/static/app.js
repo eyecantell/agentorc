@@ -3418,7 +3418,8 @@
       if (pc) pc.classList.toggle("hidden", ["exited", "closed", "limited", "unreachable"].includes(v.state));
       const readyNow = !!((v.ready || []).length && (v.ready || []).every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
       const cls = v.state_class, scraped = v.scraped ? " scraped" : "";
-      let head = `<span class="pill s-${cls}${scraped}"><span class="dot"></span>${v.state_label}</span>`;
+      // the pill's hover (§4.5a **state pill hover**, TD-490): the card's one text, from the view
+      let head = `<span class="pill s-${cls}${scraped}" title="${esc(v.pill_title || "")}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
       if (v.state === "needs-you" && p && p.kind === "permission") {
         head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>`;
@@ -3563,7 +3564,9 @@
         const kept = v.state === "exited" && v.pane !== false;  // a kill/close destroys the pane (TD-023)
         // …and, where the header draws **Transcript** (§4.5a, TD-166), *or read its transcript*
         const read = v.adapter_id ? ` — or <a href="/transcript/${id}" target="_blank" rel="noopener">read its transcript</a>` : "";
-        ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. ${kept ? `The pane is kept so its last screen and run log stay readable${read}.` : `Its pane is gone (killed, or the tmux server restarted); the run log stays readable${read}.`} `
+        // the first line is the ending in the card's words and its time (§4.5a **state pill hover**, TD-490)
+        const ending = v.ending_text ? `<div class="endwords"><b>${esc(v.ending_text)}</b></div>` : "";
+        ex.innerHTML = `${ending}This session's process has ${esc(v.state)}${esc(code)}. ${kept ? `The pane is kept so its last screen and run log stay readable${read}.` : `Its pane is gone (killed, or the tmux server restarted); the run log stays readable${read}.`} `
           // design §4.5a **Focus (exited / closed)** (TD-081 step 2, Paul: *a resume option that
           // requires no input from me*): **Resume** is one press and no form — the same name, so
           // the record is replaced in place and keeps its mail — and **Resume with changes…** is
