@@ -43,10 +43,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-538 | The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead | Medium | Designed 2026-10-10 — build TD-541 |
 | TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Designed 2026-10-10 — build TD-542 |
 | TD-542 | Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list | Medium | Open |
-| TD-541 | Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped | Medium | Open |
 | TD-543 | The Session card lists no links: a PR, CI run or doc URL a session printed is found again only by scrolling the pane; read recent URLs from the transcript, off the keystroke path | Medium | Designed 2026-10-10 — build TD-544 |
 | TD-544 | Build the Session card's recent links (TD-543): the adapter's `links` read from a cursor, the record's `links` on the tick, the card's row | Medium | Open |
 | TD-545 | `person.file_link` is merged field by field and no test says so: dropping `file_link` from `_person_change`'s nested table leaves the whole suite green | Low | Open |
@@ -633,25 +631,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-## TD-538: The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (ao-paul, Paul's question on TD-527)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-10 (the designer) — (1) §4.2: the record's `files` are git's, read with the status read on the record's host: every path the porcelain holds and every path in the commits from `merge-base HEAD origin/<default>` (the cadence's default-branch rule; no origin, the tree alone) to `HEAD`, `{path, at, sha}` — `at` the file's mtime while dirty, else the newest touching commit's committer time, `sha` that commit's — newest first, a path once, twenty kept; one `git log --name-only` beside the status, re-read only when `oid` or the porcelain changes. (2) Computed on each read and never kept, Paul's refinement (#1489): after a squash merge the base has caught up with `HEAD` and the list is the tree's alone, empty when clean — the merged files are the PR's; the base follows a rebase where the creation commit would not. (3) The hook's `file` is dropped — a change is a change whatever made it — and the `shell` adapter shows the same list (§4.3). (4) A session with no branch of its own (on `main`) lists its tree and its unpushed commits by the same rule; the cap stays twenty. (5) §4.5 item 4 and the §4.5a row: the commit's time and short sha on hover for a committed file, **M** from the porcelain. The card's shape is unchanged, so no new mockup. Built by TD-541. Was: Open.
-**Blocked by:** TD-541
-**Location:** design §4.5 item 4 (the **Session** card's *recent files*, `docs/design/4.5-ui.md` ~L425: *the files the session edited in this run … absent until the first edit, and on a tool whose hook reports none*), §4.3 (the adapter contract's neutrality); `src/agentorc/adapters/claude_code/hook.py` (`EDIT_TOOLS` ~L73, `file` on a `PostToolUse`), `src/sessionorc/gitinfo.py` (the record's `git.files`, up to 20 porcelain lines)
-
-**Why:** On 2026-10-10, after TD-527 (#1476) went live, the card showed no recent files for any session: `ao status --json` gave `files: []` for ao-paul and both grinders. ao-paul had changed `docs/technical_debt.md` four times that day, each by a Python script run from Bash, which the hook does not report (only `Edit`, `Write`, `MultiEdit`, `NotebookEdit` do). Paul: *Is this the right design? Seems like it would be more prudent to have git tell us what files have changed and keep a running list as we commit/merge?* The hook list misses every shell edit, a generated file, a `git mv`, a rebase's resolution. It is Claude-Code-shaped too, so another adapter shows nothing (§4.3). Git sees every change, whatever made it, and the host agent already reads `git status` into the record's `git.files` for the **M** mark.
-
-**Paul, 2026-10-10, refining the ask:** *a simple git diff --name-only (or similar) from the commit where the worktree was created would give us the full list and we would not have to track anything separately — evaluate this instead of the current design.* So the round evaluates first a list that is **computed, never kept**: on each read, `git diff --name-only <base>` (the committed and uncommitted changes against the base, in one call) plus the untracked files from `git status`, with nothing recorded by a hook or carried between reads. One point to settle in that: the worktree's creation commit is the base only until the branch is rebased. After a rebase onto a newer `main`, a diff from the creation commit also lists every file other PRs changed in between. `git merge-base HEAD origin/main` follows the rebase and lists only the branch's own files, which is the PR's file list. The creation commit is not recorded today in any case, so the recorded or derived base is the round's choice. Order (newest first) would come from each file's last commit time or mtime, still computed.
-
-**Fix:** a design round settles the list's source, starting from Paul's computed form above. Otherwise weighed: the files the session's branch has changed, from git. That is the working tree's changes (`git.files`, already read) and the files of the branch's commits since its base (`git diff --name-only <merge-base>...HEAD`), newest first by the last commit or modification that touched each, kept as a running list through commits so a committed file does not drop off. After a squash merge the branch is gone: say what the list holds then (last run's list kept, or cleared). Settle what is left for the hook: dropped, or one input among others. Settle a session with no branch of its own (a person's interactive session on `main`), and the twenty-file cap. **Done when** the design says it and the build entry it names is ledgered.
-
-**Related:** TD-525 / TD-527 (the card and its hook-fed list, #1474 / #1476), TD-112 (adapter neutrality), TD-501 (the pane's file links).
-
 ## TD-539: No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes
 
 **Priority:** Medium
@@ -668,30 +647,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a design round settles a display of the live build on the page: where (top bar beside the usage, the Settings page, or both); what it reads (the live commit's time as a local date and time, e.g. *live 10-10 15:41*, with the hash and the commits not yet live on hover or press); a mark when `main` holds merges not yet live (*main +1, not live*) and when a promote is running or held; the UI's own build against the host agent's after a promote restarts one before the other; a node's build (`ao host status`). Display only, no control. **Done when** the design says it and the build entry it names is ledgered.
 
 **Related:** TD-062 (the promoted install), TD-120 / TD-132 (Promote), TD-226 (rollback, whose hold the display should name).
-
-## TD-541: Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (the designer, TD-538's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.2 (*The record's `files`*), §4.5 item 4, §4.5a *Focus side panel, Session card: recent files*; `src/sessionorc/gitinfo.py` (a `changed_files(directory, base, timeout)` read beside `git_info`: the porcelain's paths with their mtimes and `git log --name-only --format=%H%x09%ct <base>..HEAD` over the branch's commits; `ledger_mod.default_ref` for the base, as `_checkout_tree` in `agent_tick.py` ~L2452 reads it), `src/sessionorc/agent_tick.py` (the status loop ~L3000: the read when `oid` or the porcelain changed since the record's last; ~L3663 the hook's `files` line, dropped), `src/agentorc/adapters/claude_code/hook.py` (`EDIT_TOOLS` ~L73 and the `file` on `PostToolUse`, dropped), `src/sessionorc/models.py` (`RECENT_FILES` ~L701; `files` entries gain `sha`), `src/agentorc/ui/static/app.js` (`AO.recentFiles` ~L3503: the hover's time and sha, **M** from the porcelain as today), `src/agentorc/ui/cards.py` (nothing new on `editor`), `docs/mockups/gen.py` (`focus_session_card`'s `files` tuples may carry a sha; optional), `tests/test_gitinfo.py`, `tests/test_recent_files.py`, `tests/test_ui_focus_recent_files.py`, the hook's tests
-
-**Why:** TD-538: after #1476 went live the card showed no recent files for any session — Paul's edits were scripts run from Bash, which the hook never reports — and the hook-fed list is Claude-Code-shaped, so another adapter shows nothing; git sees every change.
-
-**Fix:**
-1. `gitinfo.changed_files`: the base is `merge-base HEAD <default_ref>` where `default_ref` names one, else none (the tree alone); the list is `git diff --name-only <base>` plus the porcelain's untracked paths; the branch's commits read in one `git log --name-only` with hash and committer time, newest first, for each path's time and sha; each path once with the newest commit that touched it; the porcelain's paths (changed and untracked, from the status just read) with the file's mtime (`stat`; a deleted path keeps the commit's time or, uncommitted, the read's time); merged into one list newest first, cut at `RECENT_FILES`. Bounded by the status read's timeout; a read that fails leaves the record's list as it was.
-2. `agent_tick`'s status loop: after `git_info`, call `changed_files` only when the record's `git.oid` or its `files` porcelain differs from the last read, or the record holds no list yet; set `s.files` to what the read returned, empty included — nothing kept between reads, nothing to start empty at a restart.
-3. Drop the hook's `file` (`EDIT_TOOLS` and its `PostToolUse` line) and the tick's `files` update on a hook; the §4.2 line in the hook's docstring says so.
-4. `AO.recentFiles`: the hover reads *edited 20:11* for a dirty path and *committed 3f2a9c1 20:30* for a committed one; **M** as today; the repo-relative drawing unchanged.
-5. Tests: `changed_files` on a scratch repo (dirty, committed since base, both, no origin, a deleted path); the tick's re-read trigger and that an empty read empties the list; the hook reports no `file`; the card's hover and the empty list after a merge; `ao status --json` shows `files` for a session whose edits were made by a script.
-6. UI check on a scratch home (§4.9b): a session edits by a script run from Bash — the file appears within the status cadence; it commits — the sha on hover; its PR squash-merges and the worktree sits on main — the list is empty; a `shell` session shows its list. Shots `docs/mockups/reviews/2026-10-10-td541-*.png` in the PR.
-
-**Done when** the Session card lists the files a session's work changed whatever made the change, with the commit's time and sha on a committed one and **M** on a dirty one, is empty after a merge, shows the same on a `shell` session, the hook reports no `file`, and the tests pin it.
-
-**Related:** TD-538 (the design), TD-525 / TD-527 (the card and its first, hook-fed list, #1474 / #1476), TD-532 / TD-535 / TD-536 (the file link's launches), TD-112 (adapter neutrality), TD-080 (`git_info` and one measure of pushed); the base is `ledger.default_ref`'s (cadence §9's default-branch rule).
 
 ## TD-542: Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list
 

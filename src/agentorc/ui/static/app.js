@@ -3501,7 +3501,8 @@
   // The Session card's **recent files** (§4.5 item 4, §4.5a, TD-525): the record's `files`, newest
   // first, each drawn relative to the session's directory (else its repo) with the absolute path and
   // its time on hover — the file's, or the commit's and its short sha (TD-538) — **M** before one
-  // `git.files` holds (its porcelain lines, relative to the worktree), and a link by the editor's file form at line 1 — the `a.editor` handler opens it on a
+  // `git.files` holds (its porcelain lines, relative to the worktree), and a link by the editor's file
+  // form at line 1 — the `a.editor` handler opens it on a
   // plain click, after the session's folder unless the person turned that off (`editor.first`, TD-536).
   // No file form, no links: the paths are text. "" when the work has changed nothing.
   AO.recentFiles = function (v, editor) {
