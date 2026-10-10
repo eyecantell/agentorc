@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-532 | A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward | Medium | Open |
-| TD-534 | The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes | Medium | Open |
 
 ---
 
@@ -627,7 +626,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-
 ## TD-532: A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward
 
 **Priority:** Medium
@@ -644,16 +642,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (the Session card, #1476), TD-501 (the pane's links).
 
-## TD-534: The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing #1476)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (the delta render: `$("#frecent").innerHTML = rf;` and its `classList.toggle("hidden", !rf)` pair, and `renderRail`'s `AO.railGlyphs(railV, railReady, inboxN, lines, s.editor)` and its `x.href ? <a class="railbtn editor …>` branch, all added by #1476, TD-527); `tests/test_ui_focus_recent_files.py`
-
-**Why:** the module's four node probes call `AO.recentFiles` and `AO.railGlyphs` as functions with stubbed arguments; the one page test (`test_focus_draws_the_editor_button_…`) reads the server-rendered template only. Probe, on `origin/main` 65ef7f0f, in the worktree: (a) delete `$("#frecent").classList.toggle("hidden", !rf); $("#frecentdt").classList.toggle("hidden", !rf);` and (b) change `AO.railGlyphs(railV, railReady, inboxN, lines, s.editor)` to omit `s.editor` — `pytest -q tests/test_ui_focus_recent_files.py` stays at **6 passed**. So a page that never shows its recent files after the first edit (the row stays `hidden`), or a rail that never draws the **‹›** glyph, ships green; the module's docstring says it holds *the rail's ‹› carrying the button's press*, and it holds only the function that returns the glyph.
-
-**Fix:** add a probe that runs the page's Focus render path (`renderRail` and the delta render) under node, or a test that reads the two call sites' behaviour from a rendered DOM stub: after a view with `files` the `#frecent` row is un-hidden and holds the links, and the rail's last child is the `a.railbtn.editor` with the button's `href`. Revert each of the two lines to confirm the test fails, then restore. **Done when** the test is named here under **Resolved:**.

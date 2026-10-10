@@ -3404,6 +3404,15 @@
     if (editor && editor.url) g.push({ card: "editor", text: "‹›", title: `${editor.label} — opens the worktree`, href: editor.url, label: editor.label });
     return g;
   };
+  // …drawn: a button that opens its card, or for **‹›** the editor's link, opened by the `a.editor`
+  // handler as the Session card's button is (TD-525)
+  AO.railHtml = function (v, ready, inboxN, lines, editor) {
+    return AO.railGlyphs(v, ready, inboxN, lines, editor)
+      .map((x) => x.href
+        ? `<a class="railbtn editor g-${x.card}" href="${esc(x.href)}" data-label="${esc(x.label)}" title="${esc(x.title)}">${esc(x.text)}</a>`
+        : `<button class="railbtn g-${x.card || "needs"}" type="button" data-rail="${x.card}" title="${esc(x.title)}">${esc(x.text)}</button>`)
+      .join("");
+  };
   // **» put away** / **«** and the glyphs (§4.5a, TD-412): `side` gains `rail` and the choice is
   // remembered per browser as `focus.side`, the key the template's inline script reads before the
   // first paint; a glyph brings the panel back with its card open — `card(name)` finds the fold,
@@ -3492,6 +3501,13 @@
         : `<span title="${title}">${esc(rel)}</span>`;
       return `<div>${mark}${name}</div>`;
     }).join("");
+  };
+  // …painted into the Session card's row and its term from the view and each delta: shown with
+  // the run's first edit, hidden while it has none
+  AO.paintRecent = function (v, editor, row, dt) {
+    const rf = AO.recentFiles(v, editor);
+    row.innerHTML = rf;
+    row.classList.toggle("hidden", !rf); dt.classList.toggle("hidden", !rf);
   };
   // The provider the page registers beside the web-links addon when the Session card has an editor button:
   // a row with candidates asks the `paths` route once — the answer kept by the row's text until
@@ -4059,9 +4075,7 @@
         $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
-      const rf = AO.recentFiles(v, s.editor);
-      $("#frecent").innerHTML = rf;
-      $("#frecent").classList.toggle("hidden", !rf); $("#frecentdt").classList.toggle("hidden", !rf);
+      AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
       renderReports(v);
       renderInbox(v);
       renderGrants(v);
@@ -4090,11 +4104,7 @@
     function renderRail(v, ready) {
       if (v) { railV = v; railReady = !!ready; }
       const lines = { reports: $("#reportscount").textContent, inbox: $("#inboxcount").textContent };
-      const html = AO.railGlyphs(railV, railReady, inboxN, lines, s.editor)
-        .map((x) => x.href
-          ? `<a class="railbtn editor g-${x.card}" href="${esc(x.href)}" data-label="${esc(x.label)}" title="${esc(x.title)}">${esc(x.text)}</a>`
-          : `<button class="railbtn g-${x.card || "needs"}" type="button" data-rail="${x.card}" title="${esc(x.title)}">${esc(x.text)}</button>`)
-        .join("");
+      const html = AO.railHtml(railV, railReady, inboxN, lines, s.editor);
       const el = $("#railglyphs");
       if (el && el.innerHTML !== html) el.innerHTML = html;
     }

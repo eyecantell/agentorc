@@ -9207,3 +9207,19 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Fix:** add a test that applies a queued `PostToolUse` event carrying `file` whose `at` is older than the session's last live hook (`stale`, ~L3637) and asserts the record's `files` does not move, and that the same event with a newer `at` does. Revert the guard to confirm it fails, then restore it. **Done when** the test is named here under **Resolved:**.
 
 **Resolved:** 2026-10-10 (PR #1481) — `tests/test_recent_files.py::test_a_stale_queued_edit_leaves_files_alone`: a queued edit stamped before the last live hook leaves `files` alone (its adapter id applies), one stamped after moves to the top; with the guard reverted to `... and f:` it fails, restored it passes.
+
+## TD-534: The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1476)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (the delta render: `$("#frecent").innerHTML = rf;` and its `classList.toggle("hidden", !rf)` pair, and `renderRail`'s `AO.railGlyphs(railV, railReady, inboxN, lines, s.editor)` and its `x.href ? <a class="railbtn editor …>` branch, all added by #1476, TD-527); `tests/test_ui_focus_recent_files.py`
+
+**Why:** the module's four node probes call `AO.recentFiles` and `AO.railGlyphs` as functions with stubbed arguments; the one page test (`test_focus_draws_the_editor_button_…`) reads the server-rendered template only. Probe, on `origin/main` 65ef7f0f, in the worktree: (a) delete `$("#frecent").classList.toggle("hidden", !rf); $("#frecentdt").classList.toggle("hidden", !rf);` and (b) change `AO.railGlyphs(railV, railReady, inboxN, lines, s.editor)` to omit `s.editor` — `pytest -q tests/test_ui_focus_recent_files.py` stays at **6 passed**. So a page that never shows its recent files after the first edit (the row stays `hidden`), or a rail that never draws the **‹›** glyph, ships green; the module's docstring says it holds *the rail's ‹› carrying the button's press*, and it holds only the function that returns the glyph.
+
+**Fix:** add a probe that runs the page's Focus render path (`renderRail` and the delta render) under node, or a test that reads the two call sites' behaviour from a rendered DOM stub: after a view with `files` the `#frecent` row is un-hidden and holds the links, and the rail's last child is the `a.railbtn.editor` with the button's `href`. Revert each of the two lines to confirm the test fails, then restore. **Done when** the test is named here under **Resolved:**.
+
+**Resolved:** 2026-10-10 (PR #1482) — the paint and the rail's markup lifted into `AO.paintRecent` and `AO.railHtml`; `tests/test_ui_focus_recent_files.py`'s `test_the_paint_shows_the_row_with_the_first_edit_and_hides_it_again_with_none`, `test_the_rails_last_child_is_the_editor_link_with_the_buttons_href` and `test_focus_paints_the_row_and_the_rail_from_each_view_with_its_editor` hold them; each of the two lines reverted fails one.
