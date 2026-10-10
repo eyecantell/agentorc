@@ -132,14 +132,16 @@ WantedBy=multi-user.target
 def watch_service_text(user: str, uid: int, home: str | None = None) -> str:
     """The watch's one run (design §4.10 *When the home itself is down*): a oneshot as the person;
     `ExecStartPre=+` runs as root and starts the user manager — a no-op while it runs — before
-    `agentorc-watch` asks the home's socket. The same text made by the person or by root for them."""
+    `agentorc-watch` asks the home's socket; its `-` lets a start that fails still be followed by the
+    run, so a manager that will not start is told as silence rather than not at all. The same text
+    made by the person or by root for them."""
     return f"""[Unit]
 Description=agentorc watch (the user manager runs; the host agent answers)
 
 [Service]
 Type=oneshot
 User={user}
-ExecStartPre=+/usr/bin/systemctl start user@{uid}.service
+ExecStartPre=-+/usr/bin/systemctl start user@{uid}.service
 ExecStart={_bin("agentorc-watch")}
 Environment=PATH={_path_env(home)}
 Environment=LANG=C.UTF-8
@@ -285,7 +287,17 @@ def watch_reading() -> dict[str, Any]:
     make of a system unit; `{"loaded": False}` with no systemd at all."""
     try:
         cp = subprocess.run(
-            ["systemctl", "show", f"{WATCH_UNIT}.timer", "-p", "LoadState", "-p", "ActiveState", "-p", "LastTriggerUSec"],
+            [
+                "systemctl",
+                "show",
+                f"{WATCH_UNIT}.timer",
+                "-p",
+                "LoadState",
+                "-p",
+                "ActiveState",
+                "-p",
+                "LastTriggerUSec",
+            ],
             capture_output=True,
             text=True,
             timeout=10,
@@ -381,5 +393,9 @@ def status() -> str:
     lines.append(linger.stdout.strip() or "Linger: unknown")
     lines.append(tmux_placement())
     watch = watch_reading()
-    lines.append(f"{WATCH_UNIT}.timer: {watch.get('active') or 'inactive'}" if watch["loaded"] else f"{WATCH_UNIT}.timer: not installed")
+    lines.append(
+        f"{WATCH_UNIT}.timer: {watch.get('active') or 'inactive'}"
+        if watch["loaded"]
+        else f"{WATCH_UNIT}.timer: not installed"
+    )
     return "\n".join(lines)

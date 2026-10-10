@@ -72,11 +72,12 @@ def _when(iso: Any) -> datetime | None:
 
 
 def step(
-    state: dict[str, Any], *, now: datetime, answered: bool, started: bool, host: str
+    state: dict[str, Any], *, now: datetime, answered: bool, started: bool, host: str, on: bool = True
 ) -> tuple[dict[str, Any], list[str]]:
     """One run's judgement: the state `watch.json` keeps next — `silent_since`, `manager_started_at`,
     `told` (which of `manager` and `silent` went for this outage) — and the lines to tell, at most one
-    of each kind an outage and one on its recovery."""
+    of each kind an outage and one on its recovery. With the switch off (`on`) nothing is told and
+    nothing is marked told, so a switch turned on mid-outage tells the outage before its recovery."""
     silent_since = _when(state.get("silent_since"))
     started_at = _when(state.get("manager_started_at"))
     told = [t for t in state.get("told") or [] if t in ("manager", "silent")]
@@ -85,7 +86,7 @@ def step(
     if started:
         started_at = now
         silent_since = silent_since or now
-        if "manager" not in told:
+        if on and "manager" not in told:
             lines.append(manager_line(host, now))
             told.append("manager")
     if answered:
@@ -93,7 +94,7 @@ def step(
             lines.append(back_line(host, now - (silent_since or started_at or now)))
         return {"silent_since": None, "manager_started_at": None, "told": [], "last_run": now.isoformat()}, lines
     silent_since = silent_since or now
-    if now - silent_since >= WATCH_SILENCE and "silent" not in told:
+    if on and now - silent_since >= WATCH_SILENCE and "silent" not in told:
         lines.append(silent_line(host, silent_since))
         told.append("silent")
     return {
@@ -183,7 +184,7 @@ def run_once(
     """One run against the files under `home`: the state read and written back, the lines sent when
     the switch is on (`secrets` set), each a line in the log; returns the lines judged due."""
     path = home / "watch.json"
-    state, lines = step(_load(path), now=now, answered=answered, started=started, host=host)
+    state, lines = step(_load(path), now=now, answered=answered, started=started, host=host, on=bool(secrets))
     home.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=1) + "\n")
@@ -194,8 +195,7 @@ def run_once(
             f.write(f"{now.isoformat(timespec='seconds')} {text}\n")
 
     for line in lines:
-        if secrets:
-            send(line, secrets, log)
+        send(line, secrets or "", log)
     return lines
 
 

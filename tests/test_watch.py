@@ -31,7 +31,7 @@ def drive(home, runs, secrets="samscrape/prd"):
             started=started,
             host="kmaster",
             secrets=secrets,
-            send=lambda line, s, log: got.append(line),
+            send=lambda line, s, log, got=got: got.append(line),
         )
         sent.append(got)
     return sent
@@ -93,7 +93,10 @@ def test_a_failed_send_is_logged_and_not_retried(home, monkeypatch):
         )
     assert len(calls) == 1, "the silent line once, and the failure not retried"
     argv, line = calls[0]
-    assert argv[:6] == ["doppler", "run", "--project", "a", "--config", "b"] and argv[-2:] == ["-m", "sessionorc.notify"]
+    assert argv[:6] == ["doppler", "run", "--project", "a", "--config", "b"] and argv[-2:] == [
+        "-m",
+        "sessionorc.notify",
+    ]
     assert line.startswith("agentorc · the host agent on kmaster has not answered")
     assert (home / "watch.log").read_text().endswith("send failed: Doppler Error: you must be logged in\n")
 
@@ -145,3 +148,11 @@ def test_the_spans_read_as_a_person_says_them():
     assert watch._span(timedelta(minutes=260)) == "4h20m"
     assert watch._span(timedelta(minutes=15)) == "15 min"
     assert watch.WATCH_SILENCE == 2 * EVERY
+
+
+def test_a_switch_turned_on_mid_outage_tells_the_outage_before_its_recovery(home):
+    drive(home, [(0, False, False), (10, False, False)], secrets=None)
+    assert drive(home, [(15, False, False), (20, True, False)]) == [
+        [watch.silent_line("kmaster", T0)],
+        ["agentorc · the host agent on kmaster answers again (silent 20 min)"],
+    ]

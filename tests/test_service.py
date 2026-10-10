@@ -100,7 +100,7 @@ def test_the_watch_unit_texts():
     for line in (
         "Type=oneshot",
         "User=paul",
-        "ExecStartPre=+/usr/bin/systemctl start user@1000.service",
+        "ExecStartPre=-+/usr/bin/systemctl start user@1000.service",
         "Environment=LANG=C.UTF-8",
     ):
         assert f"{line}\n" in t
