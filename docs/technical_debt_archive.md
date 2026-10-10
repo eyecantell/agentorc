@@ -8971,3 +8971,39 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-480 (the build), TD-474 (the design), #1451.
 
 **Resolved:** 2026-10-10 (PR #1460) — `test_the_term_socket_sends_the_clients_frame_for_the_real_window` (`tests/test_ui.py`) attaches a shell session through the real `/term/` socket at 100×20 and reads `{"clients": 1, "window": [100, 20]}` off it, equal to tmux's own reading of the session. The probe in the Why (`watcher = asyncio.ensure_future(asyncio.sleep(0))`) fails it.
+
+## TD-472: An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul asked why a screenshot pastes into the composer and not the terminal)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.5a (the *Copy / Paste* row and the *Attach / drop / paste* row), §4.4 *Attachment drop*; `src/agentorc/ui/` (the terminal's paste handler beside the composer's)
+
+**Why:** the terminal's Paste sends the clipboard's text through the terminal as keys (§4.5a *Copy / Paste*); a clipboard holding only an image has no text, so the paste sends nothing and says nothing. Claude Code's own image paste reads the clipboard of the machine it runs on, never the browser's, so tmux is not the gap. A file *dropped* on the terminal already takes the attachment road; a *pasted* one is the one way in that does not, and the terminal is where a person's eyes are.
+
+**Fix:** design first: a paste on the terminal that carries a file and no text takes the composer's road — `attach`, named `paste-<date>-<time>.<ext>` — and the returned path goes into the terminal as a bracketed paste, so it lands in the tool's own input (not sent; Enter stays the person's). Inert where Paste already is (a read-only Focus); a paste that carries text stays the text's; the same bounds as the composer (desktop, a session on this host, `ATTACH_BYTES_MAX`); a refusal toasts, never silence. **Done when** §4.5a's two rows say it, the build lands, and a screenshot pasted on the terminal of an interactive Claude Code session puts its path in the prompt.
+
+**Related:** TD-002 (the attach), TD-096 (read-only Focus), TD-469 (the attachment's life).
+
+**Resolved:** 2026-10-10 (PRs #1448, #1450) — its build TD-479 is archived: Paul's look said *This works* (m-071d09fa4a08); the *Paste* button his browser drew first is TD-523.
+
+## TD-479: Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-472's round)
+**Owner:** grinder
+**Kind:** live-check #1448
+**Status:** Resolved
+**Location:** design §4.5a *Copy / Paste* and *Attach / drop / paste*, §4.4 *Attachment drop*; `src/agentorc/ui/static/app.js` (`pasteClip` ~L3266 — the one road every terminal paste takes: Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click, the header's Paste; `AO.wireAttach` ~L152 and its `shut()` rule; `AO.attachName` ~L131; the Focus wiring ~L3353)
+
+**Why:** TD-472: `pasteClip` reads `navigator.clipboard.readText()`, so a clipboard holding only an image pastes nothing and says nothing, while the same screenshot pasted into the composer is attached; the terminal is where a person's eyes are.
+
+**Fix:** as §4.5a *Copy / Paste* says. (1) `pasteClip` reads `navigator.clipboard.read()`: an item carrying `text/plain` is pasted as text, as today; one carrying no text and a file type (`image/png` first) is turned into a `File` named by `AO.attachName` and handed to the attach road's `attach([file])`, and the path it answers is written with `term.paste(path)` (xterm wraps it in bracketed-paste marks when the tool has mode 2004 on, which Claude Code has, so it lands in the prompt and is not sent); nothing else is typed. (2) `AO.wireAttach` gains a way to attach for the terminal that does not need the composer open (`shut()` guards the composer's own paste and drop alone — today it also blocks a file dropped on the terminal while the composer is closed, which the Attach row says works: a terminal drop takes the same open road, its path pasted into the terminal as a terminal paste's is), and inserts nothing at the composer's caret for a terminal paste or drop — the caller takes the path. (3) Read-only Focus: the existing *watching: paste is off — Take over to type* toast, before the clipboard is read. (4) A refusal — past `person.attach.max`, a node's session, `read()` denied (no secure context, or a browser without `clipboard.read`, which falls back to `readText()` and toasts *this browser pastes text only*) — is a toast in the RPC's or the browser's words. (5) Desktop only, as the Attach row is. Tests (under node, as `tests/test_attach.py`'s `_node` harness runs the page's functions, TD-370): a file-only clipboard goes to `attach` and the answered path to `term.paste`; a text clipboard still goes to `term.paste` as text and never to `attach`; a read-only Focus toasts and reads nothing; the composer closed still attaches from the terminal. **Done when** the tests pass and a screenshot pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its path in the prompt, unsent.
+
+**Related:** TD-472 (the design), TD-002 (the attach), TD-473/TD-478 (the road in pieces and the bound), TD-096 (read-only Focus).
+
+**Resolved:** 2026-10-10 (PRs #1448, #1450) — Paul's look (m-37f220f9e955) answered on 2026-10-10 (m-071d09fa4a08): *This works* — a screenshot pasted with Ctrl+V on an interactive Claude Code session's Focus terminal lands as its path in the prompt. His *but*: the browser first draws a white *Paste* button that must be pressed before the paste happens. That is filed as TD-523.
