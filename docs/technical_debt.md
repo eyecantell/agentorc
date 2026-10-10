@@ -43,8 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-532 | A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward | Medium | Designed 2026-10-10 — build TD-535 |
-| TD-535 | Build a file link's two launches (TD-532): the folder link then, a second after, the file form, from the pane's links and the recent files alike; one toast; the help says a press may be two asks | Medium | Built — live check of #1483 |
 | TD-536 | What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form | Medium | Open |
 
 ---
@@ -627,48 +625,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-532: A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (ao-paul, Paul's ask and Paul's test)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-10 (the designer) — (1) §4.6 *A path in the pane is a link*, **the press is two launches**: the Session card's folder link, `windowId=_blank` and all, then the file form a second after. Confirmed in VS Code's source (`windowsMainService.open`, `findWindowOnFile`, `sendWhenReady`): a window holding the folder is brought forward whatever `_blank` says, on every form, since the folder's URI is compared with its authority; a file goes to the window whose folder holds it, else to that host's last-used window, which the folder launch has just made the worktree's; a file sent to a window still connecting is queued until it is ready, so the wait covers the handler, not the connection. (2) The wait: one second, fixed, no setting — inside the browser's five-second activation window; a file arriving first lands in the last-used window with the worktree opening beside it, no error, the next press right. Nothing remembered between presses: a folder already open costs the editor one focus, and a remembered press is wrong once the editor was closed. (3) The prompt is the browser's; its *always allow this site* (Chrome's and Firefox's) makes the pair silent, before it a press is two asks, which the help says. (4) A template's folder launch is the template with `{line}` dropped and its file launch the template filled; a container node's record sends the reach link then the file in its folder's place; `open_in: none` draws no link. (5) The recent files take the same road. Rows *a path is a link*, *recent files* and the Session card's *VS Code* button in §4.5a, the `vscode` file form in §5. No new shape to draw, so no mockup. Built by TD-535. Was: Open.
-**Blocked by:** TD-535
-**Location:** design §4.6 *A path in the pane is a link* (the paragraph that sets aside opening the worktree before the file, `docs/design/4.6-transport.md` ~L146), §4.5a **a path is a link** and the Session card's editor button; `src/agentorc/ui/static/app.js` `AO.pathLink` (~L3467) and `AO.openEditor` (~L461); the recent files' links of TD-527 (#1476, merged) use the same road
-
-**Why:** Paul, 2026-10-10, after TD-526's line fix worked: *any time we open a file from our worktree in vscode the worktree folder is opened as well*. TD-524/TD-525's round set this aside for two reasons. The page cannot see VS Code's windows, so it cannot know whether the worktree is open. And two launches in a row are two browser prompts. The first reason falls away if VS Code does not open the same folder twice. Paul tested one case on 2026-10-10: with the worktree already open, he pressed the header's VS Code button (the folder form, `windowId=_blank`) again, and VS Code **brought the existing window forward** and opened no second one. If that holds generally (for the remote, local and container forms alike; to confirm in the round), the page does not need to know: it can always send the folder first. That is a different case from the 2026-09-06 finding, where a folder sent *without* `_blank` replaced what a used window showed.
-
-**Fix:** a design round settles: (1) a file link sends the session's folder form first, exactly the editor button's link: a new window when none holds the worktree, the existing one brought forward when one does. After a short wait, it sends the file form, which carries no `windowId=_blank` since TD-526, so the file lands in the window just brought forward or opened. (2) The wait: how long, fixed or a setting. To confirm: how long a new remote window takes to connect, and whether a file link that lands before it goes to the previously used window, as the last-used rule (§4.6 ~L140) suggests. Say what the person sees when that happens. Consider skipping the folder launch when this page sent it for the same session moments ago. (3) The prompt: to confirm how each browser asks before handing a `vscode:` link to the editor, and whether allowing it for the site makes the two launches one press. Say so in the help. (4) A person's own template, a container node's form, and `open_in: none` each say what they do; the second launch applies only where a folder form exists. (5) The recent files list (TD-527) takes the same road. **Done when** the design says it and the build entry it names is ledgered.
-
-**Related:** TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (the Session card, #1476), TD-501 (the pane's links).
-
-
-## TD-535: Build a file link's two launches (TD-532): the folder link then, a second after, the file form, from the pane's links and the recent files alike; one toast; the help says a press may be two asks
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (the designer, TD-532's round)
-**Owner:** grinder
-**Kind:** live-check #1483
-**Status:** Built in #1483 (grinder-ao-2, 2026-10-10): `AO.openFile` sends the folder link, then after `AO.FOLDER_WAIT` (1000 ms) the file form, quietly; the pane's links and the recent files take it, the Session card's button stays one launch; the help says a press may be two asks. The scratch home read the pair in order on all three roads (#1483's UI check). **What to read once #1483 is live:** only Paul's VS Code shows it — with no window holding the worktree, a Ctrl+click on a path opens the worktree's window and the file in it at its line; with the window open it comes forward and the file lands there, no second window; a recent file the same. That is the look sent to Paul after the merge: mail `m-846739e230fc` (2026-10-10), *Works* or *Not right: <what>*; a *Works* archives this entry and TD-532, a *Not right* is ledgered as its own entry.
-**Blocked by:** decision (paul) — the look `m-846739e230fc`
-**Location:** design §4.6 *A path in the pane is a link* (*The press is two launches*); §4.5a **a path is a link**, **recent files**, the Session card's **VS Code** button, *The help text*'s *a path is a link* bullet; §5 `person.open_in` (the `vscode` file form); `src/agentorc/ui/static/app.js` (`AO.openEditor` ~L461 and the `a.editor` click handler under it, `AO.pathLink` ~L3476, `AO.recentFiles` ~L3486 — the record's `editor` is `{label, url, file}` from `src/agentorc/ui/cards.py` ~L231, `url` the folder link); `src/agentorc/ui/help.py` (the bullet); `tests/test_ui_focus_paths.py`, `tests/test_ui_focus_recent_files.py`, `tests/test_help.py`, `tests/test_design_doc.py`
-
-**Why:** TD-532: a file link with no VS Code window holding the worktree lands in whatever window was used last, and Paul opens the worktree by hand each time; VS Code brings a window holding the folder forward and opens no second one, so the page can always send the folder first.
-
-**Fix:**
-1. `AO.openFile(editor, fileUrl)` (or the name the build picks) in app.js: `AO.openEditor(editor.url, editor.label)` — the folder link as served, `windowId=_blank` and all — then `setTimeout(() => AO.openEditor(fileUrl, editor.label), 1000)`, the one-second wait a named constant beside it with §4.6's reason; one toast for the pair, *opening in <label>…*, not two. Where `editor.url` is absent (a record with no button draws no file link, so this does not arise) the file alone.
-2. `AO.pathLink` and `AO.pathProvider`'s activate take the record's `editor` (not `editor.file` alone) and call it; `AO.recentFiles`' links carry the folder link too — a `data-folder` on the `a.editor`, or the handler reads the card's `editor` — and the `a.editor` click handler sends the pair when a `data-folder` is present, the one launch when not (the Session card's own button, *edit yml*, Settings' **Open file**: a folder, as before).
-3. `help.py`, the *a path is a link* bullet and §4.5a *The help text* word for word (`tests/test_help.py`): add *It opens the session's folder first, so the file lands in the worktree's window; your browser may ask twice until you tell it to always allow this site.*
-4. Tests: a path press calls the opener twice, the folder link first and the file form after the wait (fake timers), one toast; a recent-file click the same; the Session card's button once; the help bullet equal to the design's.
-5. UI check on a scratch home (§4.9b), the UI reached over SSH as Paul reaches it: with no window holding the worktree, Ctrl+click on a path opens the worktree's window and the file in it, at its line; with the window open, the window comes forward and the file lands in it, no second window; a recent file the same; the browser's *always allow* ticked, no ask on the second press. Shots `docs/mockups/reviews/2026-10-10-td533-*.png` in the PR.
-
-**Done when** a path press and a recent-file click each send the folder link then the file form a second later, the file opens in the worktree's window whether or not one held it, the Session card's button still sends the one launch, the help says a press may be two asks, and the tests pin the pair.
-
-**Related:** TD-532 (the design), TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (recent files, #1476), TD-528 / TD-529 (a template's folder form), TD-501 (the pane's links).
 
 ## TD-536: What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form
 

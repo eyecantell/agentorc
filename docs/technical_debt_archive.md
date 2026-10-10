@@ -9223,3 +9223,46 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Fix:** add a probe that runs the page's Focus render path (`renderRail` and the delta render) under node, or a test that reads the two call sites' behaviour from a rendered DOM stub: after a view with `files` the `#frecent` row is un-hidden and holds the links, and the rail's last child is the `a.railbtn.editor` with the button's `href`. Revert each of the two lines to confirm the test fails, then restore. **Done when** the test is named here under **Resolved:**.
 
 **Resolved:** 2026-10-10 (PR #1482) — the paint and the rail's markup lifted into `AO.paintRecent` and `AO.railHtml`; `tests/test_ui_focus_recent_files.py`'s `test_the_paint_shows_the_row_with_the_first_edit_and_hides_it_again_with_none`, `test_the_rails_last_child_is_the_editor_link_with_the_buttons_href` and `test_focus_paints_the_row_and_the_rail_from_each_view_with_its_editor` hold them; each of the two lines reverted fails one.
+
+## TD-532: A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask and Paul's test)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.6 *A path in the pane is a link* (the paragraph that sets aside opening the worktree before the file, `docs/design/4.6-transport.md` ~L146), §4.5a **a path is a link** and the Session card's editor button; `src/agentorc/ui/static/app.js` `AO.pathLink` (~L3467) and `AO.openEditor` (~L461); the recent files' links of TD-527 (#1476, merged) use the same road
+
+**Why:** Paul, 2026-10-10, after TD-526's line fix worked: *any time we open a file from our worktree in vscode the worktree folder is opened as well*. TD-524/TD-525's round set this aside for two reasons. The page cannot see VS Code's windows, so it cannot know whether the worktree is open. And two launches in a row are two browser prompts. The first reason falls away if VS Code does not open the same folder twice. Paul tested one case on 2026-10-10: with the worktree already open, he pressed the header's VS Code button (the folder form, `windowId=_blank`) again, and VS Code **brought the existing window forward** and opened no second one. If that holds generally (for the remote, local and container forms alike; to confirm in the round), the page does not need to know: it can always send the folder first. That is a different case from the 2026-09-06 finding, where a folder sent *without* `_blank` replaced what a used window showed.
+
+**Fix:** a design round settles: (1) a file link sends the session's folder form first, exactly the editor button's link: a new window when none holds the worktree, the existing one brought forward when one does. After a short wait, it sends the file form, which carries no `windowId=_blank` since TD-526, so the file lands in the window just brought forward or opened. (2) The wait: how long, fixed or a setting. To confirm: how long a new remote window takes to connect, and whether a file link that lands before it goes to the previously used window, as the last-used rule (§4.6 ~L140) suggests. Say what the person sees when that happens. Consider skipping the folder launch when this page sent it for the same session moments ago. (3) The prompt: to confirm how each browser asks before handing a `vscode:` link to the editor, and whether allowing it for the site makes the two launches one press. Say so in the help. (4) A person's own template, a container node's form, and `open_in: none` each say what they do; the second launch applies only where a folder form exists. (5) The recent files list (TD-527) takes the same road. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (the Session card, #1476), TD-501 (the pane's links).
+
+**Resolved:** 2026-10-10 (PRs #1480, #1483) — designed in #1480 (§4.6 *The press is two launches*) and built by TD-535; Paul's look answered *Works*.
+
+## TD-535: Build a file link's two launches (TD-532): the folder link then, a second after, the file form, from the pane's links and the recent files alike; one toast; the help says a press may be two asks
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (the designer, TD-532's round)
+**Owner:** grinder
+**Kind:** live-check #1483
+**Status:** Resolved
+**Location:** design §4.6 *A path in the pane is a link* (*The press is two launches*); §4.5a **a path is a link**, **recent files**, the Session card's **VS Code** button, *The help text*'s *a path is a link* bullet; §5 `person.open_in` (the `vscode` file form); `src/agentorc/ui/static/app.js` (`AO.openEditor` ~L461 and the `a.editor` click handler under it, `AO.pathLink` ~L3476, `AO.recentFiles` ~L3486 — the record's `editor` is `{label, url, file}` from `src/agentorc/ui/cards.py` ~L231, `url` the folder link); `src/agentorc/ui/help.py` (the bullet); `tests/test_ui_focus_paths.py`, `tests/test_ui_focus_recent_files.py`, `tests/test_help.py`, `tests/test_design_doc.py`
+
+**Why:** TD-532: a file link with no VS Code window holding the worktree lands in whatever window was used last, and Paul opens the worktree by hand each time; VS Code brings a window holding the folder forward and opens no second one, so the page can always send the folder first.
+
+**Fix:**
+1. `AO.openFile(editor, fileUrl)` (or the name the build picks) in app.js: `AO.openEditor(editor.url, editor.label)` — the folder link as served, `windowId=_blank` and all — then `setTimeout(() => AO.openEditor(fileUrl, editor.label), 1000)`, the one-second wait a named constant beside it with §4.6's reason; one toast for the pair, *opening in <label>…*, not two. Where `editor.url` is absent (a record with no button draws no file link, so this does not arise) the file alone.
+2. `AO.pathLink` and `AO.pathProvider`'s activate take the record's `editor` (not `editor.file` alone) and call it; `AO.recentFiles`' links carry the folder link too — a `data-folder` on the `a.editor`, or the handler reads the card's `editor` — and the `a.editor` click handler sends the pair when a `data-folder` is present, the one launch when not (the Session card's own button, *edit yml*, Settings' **Open file**: a folder, as before).
+3. `help.py`, the *a path is a link* bullet and §4.5a *The help text* word for word (`tests/test_help.py`): add *It opens the session's folder first, so the file lands in the worktree's window; your browser may ask twice until you tell it to always allow this site.*
+4. Tests: a path press calls the opener twice, the folder link first and the file form after the wait (fake timers), one toast; a recent-file click the same; the Session card's button once; the help bullet equal to the design's.
+5. UI check on a scratch home (§4.9b), the UI reached over SSH as Paul reaches it: with no window holding the worktree, Ctrl+click on a path opens the worktree's window and the file in it, at its line; with the window open, the window comes forward and the file lands in it, no second window; a recent file the same; the browser's *always allow* ticked, no ask on the second press. Shots `docs/mockups/reviews/2026-10-10-td533-*.png` in the PR.
+
+**Done when** a path press and a recent-file click each send the folder link then the file form a second later, the file opens in the worktree's window whether or not one held it, the Session card's button still sends the one launch, the help says a press may be two asks, and the tests pin the pair.
+
+**Related:** TD-532 (the design), TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (recent files, #1476), TD-528 / TD-529 (a template's folder form), TD-501 (the pane's links).
+
+**Resolved:** 2026-10-10 (PRs #1483, #1484) — built in #1483: `AO.openFile` sends the folder link, then after `AO.FOLDER_WAIT` (1000 ms) the file form quietly, from the pane's path links and the recent files; the Session card's button stays one launch; the help says a press may be two asks. `tests/test_ui_focus_paths.py` and `tests/test_ui_focus_recent_files.py` pin the pair. Paul's look `m-846739e230fc` answered *Works* (2026-10-10).
