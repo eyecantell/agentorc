@@ -45,7 +45,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-524 | A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder | Medium | Designed 2026-10-10 — build TD-526 |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
-| TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Open |
+| TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Built (#1467); waits for Paul's look |
 | TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open |
 
 ---
@@ -675,7 +675,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (the designer, TD-524's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built by PR #1467 (the UI check held on a scratch home: the remote link carries `:line`, `:1` where none, no `windowId`); waits for Paul's look in VS Code over SSH — *Works* archives it
+**Blocked by:** decision (paul)
 **Location:** design §4.6 *A path in the pane is a link* (the line, the window), §4.5a **a path is a link**, §5 `person.open_in` (the file form, `{line}`); `src/agentorc/ui/uiconf.py` (`editor_file`: the three `vscode` forms without `?windowId=_blank`, `vscode_link` unchanged), `src/agentorc/ui/static/app.js` (`AO.pathLink`: the `at` suffix on every `vscode://` form, `:1` when no line was printed, `{line}` filled in a template), `tests/test_ui_focus_paths.py`
 
 **Why:** TD-524: Paul's Ctrl+click from a UI reached over SSH opened VS Code, which named the file and asked for a folder — the remote form carried no `:line`, and VS Code's handler opens a `vscode-remote` path as a file only when it ends in `:digits` (`getWindowOpenableFromProtocolUrl`, read in the source 2026-10-10). Every file link from a UI not on the host was broken.
