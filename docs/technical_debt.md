@@ -45,6 +45,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
+| TD-522 | The `/term` route's wiring of `watch_clients` (TD-480) is held by no test: the terminal mark's *resized by another client* can never reach a page and the suite passes | Medium | Open |
 
 ---
 
@@ -661,3 +662,18 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
+## TD-522: The `/term` route's wiring of `watch_clients` (TD-480) is held by no test: the terminal mark's *resized by another client* can never reach a page and the suite passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1451)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`read_clients` and `watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))` in the `/term/` websocket route, ~L3558-3581), `tests/test_ui_term_mark.py`, `tests/test_ui.py` (`pane_bytes`)
+
+**Why:** TD-480 (#1451) added three pieces: `clients_argv`/`clients_frame`/`watch_clients` in `pty_bridge.py`, the page's `AO.termMark`, and the route's `read_clients` closure plus the `watcher` task that joins them. The first two are tested, each on its own (`test_the_bridge_reads_clients_and_window_through_tmux`, `test_the_bridge_sends_a_frame_when_the_reading_changes_and_nothing_else`, the node probe), and the page's side reads the frame by string (`'if (c && "clients" in c)'`). The route's own wiring is held by nothing. Probe on `origin/main` at `73235b88`: in `app.py` replace the line `watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))` with `watcher = asyncio.ensure_future(asyncio.sleep(0))` and run `pytest tests/test_ui.py tests/test_ui_term_mark.py`: **74 passed**. With that line gone the bridge never sends a `{clients, window}` frame, so *resized by another client* never draws and the person is back to the three causes they could not tell apart. `tests/test_ui.py` gained `pane_bytes(ws, words)`, which collects the attach's text frames, but its one caller asserts only `not [w for w in words if "read_only" in w]`; no test reads a `clients` word off a real `/term/` socket, and `read_clients`'s argv (the `-it` filter, the socket name and, for a node, the `docker exec` prefix shared with the scroll command) is run by none.
+
+**Fix:** one test in `tests/test_ui.py` beside the existing `/term/` socket tests, on a private tmux socket: attach, and assert the first text frame the socket sends is `{"clients": n, "window": [w, h]}` for the session's real window (`watch_clients`' first reading is always sent), collected through `pane_bytes(ws, words)`. Verify it fails with the `watcher` line replaced as above. **Done when** that revert fails a test.
+
+**Related:** TD-480 (the build), TD-474 (the design), #1451.
