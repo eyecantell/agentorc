@@ -120,3 +120,46 @@ async def test_an_unreadable_file_and_a_record_with_no_repo(agent, tmp_path):
         assert got["locked/g.txt"] is None or os.geteuid() == 0  # root stats through a mode of 0
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_checkout_reached_through_a_symlink_answers_its_files(agent, tmp_path):
+    """The roots are compared as real paths (TD-517): a `dir` and a `repo` reached through a link —
+    a home or a worktree path that is one — still own the files under them."""
+    wt = checkout(tmp_path)
+    repo = wt.parent.parent.parent
+    (tmp_path / "linked").symlink_to(repo)
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="sh", dir=str(wt), adapter="shell", argv=["bash", "--norc"]))["id"]
+        s = agent.sessions[sid]
+        s.dir = str(tmp_path / "linked" / ".claude" / "worktrees" / "w")  # as the record may hold it
+        s.repo = str(tmp_path / "linked")
+        got = (await person.call("paths", id=sid, runs=["src/a.py", "../../../top.md", "out.txt"]))["paths"]
+        assert got == {"src/a.py": str(wt / "src" / "a.py"), "../../../top.md": str(repo / "top.md"), "out.txt": None}
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_paths_is_served_under_enforce_from_a_channel_nobody_can_place(agent, tmp_path, monkeypatch):
+    """`paths` is a read (§4.4a, TD-519): under `enforce` a request whose channel cannot be placed
+    is refused unless its method is in `identity.READS`, and the Focus page's hover is one."""
+    wt = checkout(tmp_path)
+
+    async def boom(*_a, **_k):
+        raise RuntimeError("the classification fell over")
+
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="sh", dir=str(wt), adapter="shell", argv=["bash", "--norc"]))["id"]
+    monkeypatch.setattr(agent, "_id_channel", boom)
+    agent.identity_mode = "enforce"
+    async with LocalClient() as person:
+        assert (await person.call("paths", id=sid, runs=["src/a.py"]))["paths"] == {
+            "src/a.py": str(wt / "src" / "a.py")
+        }
+        with pytest.raises(AgentError, match="identity check failed"):
+            await person.call("doing", id=sid, text="nope")  # the gate is on: a write is refused
+    agent.identity_mode = "off"
+    async with LocalClient() as person:
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
