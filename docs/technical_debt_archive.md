@@ -8190,3 +8190,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-490 (#1401), TD-498.
 
 **Resolved:** 2026-10-09 (PR #1414) — four tests in `tests/test_exit_cause.py`: a dead pane under `_observe` keeps a `how: tool` end and refreshes a `how: pane` code; a closed exited record keeps `ended` with `confidence: tick`; a forgotten host's exited record likewise; a `HostStore.save` raising `OSError` leaves `tick()` complete. Each of the five probes fails a test.
+
+## TD-471: Build the fold of `conflict` into `ask` (TD-462): the kind refused, `--cites` on an `ask` to two or more, the lists and briefs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (the designer, TD-462's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.10 *Two controllers disagree*, *A disagreement, worked*, the kinds table; §4.7 *Mail*; `src/sessionorc/agent_mail.py` (the `conflict` gates at ~L423–L427 and ~L513–L520, the person gate; the first-reply close on every copy, which stays), `src/sessionorc/mail.py` (comments at L28, L34, L51; `MailEntry.open`), `src/agentorc/cli.py` (`--kind` choices at ~L3424, `--cites` help at ~L3435, the kind lists at ~L2599 and ~L2625), `src/agentorc/ui/inbox.py` (`PERSON_ASK_KINDS` L44, `OWING_KINDS` L1520, the docstrings at L54, L1660, L1808), `src/agentorc/ui/static/app.js` (L854), `src/agentorc/briefs/grinder.md` (*Two controllers telling you opposite things*), `src/agentorc/skill.md` (the kinds line, L47), `docs/briefs/techlead-context.md` (a held path: the techlead's read), `tests/test_mail.py`, `tests/test_cli.py`, `tests/test_ui_inbox.py`
+
+**Why:** TD-462: no session has sent a `conflict` since the kind was built, every brief and row renderer carries it as its own kind, and §4.10 already said it is an `ask` for every rule.
+
+**Fix:** (1) `agent_mail`: `--kind conflict` refused with *a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)*; `--cites` accepted on an `ask` whose `to` names two or more sessions and refused otherwise with the same words; the gate *an `ask` to two or more never names the person* in place of the conflict's; the first-reply close on every copy unchanged; an entry whose stored `kind` is `conflict` read as `ask` wherever a kind is tested (`MailEntry.open`, the open-question counts, the rows); (2) the lists: `cli.py`'s choices and kind tuples, `inbox.py`'s `PERSON_ASK_KINDS` and `OWING_KINDS`, `app.js` L854 — each drops `conflict`; (3) the words: `grinder.md`'s bullet says `--kind ask --cites`, `skill.md`'s kinds line (L47) drops `conflict` and says `--cites` goes on an `ask` to two or more, `techlead-context.md` L116 likewise (a held path: the techlead reads the PR; `director.md`'s *open conflict* is §10's question, not the kind); (4) tests: an `ask` to two controllers with `--cites` lands in both and closes on the first reply; `--cites` on an `ask` to one refused; `--kind conflict` refused; the person gate on an `ask` to two. **Done when** no file under `src/` or `docs/briefs/` names the `conflict` kind, the four tests pass, and `ao msg --kind conflict` is refused naming §4.10.
+
+**Related:** TD-462 (the design), TD-039 (the conflict), TD-105 (archived; the evaluation), TD-052 (mail).
+
+**Resolved:** 2026-10-09 (PR #1412) — `agent_mail.msg` refuses `--kind conflict` and a `--cites` anywhere but an `ask` to two or more in one sentence naming §4.10 *Two controllers disagree*; the person gate covers an `ask` to two; `MAIL_KINDS`/`ASK_KINDS` drop the kind and `MailEntry.from_dict` reads a retained `conflict` as an `ask`; `cli.py`, `inbox.py`, `app.js`, `inbox_row.html`, `grinder.md`, `skill.md` and `techlead-context.md` drop it; `tests/test_mail.py`, `tests/test_cli.py` pin the four cases and the retained entry.
