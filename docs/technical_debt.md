@@ -661,7 +661,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 ## TD-534: The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes
 
 **Priority:** Medium
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-10 (test-audit-ao-1, auditing #1476)
 **Owner:** grinder
 **Kind:** build
