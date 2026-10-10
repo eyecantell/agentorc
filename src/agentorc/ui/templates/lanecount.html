@@ -1,0 +1,3 @@
+{# the lane's count in a member's pill (§4.5a *card: compact*, TD-428): soft, solid while out of work
+   and idle. One macro for the card and for the groups payload every delta carries (TD-484). #}
+{% macro span(lc) %}{% if lc %}<span class="lanecount k-{{ lc.kind }}{% if lc.solid %} solid{% endif %}" title="{{ lc.title }}">{{ lc.text }}</span>{% endif %}{% endmacro %}
