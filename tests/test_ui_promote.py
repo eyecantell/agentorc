@@ -203,5 +203,10 @@ def test_every_page_and_the_inbox_poll_draw_the_build_chip(page, monkeypatch):
     html = c.get("/inbox").text
     want = 'class="mono behind" id="buildchip" title="a\nb" data-at="2026-10-10T15:41:00+00:00" data-rest=" · main +2"'
     assert want in html
-    monkeypatch.setattr(uiapp, "build_chip", lambda info: None)  # the agent did not answer
-    assert 'id="buildchip"' not in c.get("/").text
+    # a subject is the committer's text: escaped in the hover, never markup
+    live = {**live, "title": 'abc "x" <b>&'}
+    assert 'title="abc &#34;x&#34; &lt;b&gt;&amp;"' in c.get("/inbox").text
+    # the agent did not answer at load: an empty, hidden span the Inbox poll can draw into
+    monkeypatch.setattr(uiapp, "build_chip", lambda info: None)
+    assert '<span class="mono hidden" id="buildchip"></span>' in c.get("/").text
+    assert c.get("/api/person/inbox").json()["build_chip"] is None

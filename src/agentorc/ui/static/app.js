@@ -1197,7 +1197,7 @@
     if (!el) return;
     if (c) {
       el.className = `mono ${c.cls || ""}`; el.title = c.title || "";
-      if (c.at) { el.dataset.at = c.at; el.dataset.rest = c.rest || ""; } else { delete el.dataset.at; el.textContent = c.text || ""; }
+      if (c.at) { el.dataset.at = c.at; el.dataset.rest = c.rest || ""; } else { delete el.dataset.at; delete el.dataset.rest; el.textContent = c.text || ""; }
     }
     const when = el.dataset.at ? buildStamp(el.dataset.at) : "";
     if (when) el.textContent = `live ${when}${el.dataset.rest || ""}`;

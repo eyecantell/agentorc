@@ -30,8 +30,8 @@
      the browser's zone, then `data-rest` (*· main +n*, *· promoting…*, *· held*, *· main unknown*).
      `build_chip` (`common.build_chip`): the home's promote reading where it holds the build, so the
      chip and the Inbox's Promote row agree; the hover lists what is not live yet. The Inbox poll
-     redraws it. #}
-  {% if build_chip %}<span class="mono {{ build_chip.cls }}" id="buildchip" title="{{ build_chip.title }}"{% if build_chip.at %} data-at="{{ build_chip.at }}" data-rest="{{ build_chip.rest }}"{% endif %}>{{ build_chip.text }}</span>{% endif %}
+     redraws it, and draws it when the agent did not answer at load (an empty, hidden span). #}
+  {% if build_chip %}<span class="mono {{ build_chip.cls }}" id="buildchip" title="{{ build_chip.title }}"{% if build_chip.at %} data-at="{{ build_chip.at }}" data-rest="{{ build_chip.rest }}"{% endif %}>{{ build_chip.text }}</span>{% else %}<span class="mono hidden" id="buildchip"></span>{% endif %}
   {# design §4.5a Org top bar **Inbox** / **Inbox page** (§4.5 screen 6, §4.10, TD-069 step 1): the
      nav item for `/inbox`, which replaced the dialog that hung here until 2026-09-19. Its number is
      that page's **Needs you** section — open questions to you plus `steer`s you have paused, minus

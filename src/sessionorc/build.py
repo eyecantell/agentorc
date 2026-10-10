@@ -91,15 +91,25 @@ def _git(source: str, *args: str) -> str | None:
     return cp.stdout if cp.returncode == 0 else None
 
 
+_COMMITS: dict[tuple[str, str], tuple[str, str]] = {}  # a commit's time and subject never change
+
+
 def commit_at(source: Any, commit: Any) -> tuple[str, str]:
     """`(committer time ISO, subject)` of `commit` in the checkout `source`, `("", "")` when it
-    cannot be read — the chip's *live <time>* and the hover's first line (§4.5a, TD-539)."""
-    if not commit or not isinstance(source, str) or not Path(source).is_dir():
+    cannot be read — the chip's *live <time>* and the hover's first line (§4.5a, TD-539). A read
+    is kept, so a page and its poll pay for it once per commit; a failure is asked again."""
+    if not commit or not isinstance(source, str):
+        return "", ""
+    key = (source, str(commit))
+    if key in _COMMITS:
+        return _COMMITS[key]
+    if not Path(source).is_dir():
         return "", ""
     out = _git(source, "log", "-1", "--format=%cI%x09%s", str(commit), "--")
     if not out or "\t" not in out:
         return "", ""
     at, subject = out.strip("\n").split("\t", 1)
+    _COMMITS[key] = (at, subject)
     return at, subject
 
 
@@ -108,11 +118,12 @@ def pending(source: Any, live: Any, main: Any) -> tuple[list[dict[str, str]], in
     `PENDING_SHOWN` and how many more — or None when it cannot be read (§6 *Promote*, TD-539)."""
     if not live or not main or not isinstance(source, str) or not Path(source).is_dir():
         return None
-    out = _git(source, "log", "--format=%H%x09%s", f"{live}..{main}", "--")
-    if out is None:
+    out = _git(source, "log", "-n", str(PENDING_SHOWN), "--format=%H%x09%s", f"{live}..{main}", "--")
+    n = _git(source, "rev-list", "--count", f"{live}..{main}", "--")
+    if out is None or not (n or "").strip().isdigit():
         return None
     rows = [ln.split("\t", 1) for ln in out.splitlines() if "\t" in ln]
-    return [{"sha": s, "subject": t} for s, t in rows[:PENDING_SHOWN]], max(0, len(rows) - PENDING_SHOWN)
+    return [{"sha": s, "subject": t} for s, t in rows], max(0, int(n) - len(rows))
 
 
 def stamp(at: str, now: datetime | None = None) -> str:
