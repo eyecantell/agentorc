@@ -8571,3 +8571,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-002 (the attach), TD-469 (the attachment's life), TD-472 (paste on the terminal), TD-003 (the phone's share sheet).
 
 **Resolved:** 2026-10-10 — designed 2026-10-09 and built by TD-478 (PRs #1370, #1413), archived beside it; Paul's live look of a 50 MB PDF answered **Works** (m-52afbe26fc42).
+
+## TD-513: The client half of TD-484 — `syncGroups` patching every member's lane count from `g.lanes` — is pinned by no test: the block can go and 604 UI tests pass
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`syncGroups`, the `Object.entries(g.lanes || {})` block), `tests/test_ui_team_summary.py` (`test_each_member_card_draws_its_own_lane_count_in_its_pill`)
+
+**Why:** The test-audit of #1424. The change has two halves: `render_heads` puts `lanes` on each group, and `app.js` reads `g.lanes` to patch each sibling's pill — the half that makes a sibling's claim move this card's count with no delta of its own. The test added reads only the server half (`ui.render_heads(...)[...]['lanes']`); it never opens `app.js`, though the neighbouring tests of this file do (`(ui.Path(ui.__file__).parent / "static" / "app.js").read_text()`, lines 275, 292, 382, 521; 831 hands the path to a node probe). Probe: the `// each member's lane count (TD-484)` block deleted from `syncGroups`, `pytest -q tests -k ui` — **604 passed**. The TD-484 **Resolved:** line says `syncGroups` patches each pill; nothing asserts it. A second, smaller gap in the same change: the `if g.get("summary") else {}` guard in `render_heads` is replaced by `if True` and `tests/test_ui_team_summary.py tests/test_ui.py` stay at 98 passed, so a group with no summary drawing no `lanes` is unpinned too.
+
+**Fix:** Add a source-reading test beside the file's others that the `app.js` `syncGroups` reads `g.lanes` and removes a stale `.lanecount` / inserts the new one in the pill (or a driven-DOM check where the suite has one), and a case in `render_heads`' test for a group with no summary giving `lanes == {}`. **Done when** both probes in the Why fail a test.
+
+**Related:** TD-484 (#1424), TD-428.
+
+**Resolved:** 2026-10-10 (PR #1440) — `tests/test_ui_team_summary.py::test_sync_groups_patches_every_members_lane_count_from_the_groups_payload` reads `syncGroups`' `g.lanes` block step by step (pill, compare, remove, insert), and `test_each_member_card_draws_its_own_lane_count_in_its_pill` gains a *No team* member whose group carries `lanes == {}`; both probes in the Why now fail a test.
