@@ -633,7 +633,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (grinder-ao-1, from Paul's answer to TD-479's look)
 **Owner:** grinder
 **Kind:** build
-**Status:** Built by PR #1462 (Ctrl+V reads the paste event; the UI check held in headless Chromium); waits for Paul's look in his own browser — *Works* archives it
+**Status:** Built by PR #1462 (Ctrl+V reads the paste event; the UI check held in headless Chromium); merged 2026-10-10 (d748e38); waits for Paul's look in his own browser, sent as m-c34d930db6db — *Works* archives it
 **Blocked by:** decision (paul)
 **Location:** `src/agentorc/ui/static/app.js` (`AO.pasteKey` ~L286, which cancels the keydown and calls the paste road; Focus `pasteClip` ~L3598 and `AO.clipPaste`, which read `navigator.clipboard.read()` / `readText()`; `term.attachCustomKeyEventHandler` ~L3606), `tests/test_attach.py` (the node harness); design §4.5a **Copy / Paste**
 
