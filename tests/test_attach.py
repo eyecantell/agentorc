@@ -422,7 +422,7 @@ async function run() {
   {
     const h = host({ total: 10 }), pct = [];
     const path = await AO.uploadPieces(fileOf("0123456789"), { name: "deck.pptx", piece: 4, post: h.post,
-      progress: (n) => pct.push(n), cancelled: () => false });
+      progress: (n, last) => pct.push([n, last]), cancelled: () => false });
     out.whole = { path, pct, seen: h.seen };
   }
   {
@@ -430,6 +430,12 @@ async function run() {
     const path = await AO.uploadPieces(fileOf("abc"), { name: "s.png", piece: 4, post: h.post,
       progress: (n) => pct.push(n), cancelled: () => true });
     out.one = { path, pct, seen: h.seen };
+  }
+  {
+    const h = host({ total: 0 });
+    const path = await AO.uploadPieces(fileOf(""), { name: "empty.txt", piece: 4, post: h.post,
+      progress: () => {}, cancelled: () => true });
+    out.empty = { path, seen: h.seen };
   }
   {
     const h = host({ total: 10 });
@@ -458,16 +464,17 @@ def test_the_page_sends_a_file_in_pieces_and_cancels_what_is_half_up(tmp_path):
     order — the first piece with `total`, each later one with the `upload` and its `offset` — with
     the percent after each middle piece and the path from the last; a file of one piece is one call
     and is never asked to cancel; the ✕ before a later piece sends `{upload, cancel}` and answers no
-    path; a refused piece cancels what is up and throws the host agent's words."""
+    path; a refused piece cancels what is up and throws the host agent's words; an empty file is one call."""
     got = _node(tmp_path, PIECES_PROBE)
     whole = got["whole"]
-    assert whole["path"] == "/a/deck.pptx" and whole["pct"] == [40, 80]
+    assert whole["path"] == "/a/deck.pptx" and whole["pct"] == [[40, False], [80, True]]
     assert [(x.get("upload"), x.get("offset"), x.get("total"), x["file"]) for x in whole["seen"]] == [
         (None, None, 10, "0123"),
         ("u1", 4, None, "4567"),
         ("u1", 8, None, "89"),
     ]
     assert got["one"] == {"path": "/a/s.png", "pct": [], "seen": [{"total": 3, "name": "s.png", "file": "abc"}]}
+    assert got["empty"] == {"path": "/a/empty.txt", "seen": [{"total": 0, "name": "empty.txt", "file": ""}]}
     cancelled = got["cancelled"]
     assert cancelled["path"] is None
     assert [x.get("cancel") or x["file"] for x in cancelled["seen"]] == ["0123", "1"]
@@ -483,7 +490,8 @@ PROGRESS_PROBE = (
 const tick = () => new Promise((r) => setImmediate(r));
 const stub = (extra) => { const on = {}; const cls = new Set(extra && extra.hidden ? ["hidden"] : []);
   return Object.assign({ on,
-  classList: { contains: (c) => cls.has(c), add: (c) => cls.add(c), remove: (c) => cls.delete(c) },
+  classList: { contains: (c) => cls.has(c), add: (c) => cls.add(c), remove: (c) => cls.delete(c),
+    toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)) },
   addEventListener: (k, f) => { on[k] = f; }, dispatchEvent: () => {}, focus: () => {}, click: () => {} }, extra); };
 async function run() {
   const button = stub({ lastChild: { textContent: "Attach" }, disabled: false });
@@ -491,6 +499,9 @@ async function run() {
   const compose = stub({ value: "", selectionStart: 0, selectionEnd: 0 });
   let gate, seen = {};
   const upload = async (f, ctl) => {
+    if (f.name === "two.bin") {
+      ctl.progress(60, true); seen.last_shown = !cancel.classList.contains("hidden"); return "/a/two.bin";
+    }
     ctl.progress(37);
     seen.label = button.lastChild.textContent; seen.shown = !cancel.classList.contains("hidden");
     await new Promise((r) => { gate = r; });
@@ -504,6 +515,8 @@ async function run() {
   cancel.on.click();
   seen.hidden_on_press = cancel.classList.contains("hidden");
   gate(); await done;
+  seen.cancel_value = compose.value;
+  await attach([{ name: "two.bin" }]);
   seen.value = compose.value; seen.after = !cancel.classList.contains("hidden");
   seen.label_after = button.lastChild.textContent;
   console.log(JSON.stringify(seen));
@@ -517,11 +530,12 @@ run().catch((e) => { console.error(e); process.exit(1); });
 def test_the_composer_shows_an_uploads_percent_and_its_cancel(tmp_path):
     """TD-478 (6), §4.5a *Attach*: past a file's first piece the label reads *Attaching <name> · n%*
     and the ✕ is shown; its press marks the upload cancelled and hides it, and a cancelled upload
-    inserts no path; the label is *Attach* again afterwards."""
+    inserts no path; the label is *Attach* again afterwards. Once only the last piece is left the ✕ is
+    hidden: that piece links the file into place, past cancelling (the review of #1413)."""
     got = _node(tmp_path, PROGRESS_PROBE)
     assert got == {
         "label": "Attaching deck.pptx · 37%", "shown": True, "hidden_on_press": True, "cancelled": True,
-        "value": "", "after": False, "label_after": "Attach",
+        "cancel_value": "", "value": "/a/two.bin ", "after": False, "label_after": "Attach", "last_shown": False,
     }  # fmt: skip
 
 

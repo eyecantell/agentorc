@@ -148,8 +148,8 @@
   // handed in, so the rules run as themselves under node (TD-370): the picker, a drop on any of
   // `targets` and a paste into `compose` each attach their files one upload at a time, the path each
   // answers inserted at the caret; nothing while `composer` is closed, and a paste carrying
-  // `text/plain` is the text's. `upload(f, ctl)` is handed `ctl.progress(pct)`, which past a file's
-  // first piece makes the label *Attaching <name> · n%* and shows `cancel`, the ✕, and
+  // `text/plain` is the text's. `upload(f, ctl)` is handed `ctl.progress(pct, last)`, which past a file's
+  // first piece makes the label *Attaching <name> · n%* and shows `cancel`, the ✕, until `last`, and
   // `ctl.cancelled()`, true once the ✕ was pressed for this file; an upload that answers no path was
   // cancelled and inserts nothing (TD-478). Answers `attach(files)`, the promise of the queue.
   AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel }) {
@@ -165,7 +165,8 @@
         let stopped = false;
         stopNow = () => { stopped = true; };
         const ctl = {
-          progress: (pct) => { label.textContent = `Attaching ${f.name} · ${pct}%`; if (cancel && !stopped) cancel.classList.remove("hidden"); },
+          // the ✕ goes once only the last piece is left: that one links the file into place, past cancelling
+          progress: (pct, last) => { label.textContent = `Attaching ${f.name} · ${pct}%`; if (cancel) cancel.classList.toggle("hidden", stopped || !!last); },
           cancelled: () => stopped,
         };
         try { const path = await upload(f, ctl); if (path) AO.insertAtCaret(compose, path); } catch (e) { fail(`Attach failed: ${e.message}`); }
@@ -199,7 +200,8 @@
   // host agent's `paths.ATTACH_PIECE_BYTES`, served on the Attach button) and sent in order through
   // `post(fields)`, which answers the route's JSON. The first piece carries `total`; the host agent
   // answers an `upload` id while more is to come, and each later piece names it and its `offset`,
-  // the bytes it has. `progress(pct)` after each middle piece; `cancelled()` is asked before each
+  // the bytes it has. `progress(pct, last)` after each middle piece, `last` when only the final piece is
+  // left; `cancelled()` is asked before each
   // later piece, and true sends `{upload, cancel}` and answers null. A refusal or a broken answer
   // cancels what is half up and throws, so no `.part` waits for the hour's sweep. Answers the path.
   AO.uploadPieces = async function (f, { name, piece, post, progress, cancelled }) {
@@ -216,7 +218,7 @@
       if (got && got.path) return got.path;
       if (!got || !got.upload || !(got.bytes > offset)) { await drop(); throw new Error("the host agent answered no path"); }
       upload = got.upload; offset = got.bytes;
-      progress(Math.floor((offset * 100) / total));
+      progress(Math.floor((offset * 100) / total), total - offset <= piece);
     }
   };
 
