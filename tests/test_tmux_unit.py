@@ -11,6 +11,7 @@ from conftest import park_ticks
 from test_identity import FakeProc, P
 
 from sessionorc import identity
+from sessionorc.client import LocalClient
 
 SYSTEM = "/system.slice/agentorc-tmux.service"
 USER = "/user.slice/user-1000.slice/user@1000.service/app.slice/agentorc-agent.service"
@@ -94,24 +95,30 @@ def test_a_pane_cgroup_that_cannot_be_written_leaves_nothing(tmp_path, monkeypat
 
 
 async def test_the_create_path_makes_the_pane_cgroup_only_under_the_unit(agent, tmp_path, monkeypatch):
+    """TD-503: through the `create` RPC, so `_start` dropping its `_pane_cgroup` call fails here —
+    the pane's own cgroup under the unit holds the pane's pid; under the user manager none is made."""
     await park_ticks(agent)
     root = tmp_path / "cgroup"
-    (root / SYSTEM.strip("/")).mkdir(parents=True)
+    unit = root / SYSTEM.strip("/")
+    unit.mkdir(parents=True)
     agent.cgroup_root = str(root)
-    agent.tmux.ensure_server()
-    agent.tmux.new_session("ao-unit", tmp_path, ["sleep", "30"], {})
-    try:
-        pane = agent.tmux.pane_pid("ao-unit")
-        assert pane and pane > 1
-        where = {"cg": USER}
-        monkeypatch.setattr(agent.proc, "cgroup", lambda pid: where["cg"])
-        agent._pane_cgroup("ao-unit")  # under the user manager: tmux's scope stands, nothing made
-        assert not (root / SYSTEM.strip("/") / "pane-ao-unit").exists()
+    where = {"cg": USER}
+    monkeypatch.setattr(agent.proc, "cgroup", lambda pid: where["cg"])
+    async with LocalClient() as c:
+        user = (await c.call("create", name="u", dir=str(tmp_path), adapter="shell", argv=["sleep", "30"]))["id"]
+        try:
+            assert agent.tmux.pane_pid(user)
+            assert not any(unit.iterdir())  # under the user manager: tmux's scope stands, nothing made
+        finally:
+            await c.call("kill", id=user)
         where["cg"] = SYSTEM
-        agent._pane_cgroup("ao-unit")
-        assert _procs(root / SYSTEM.strip("/") / "pane-ao-unit") == f"{pane}\n"
-    finally:
-        agent.tmux.kill_session("ao-unit")
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter="shell", argv=["sleep", "30"]))["id"]
+        try:
+            pane = agent.tmux.pane_pid(sid)
+            assert pane and pane > 1
+            assert _procs(unit / f"pane-{sid}") == f"{pane}\n"
+        finally:
+            await c.call("kill", id=sid)
 
 
 async def test_the_doctor_says_where_the_server_runs(agent, monkeypatch):
