@@ -26,12 +26,14 @@ const noop = () => {};
 const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
   classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
   querySelector: () => null, querySelectorAll: () => [] });
+const clicks = [];
 const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
-  addEventListener: noop, createElement: el };
+  addEventListener: (k, f) => { if (k === "click") clicks.push(f); }, createElement: el };
 global.window = {}; global.document = document;
 global.localStorage = { getItem: () => null, setItem: noop };
 global.matchMedia = () => ({ matches: false });
-global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+const timers = [];
+global.setInterval = noop; global.setTimeout = (f, ms) => timers.push([f, ms]); global.clearTimeout = noop;
 global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
@@ -55,7 +57,23 @@ AO.paintRecent(v, editor, row, dt);
 const painted = { html: row.innerHTML, rowHidden: row.cls.has("hidden"), dtHidden: dt.cls.has("hidden") };
 AO.paintRecent({ dir: "/w/wt", files: [] }, editor, row, dt);
 const emptied = { html: row.innerHTML, rowHidden: row.cls.has("hidden"), dtHidden: dt.cls.has("hidden") };
+// a click on an editor link, through the page's own handlers (TD-535): a recent file's link carries
+// its folder and sends the pair; the Session card's button carries none and sends one launch
+const click = (a) => {
+  const opened = [];
+  const saved = AO.openEditor; AO.openEditor = (...x) => opened.push(x);
+  timers.length = 0;
+  const ev = { target: { closest: (sel) => (sel === "a.editor" ? a : null) }, preventDefault: noop };
+  clicks.forEach((f) => { try { f(ev); } catch (e) {} });
+  timers.splice(0).forEach(([f]) => f());
+  AO.openEditor = saved;
+  return opened;
+};
+const recentClick = click({ href: "vscode://file/w/wt/README.md:1",
+  dataset: { folder: editor.url, label: "VS Code" } });
+const buttonClick = click({ href: editor.url, dataset: { label: "VS Code" } });
 console.log(JSON.stringify({
+  recentClick, buttonClick,
   painted, emptied,
   railHtml: AO.railHtml({ state: "idle" }, true, 0, {}, editor),
   railHtmlNone: AO.railHtml({ state: "idle" }, true, 0, {}, null),
@@ -92,7 +110,10 @@ def test_the_row_draws_the_records_files_newest_first_relative_with_their_marks_
     # **M** only before the one the worktree's porcelain lines hold
     assert rows[0].startswith('<span class="fmark"') and "fmark" not in "".join(rows[1:])
     # a link by the file form at line 1, opened by the `a.editor` handler on a plain click
-    assert 'class="editor" href="vscode://file/w/wt/src/new%20file.py:1" data-label="VS Code"' in rows[0]
+    assert (
+        'class="editor" href="vscode://file/w/wt/src/new%20file.py:1" data-folder="vscode://file/w/wt?windowId=_blank"'
+        ' data-label="VS Code"'
+    ) in rows[0]
     # the absolute path and the edit's time on hover
     assert 'title="/w/wt/src/new file.py — edited 2026-10-10 20:05Z"' in rows[0]
 
@@ -103,6 +124,16 @@ def test_m_reads_the_porcelain_from_the_worktrees_root_when_the_directory_is_bel
     # the record carries no git root, so a root-level `b.py` and the directory's own read alike: only
     # the directory's path below the root is pinned here
     assert re.sub(r"<[^>]+>", "", rows[0]) == "M a.py"
+
+
+@pytest.mark.unit
+def test_a_recent_file_click_sends_the_folder_then_the_file_and_the_cards_button_one_launch():
+    got = _probe()
+    assert got["recentClick"] == [
+        ["vscode://file/w/wt?windowId=_blank", "VS Code"],
+        ["vscode://file/w/wt/README.md:1", "VS Code", True],
+    ]
+    assert got["buttonClick"] == [["vscode://file/w/wt?windowId=_blank", "VS Code"]]
 
 
 @pytest.mark.unit
@@ -174,4 +205,4 @@ def test_focus_draws_the_editor_button_on_the_session_cards_summary_and_not_the_
 @pytest.mark.unit
 def test_the_help_says_file_links_follow_the_session_cards_button():
     text = {h.key: h.text for h in helpmod.HELP}["pane-path"]
-    assert text.endswith("without an editor button on the Session card there are no file links.")
+    assert "without an editor button on the Session card there are no file links." in text

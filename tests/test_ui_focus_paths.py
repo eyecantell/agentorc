@@ -118,15 +118,25 @@ const document = { documentElement: el(), body: el(), querySelector: () => null,
 global.window = {}; global.document = document;
 global.localStorage = { getItem: () => null, setItem: noop };
 global.matchMedia = () => ({ matches: false });
-global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+const timers = [];
+global.setInterval = noop; global.setTimeout = (f, ms) => timers.push([f, ms]); global.clearTimeout = noop;
 global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
+// the pair (TD-535): what opened at the press, the wait asked for, and what opened when it ran
+const pair = (event, editor, resolved, line) => {
+  const opened = [];
+  timers.length = 0;
+  const r = AO.pathLink(event, editor, resolved, line, null, (...a) => opened.push(a));
+  const atPress = opened.slice(), waits = timers.map(([, ms]) => ms);
+  timers.splice(0).forEach(([f]) => f());
+  return { r, atPress, waits, opened };
+};
 const runs = (t) => AO.pathRuns(t).map((r) => [r.run, r.path, r.line, r.col, r.start, r.end]);
 const press = (event, file, resolved, line, col) => {
   const opened = [];
-  const r = AO.pathLink(event, file, resolved, line, col, (...a) => opened.push(a));
+  const r = AO.pathLink(event, { file }, resolved, line, col, (...a) => opened.push(a));
   return { r, opened };
 };
 const FILE = "vscode://file{path}", SSH = "vscode://vscode-remote/ssh-remote+km{path}";
@@ -140,7 +150,7 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
   let fail = false;
   const answer = { "src/agentorc/cli.py": "/r/src/agentorc/cli.py", "build/review": null,
     "scripts/x.py": "/r/scripts/x.py" };
-  const p = AO.pathProvider(term, "ao-x-1", FILE, (r) => { asked.push(r);
+  const p = AO.pathProvider(term, "ao-x-1", { file: FILE }, (r) => { asked.push(r);
     const paths = Object.fromEntries(r.map((k) => [k, answer[k] ?? null]));
     return fail ? Promise.reject(500) : Promise.resolve({ paths }); });
   const shape = (k) => ({ text: k.text, range: k.range, decorations: k.decorations });
@@ -163,12 +173,13 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
   const wide = { buffer: { active: { getLine: () => ({ length: cells.length,
     translateToString: () => "界 a/b.py",
     getCell: (x) => ({ getChars: () => cells[x][0], getWidth: () => cells[x][1] }) }) } } };
-  const wp = AO.pathProvider(wide, "ao-x-1", FILE, (r) => Promise.resolve({ paths: { "a/b.py": "/r/a/b.py" } }));
+  const wp = AO.pathProvider(wide, "ao-x-1", { file: FILE },
+    (r) => Promise.resolve({ paths: { "a/b.py": "/r/a/b.py" } }));
   const wideLinks = await new Promise((res) => wp.provideLinks(1, (l) => res(l.map((k) => k.range))));
   // an answer that lands after a re-attach's clear is not kept: the next hover asks again
   let release;
   const slowAsked = [];
-  const sp = AO.pathProvider(term, "ao-x-1", FILE, (r) => { slowAsked.push(r);
+  const sp = AO.pathProvider(term, "ao-x-1", { file: FILE }, (r) => { slowAsked.push(r);
     return new Promise((res) => { release = () => res({ paths: { "scripts/x.py": "/r/scripts/x.py" } }); }); });
   const pending = new Promise((res) => sp.provideLinks(3, res));
   sp.clear(); release(); await pending;
@@ -194,6 +205,10 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
     tmplQuery: press({ ctrlKey: true }, "vscode://file{path}?windowId=_blank", "/r/a.py", 12, null),
     plain: press({}, FILE, "/r/a.py", 1, null),
     none: press({ ctrlKey: true }, FILE, null, 1, null),
+    pairSsh: pair({ ctrlKey: true }, { url: "vscode://vscode-remote/ssh-remote+km/r?windowId=_blank", label: "VS Code",
+      file: SSH }, "/r/a.py", 12),
+    pairPlain: pair({}, { url: "vscode://file/r?windowId=_blank", label: "VS Code", file: FILE }, "/r/a.py", 12),
+    wait: AO.FOLDER_WAIT,
   }));
 })();
 """
@@ -271,10 +286,25 @@ def test_only_ctrl_or_cmd_opens_and_the_line_rides_on_every_vscode_form():
 
 
 @pytest.mark.unit
+def test_a_press_is_two_launches_the_folder_then_the_file_a_second_after():
+    """§4.6 *The press is two launches* (TD-532, built by TD-535): the folder link exactly as the Session
+    card's button sends it, then after the fixed wait the file form, quietly — one toast for the pair."""
+    got = _probe()
+    p = got["pairSsh"]
+    assert p["r"] is True and got["wait"] == 1000 and p["waits"] == [1000]
+    assert p["atPress"] == [["vscode://vscode-remote/ssh-remote+km/r?windowId=_blank", "VS Code"]]
+    assert p["opened"] == [
+        ["vscode://vscode-remote/ssh-remote+km/r?windowId=_blank", "VS Code"],
+        ["vscode://vscode-remote/ssh-remote+km/r/a.py:12", "VS Code", True],  # quiet: no second toast
+    ]
+    assert got["pairPlain"] == {"r": False, "atPress": [], "waits": [], "opened": []}
+
+
+@pytest.mark.unit
 def test_focus_registers_the_provider_only_where_the_header_draws_its_editor_button():
     js = (UI / "static" / "app.js").read_text()
     focus = js[js.index("AO.focus = function") :]
-    made = "const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor.file) : null;"
+    made = "const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor) : null;"
     assert made in focus and "if (pathLinks) term.registerLinkProvider(pathLinks);" in focus
     # beside the web-links addon, before the attach decides read-only; a re-attach forgets the answers
     assert focus.index("new WebLinksAddon.WebLinksAddon") < focus.index(made) < focus.index("let readOnly = false")

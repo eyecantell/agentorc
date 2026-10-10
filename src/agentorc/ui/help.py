@@ -211,7 +211,9 @@ HELP: tuple[Help, ...] = (
             "Ctrl+click (Cmd+click on a Mac) on a file the session named — `src/x.py:12` — opens it in your "
             "editor, at the line where the editor's link takes one; it underlines only when the file is in the "
             "session's repo, which the host checks when you hover. A plain click or a drag selects, as before; "
-            "without an editor button on the Session card there are no file links."
+            "without an editor button on the Session card there are no file links. It opens the session's folder "
+            "first, so the file lands in the worktree's window; your browser may ask twice until you tell it to "
+            "always allow this site."
         ),
     ),
     Help(
