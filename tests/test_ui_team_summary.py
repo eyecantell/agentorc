@@ -834,6 +834,22 @@ def _script_ages(stamps: list[str]) -> list[str]:
     return json.loads(out.stdout)
 
 
+def test_sync_groups_patches_every_members_lane_count_from_the_groups_payload():
+    """The client half of TD-484: `syncGroups` reads each group's `lanes` and puts each member's count in
+    its card's pill — the old one taken away, the new one put in, an unchanged one left — so a sibling's
+    claim moves this card's count with no delta of its own (TD-513)."""
+    js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
+    body = js[js.index("function syncGroups(gs) {") :]
+    body = body[: body.index("\n  }\n")]
+    block = body[body.index("Object.entries(g.lanes || {}).forEach(([id, html]) => {") :]
+    block = block[: block.index("});")]
+    assert "const pill = $(`#card-${CSS.escape(id)} .r1 .pill`); if (!pill) return;" in block
+    assert 'const old = $(".lanecount", pill);' in block
+    assert "if (old && old.outerHTML === html) return;" in block
+    assert "if (old) old.remove();" in block
+    assert 'if (html) pill.insertAdjacentHTML("beforeend", html);' in block
+
+
 def test_each_member_card_draws_its_own_lane_count_in_its_pill():
     """§4.5a *card: compact* (TD-418, built by TD-428): inside the pill after the word, how many
     entries the member's own lane takes that nobody holds — `n`, or `n/k` where `k` > 1 live records
@@ -885,6 +901,10 @@ def test_each_member_card_draws_its_own_lane_count_in_its_pill():
     assert lanes["g1"] == f'<span class="lanecount k-pickable solid" title="{title}">13/2</span>'
     assert lanes["g2"].endswith(">13/2</span>") and "solid" not in lanes["g2"]
     assert lanes["m1"] == "" and lanes["g0"] == ""  # no lane, ended: the page takes any count away
+    # a group with no summary (*No team*) carries no lanes at all, so the page touches no pill of it
+    loose = member("x1", "idle", lane=grind, team=None)
+    heads = ui.render_heads(ui.team_groups([ui.view(s, [*fleet, loose]) for s in [*fleet, loose]], (), repos))
+    assert next(g["lanes"] for g in heads if "x1" in g["ids"]) == {}
     # out of work but waiting on you: *waiting*, and the count stays soft
     ask = {"id": "m-a", "from": "g1", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?"}
     v = ui.compact_in(ui.view(fleet[0], fleet, waits=ui.waits_of([ask])), fleet, repos)

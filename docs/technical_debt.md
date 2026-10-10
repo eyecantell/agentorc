@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Built — live check of #1439: `ao doctor hooks` once live |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-513 | The client half of TD-484's lane-count patch is pinned by no test: deleting the `syncGroups` block leaves every UI test green | Medium | Open |
 | TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
 | TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
 | TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Built (#1436); live check: no anchor fill after a promote's restart |
@@ -885,22 +884,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-513: The client half of TD-484 — `syncGroups` patching every member's lane count from `g.lanes` — is pinned by no test: the block can go and 604 UI tests pass
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (`syncGroups`, the `Object.entries(g.lanes || {})` block), `tests/test_ui_team_summary.py` (`test_each_member_card_draws_its_own_lane_count_in_its_pill`)
-
-**Why:** The test-audit of #1424. The change has two halves: `render_heads` puts `lanes` on each group, and `app.js` reads `g.lanes` to patch each sibling's pill — the half that makes a sibling's claim move this card's count with no delta of its own. The test added reads only the server half (`ui.render_heads(...)[...]['lanes']`); it never opens `app.js`, though the neighbouring tests of this file do (`(ui.Path(ui.__file__).parent / "static" / "app.js").read_text()`, lines 275, 292, 382, 521; 831 hands the path to a node probe). Probe: the `// each member's lane count (TD-484)` block deleted from `syncGroups`, `pytest -q tests -k ui` — **604 passed**. The TD-484 **Resolved:** line says `syncGroups` patches each pill; nothing asserts it. A second, smaller gap in the same change: the `if g.get("summary") else {}` guard in `render_heads` is replaced by `if True` and `tests/test_ui_team_summary.py tests/test_ui.py` stay at 98 passed, so a group with no summary drawing no `lanes` is unpinned too.
-
-**Fix:** Add a source-reading test beside the file's others that the `app.js` `syncGroups` reads `g.lanes` and removes a stale `.lanecount` / inserts the new one in the pill (or a driven-DOM check where the suite has one), and a case in `render_heads`' test for a group with no summary giving `lanes == {}`. **Done when** both probes in the Why fail a test.
-
-**Related:** TD-484 (#1424), TD-428.
 
 ## TD-514: Two `review_pr` reads in `ui/org.py` — the TDs-in-motion row's PR and the compact line's `→ #N` — are pinned by no test in the suite
 
