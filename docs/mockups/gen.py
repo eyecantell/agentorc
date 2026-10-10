@@ -678,7 +678,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
     line: the next act outlined first (Close session, Take over, or none), the plain ones, more ▾
     at the right with Kill last. Until 2026-09-25 this was one wrapping row, the buttons at its
     tail, which broke over three lines on Paul's screen with the buttons split between two."""
-    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span><span class="badge toggle on" title="a selection in the pane copies itself — yours everywhere (design §4.5a, TD-164); Ctrl+C with a selection and Copy work either way">copy on select</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span>' if editor else ""
+    vs = f'<span class="badge toggle on" title="a selection in the pane copies itself — yours everywhere (design §4.5a, TD-164); Ctrl+C with a selection and Copy work either way">copy on select</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span>' if editor else ""
     return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
@@ -698,10 +698,18 @@ def side_card(title, meta="", body="", open_=True):
     head = f'<div class="side-h"><span class="chev">{chev}</span><span>{title}</span><span style="flex-grow: 1;"></span>{meta}</div>'
     return f'<div class="card" style="padding: 12px;">{head}{body if open_ else ""}</div>'
 
-def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, log, grants, controllers, open_=False):
+def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, log, grants, controllers, open_=False, files=()):
     """The Session card: profile, ids, times, mode, the stops control when no time is set, run log,
     and the grants and controllers chips the header carried until TD-156 — read at a session's
-    start and rarely pressed after, so it is last and folded, its summary the profile."""
+    start and rarely pressed after, so it is last and folded, its summary the profile — and, at the
+    summary's right, the editor button (TD-525: the one place Focus draws it, seen folded), above the
+    run's **recent files**, each a file link as the pane's, **M** while the worktree holds it changed."""
+    recent = "".join(
+        f'<div style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; color: #065f46; font-weight: 600;">{"M" if m else ""}</span>'
+        f'<a href="#" class="mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{full} — edited {at}; click opens it in your editor at the top (design §4.5a, TD-525)">{rel}</a></div>'
+        for rel, full, at, m in files)
+    recent_row = (f'<dt title="the files this session edited in this run, newest first, from its tool hook (design §4.5a, TD-525)">recent files</dt>'
+                  f'<dd style="display: flex; flex-direction: column; gap: 3px; line-height: 1.5; min-width: 0;">{recent}</dd>') if files else ""
     body = f'''<dl class="kv" style="margin: 10px 0 0;">
         <dt>profile</dt><dd class="mono" style="font-size: 12px;">{profile} · <span title="the context reading: the last call's input and cache tokens, from the transcript (design §6 rule 5, TD-188)">context 212k of 1M · bound 200k</span></dd>
         <dt>adapter id</dt><dd class="mono" style="font-size: 12px;">{adapter_id}</dd>
@@ -711,11 +719,14 @@ def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, lo
         <dt>mode</dt><dd>{mode}</dd>
         <dt>stops</dt><dd><span class="badge" title="click to set or change it, empty to clear">{stops}</span></dd>
         <dt>run log</dt><dd><a href="#">{log}</a></dd>
+        {recent_row}
         <dt>rounds</dt><dd class="mono" style="font-size: 12px;" title="the session's round log (ao log), display only (design §4.8, TD-175)">20:14 round 41: two claims re-checked · 20:02 round 40: #811 in review</dd>
         <dt>grants</dt><dd><span class="badge" title="capabilities: click to grant or revoke (design §4.8)">{grants}</span></dd>
         <dt>controllers</dt><dd><span class="badge" title="the sessions that may act on this one; + adds one">{controllers}</span> <span class="btn sm ghost">+</span></dd>
       </dl>'''
-    return side_card("Session", f'<span class="meta" style="font-size: 12px;">{profile} · <span title="the context reading, from the transcript (design §6 rule 5, TD-188)">context 212k of 1M</span></span>', body, open_=open_)
+    summary = (f'<span class="meta" style="font-size: 12px;">{profile} · <span title="the context reading, from the transcript (design §6 rule 5, TD-188)">context 212k of 1M</span></span>'
+               f'<span class="btn sm link" style="margin-left: 8px;" title="opens the worktree in your editor — the editor button, here and on the card (design §4.5a, TD-525); a file link below opens into this window">{ICON["code"]}VS Code</span>')
+    return side_card("Session", summary, body, open_=open_)
 
 PUT_AWAY = ('<div style="display: flex; justify-content: flex-end;"><span class="btn sm ghost" style="height: 22px; padding: 0 6px;" '
             'title="Put the panel away — the terminal takes its width (s); remembered in this browser (design §4.5a, TD-408)">» put away</span></div>')
@@ -737,6 +748,7 @@ def focus_rail():
     {glyph("✎", "Working: TD-301: pushing the branch for review · 14s ago")}
     {glyph("3", "Reports: 1/3 done · 2 filed — press to bring the panel back with Reports open")}
     {glyph("2", "Inbox: 2 unread — press to bring the panel back with Inbox open", "#1f5fa8", "#e8f0fb")}
+    {glyph("‹›", "VS Code — opens the worktree in your editor, as the Session card's button does (design §4.5a, TD-525)")}
     <span class="note" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; margin-top: 6px;">side panel put away · the terminal has its 320px</span>
   </div>
 '''
@@ -794,7 +806,7 @@ def focus():
       <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
     </div>
     {side_card("Ready to close", '<span class="btn sm" style="opacity: .5;">Close</span>', "", open_=False)}
-    {focus_session_card("claude-code · grind (pro) · sonnet", "1c8e0b2f…f42a", "ao-samscrape-tdgrind-1", "2026-09-04 20:02 MDT · 3h 14m", "14 s ago", "unattended", "stops 06:00", "tdgrind-1-20260904.log · 1.2 MB", "none", "under orc-1 ×")}
+    {focus_session_card("claude-code · grind (pro) · sonnet", "1c8e0b2f…f42a", "ao-samscrape-tdgrind-1", "2026-09-04 20:02 MDT · 3h 14m", "14 s ago", "unattended", "stops 06:00", "tdgrind-1-20260904.log · 1.2 MB", "none", "under orc-1 ×", open_=True, files=(("scripts/recover_stuck_notices.py", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/scripts/recover_stuck_notices.py", "20:11", True), ("tests/test_scripts/test_recover_stuck_notices.py", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/tests/test_scripts/test_recover_stuck_notices.py", "20:09", True), ("docs/technical_debt.md", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/docs/technical_debt.md", "19:52", False)))}
   </div>
 </div>
 </div>
