@@ -79,6 +79,7 @@ from sessionorc.gitinfo import git_info, work_left
 from sessionorc.models import (
     PERSON,
     PR_CLOSED,
+    RECENT_FILES,
     SYSTEM,
     Pending,
     Session,
@@ -3659,6 +3660,9 @@ class TickMixin:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
+        if isinstance(f := event.get("file"), str) and f and not stale:
+            # a main-thread edit's path (§4.2, TD-527): to the top of `files`, once, the newest twenty
+            s.files = [{"path": f, "at": now_iso()}, *(x for x in s.files if x.get("path") != f)][:RECENT_FILES]
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
             # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
             # typed by the tick, or a person's or a manager's send that cures *brief not sent*

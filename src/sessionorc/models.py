@@ -80,6 +80,7 @@ NODE_OWNED = frozenset(
         "model",
         "context",
         "subagents",
+        "files",
         "wrapup_sent_at",
         "gated",
         "wrapup_at",
@@ -697,6 +698,9 @@ def normalize_ref(ref: str) -> str:
 # has filed, and whether it is still this lead's to act on.
 WAKE_FIELDS = ("state", "exit_code")
 
+# How many edited files a record keeps (design §4.2, TD-527): the newest twenty.
+RECENT_FILES = 20
+
 
 def wake_digest(session: dict[str, Any]) -> str:
     """A stable string for the parts of a record a lead is waiting on.
@@ -923,6 +927,10 @@ class Session:
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
+    # The files this run edited (design §4.2, TD-527): `{path, at}` from a main-thread edit's tool hook,
+    # newest first, a path once, at most `RECENT_FILES` — the Focus Session card's recent files. Empty
+    # on a new record, so a restart starts over. Observed where the hook lands, so the node's.
+    files: list[dict[str, Any]] = field(default_factory=list)
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
