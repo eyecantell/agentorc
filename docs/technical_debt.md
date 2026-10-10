@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Built — live check of #1439: `ao doctor hooks` once live |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
 | TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Built (#1436); live check: no anchor fill after a promote's restart |
 
 ---
@@ -880,22 +879,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-515: `pill_title`'s order — a *waiting* pill's reason before a seat and the ending, a host note before all — is asserted in no case that holds two of its inputs
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/cards.py` (`pill_title`), `tests/test_exit_words.py` (`test_the_pill_hover_takes_the_first_that_applies`)
-
-**Why:** The test-audit of #1423 (TD-511). The test's docstring says §4.5a's order is *an unreachable host's reason, a waiting pill's reason, a seat on call, then the ending*, and its comment says the waiting reason and the seat are read *before the ending*. The cases it adds each hold one input (`{state_class: waiting, ...}` alone; `seat` alone), except `seat` with an ending and `host_note` with `seat`. Probes, `pytest -q tests/test_exit_words.py tests/test_ui_org.py`: the `waiting` branch moved below the `seat` and `ending` branches — **57 passed**; the `host_note` branch moved below the `waiting` branch — **9 passed**. So the order of a waiting pill against a seat, an ending and a host note is stated and asserted nowhere.
-
-**Fix:** Add cases holding two inputs: `{host_note, state_class: waiting}` gives the host note; `{state_class: waiting, seat: True}` and `{state_class: waiting}` with an ending give the waiting reason (or, if the design says a seat wins, the test says so and §4.5a is read first). **Done when** both probes fail a test.
-
-**Related:** TD-511 (#1423), TD-490.
 
 ## TD-516: Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new
 
