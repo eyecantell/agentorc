@@ -45,6 +45,7 @@ READS = frozenset(
         "log_tail",
         "explain",
         "transcript",
+        "paths",
         "occupancy",
         "name_check",
         "recent_dirs",

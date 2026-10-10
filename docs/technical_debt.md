@@ -868,7 +868,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (the designer, TD-493's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — the host agent's `paths` read (the RPC, its bounds, `NODE_READS`, `identity.READS`) is built in PR #1429 (grinder-ao-1, 2026-10-09). The UI half is left: `editor.file`, the route, the provider, the help paragraph and the mockup shot, all under `src/agentorc/`.
 **Location:** design §4.6 *A path in the pane is a link*, §4.5a *Focus pane: a path is a link*, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`), §5 `person.open_in`; `src/sessionorc/agent_common.py` (`NODE_READS`), the host agent's read methods beside `transcript` (`src/sessionorc/agent.py`, `agent_serve.py`, `agent_link.py`'s `read` allowlist), `src/agentorc/ui/app.py` (the Focus route's `editor`, a `/api/sessions/<id>/paths` route forwarding to the RPC), `src/agentorc/ui/uiconf.py` / `common.py` (`editor_link`'s file form), `src/agentorc/ui/static/app.js` (`AO.focus`: `term.registerLinkProvider(...)` beside the web-links `loadAddon`; `AO.pathRuns`, `AO.pathLink`), `src/agentorc/ui/help.py` (the paragraph), `tests/test_agent*.py`, `tests/test_ui_focus*.py`, `tests/test_help.py`
 
 **Why:** TD-493: Paul, 2026-10-09 — a file the session names (`src/agentorc/cli.py:364`) is copied by hand; the design makes it the editor button pointed at the file, only where the host says the file is there.
