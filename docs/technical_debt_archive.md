@@ -8939,3 +8939,17 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Fix:** in the narrow mode `.focus .main` takes the page's width (`align-self: stretch`, or `align-items: stretch` on the column) and the terminal fits to it; a check on a scratch home at 600px wide that `.main`'s width is the page's and `document.body.scrollWidth` the viewport's. **Done when** Focus at 600px wide has no sideways scroll and its terminal's columns fit the width.
 
 **Related:** TD-003 (the phone layout), TD-500 (where it was met).
+
+## TD-420: The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums
+
+**Priority:** Low
+**Added:** 2026-10-08 (ao-paul, a UI/UX review with Paul, split from TD-418)
+**Owner:** grinder
+**Kind:** evaluation
+**Status:** Resolved
+**Resolved:** 2026-10-10 (PR #1458, grinder-ao-2) — moot since TD-418, built by TD-428 slice 2 (#1342): with one team live the rollup draws Agents and Needs you alone, and that team's own facets say PRs in motion, so the two numbers this entry compared are no longer drawn side by side (`org.rollup`'s `lone`, `rollup.html`'s `{% if not ro.lone %}`; `tests/test_ui_team_summary.py::test_the_rollup_with_zero_one_and_two_live_teams` asserts no *PRs in motion* in the one-team rollup). With two or more live teams the rollup sums the distinct repos of every live team (`org.rollup`, a shared repo counted once), as §4.5a *Org: rollup* says, so it reads more than any one team's facet by the other repos' PRs — most likely the 93 / 85 of 2026-10-08, which fell to 84 / 83 in both once one team was live. Nothing to build.
+**Location:** `src/agentorc/ui/templates/rollup.html` (`ro.prs`), the rollup's builder in `src/agentorc/ui/app.py`; `team_summary.html`'s pull requests block; design §4.5a *Org: rollup*
+
+**Why:** Paul's screenshot of 2026-10-08: the rollup's PRs in motion read 93 opened / 92 closed for the day while ao-grind's repo facet, the only live team's, read 85 / 85. A later capture the same evening read 84 / 83 in both. §4.5a says the rollup sums over every live team; with one live team the two should agree, or the page should say what else is counted (another repo, a stopped team's, a different window edge).
+
+**Fix:** find what the rollup sums that the facet does not (read both builders against §4.5a), then either make them agree or label the rollup's scope on the page. **Done when** the two numbers agree with one live team, or the difference is named where it is shown.
