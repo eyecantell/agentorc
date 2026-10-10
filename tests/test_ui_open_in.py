@@ -5,6 +5,8 @@ the default drawn); `ui.yml` is retired and named as *migrate*."""
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 import yaml
 
@@ -50,6 +52,25 @@ def test_a_template_fills_path_and_remote_and_its_label_is_the_persons(home):
     assert link == {"label": "Zed <x>", "url": "zed://ssh/km/r/a%20b"}  # the template escapes the label
     # a template names no container: a container node's record draws no button under it
     assert uiconf.editor_link("", local=False, remote="km", reach="vscode://vscode-remote/x") is None
+
+
+def test_a_folder_drops_a_templates_line_with_the_colon_before_it(home):
+    """§5 `person.open_in` (TD-528, built by TD-529): `{line}` is the file form's; a folder form drops
+    it with the one `:` before it, or bare where no `:` is there, and the file form still fills it."""
+    write(home, "open_in: {label: Zed, url: 'zed://ssh/{remote}{path}:{line}'}\n")
+    assert uiconf.editor_link("/r/d", local=False, remote="km")["url"] == "zed://ssh/km/r/d"
+    assert uiconf.editor_file(local=False, remote="km") == "zed://ssh/km{path}:{line}"  # the page fills it
+    write(home, "open_in: {label: X, url: 'x://open?dir={path}&l={line}'}\n")
+    assert uiconf.editor_link("/r/d", local=False, remote="km")["url"] == "x://open?dir=/r/d&l="
+    write(home, "open_in: {label: Zed, url: 'zed://ssh/{remote}{path}'}\n")
+    assert uiconf.editor_link("/r/d", local=False, remote="km")["url"] == "zed://ssh/km/r/d"
+
+
+def test_the_settings_url_note_names_line():
+    html = (pathlib.Path(uiconf.__file__).parent / "templates" / "settings.html").read_text()
+    note = html[html.index('name="url"') :]
+    note = note[: note.index("</label>")]
+    assert '<span class="mono">{line}</span> the line, on a file link; a folder drops it with the' in note
 
 
 @pytest.mark.parametrize(

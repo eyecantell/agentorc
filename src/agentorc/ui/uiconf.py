@@ -172,7 +172,9 @@ def editor_link(directory: str, *, local: bool, remote: str, reach: str = "") ->
     # percent-encoded, `/` kept so the path reads as a path (TD-011)
     path = quote(directory, safe="/")
     if o.kind == "template":
-        return {"label": o.label, "url": o.url.replace("{path}", path).replace("{remote}", remote)}
+        # `{line}` is the file form's: a folder drops it with the one `:` before it (§5, TD-528)
+        url = o.url.replace(":{line}", "").replace("{line}", "")
+        return {"label": o.label, "url": url.replace("{path}", path).replace("{remote}", remote)}
     return {"label": "VS Code", "url": vscode_link(directory, local=local, remote=remote)}
 
 
