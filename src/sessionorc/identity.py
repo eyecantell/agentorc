@@ -14,7 +14,9 @@ are refused, and that a forgery is shown.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import threading
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -163,13 +165,74 @@ class Channel:
 OUTSIDE = Channel("outside")
 
 
+TMUX_UNIT = "agentorc-tmux.service"  # the installed home's tmux server, a system unit (design §4.1, TD-488)
+
+
+def server_placement(cgroup: str | None) -> str | None:
+    """Where the tmux server runs (design §4.1, TD-495): `system` in its own system unit
+    (`…/agentorc-tmux.service`), `user` anywhere under the user manager (`user@<uid>.service`, where
+    one stop of `systemd --user` ends every session — a warning), `none` elsewhere (a dev run, a
+    container, a scratch home's server started from a shell); None with no server or no reading."""
+    if not cgroup:
+        return None
+    parts = cgroup.rstrip("/").split("/")
+    if parts[-1] == TMUX_UNIT:
+        return "system"
+    if any(p.startswith("user@") and p.endswith(".service") for p in parts):
+        return "user"
+    return "none"
+
+
+def pane_cgroup(root: str | os.PathLike[str], server: str, name: str, pid: int, live: Collection[str]) -> str | None:
+    """Give a pane a cgroup of its own under the server's delegated one (design §4.8a, the fourth
+    signal; TD-495): `<root><server>/pane-<name>`, the pane's pid written to its `cgroup.procs`, so
+    what the pane starts inherits it as a `tmux-spawn-*.scope` would give it. First the empty
+    `pane-*` directories `live` (the tmux sessions now listed) no longer names are removed. Any
+    failure leaves nothing made — the pane keeps the server's cgroup — and returns None. One call at a
+    time (`_PANE_CGROUP`): creates run in threads, and one's sweep must not take another's directory
+    between its `mkdir` and its write."""
+    with _PANE_CGROUP:
+        return _pane_cgroup(os.fspath(root), server, name, pid, live)
+
+
+_PANE_CGROUP = threading.Lock()
+
+
+def _pane_cgroup(root: str, server: str, name: str, pid: int, live: Collection[str]) -> str | None:
+    base = os.path.join(root, server.strip("/"))
+    try:
+        for old in os.listdir(base):
+            if old.startswith("pane-") and old[5:] not in live and old[5:] != name:
+                with contextlib.suppress(OSError):  # an empty one only: a live process refuses it
+                    os.rmdir(os.path.join(base, old))
+    except OSError:
+        return None
+    path = os.path.join(base, f"pane-{name}")
+    made = False
+    try:
+        if not os.path.isdir(path):
+            os.mkdir(path)
+            made = True
+        with open(os.path.join(path, "cgroup.procs"), "w", encoding="ascii") as f:
+            f.write(f"{int(pid)}\n")
+    except (OSError, ValueError):
+        if made:
+            with contextlib.suppress(OSError):
+                os.rmdir(path)
+        return None
+    return "/" + os.path.relpath(path, root)
+
+
 def detached_check(reader: ProcReader, *, agent_pid: int, tmux_pid: int | None) -> str | None:
     """The cgroup a detached process would still be in — or None when the check is **off**.
 
-    On only when the tmux server's cgroup is the agent's own, that path is a systemd `.service`,
-    **and the agent is that service's own process — started by systemd itself** (the installed
-    case: `KillMode=process` keeps the tmux server, and every pane, inside `agentorc-agent.service`).
-    The last condition is what CI taught on the first push of this module: a test runner is often
+    On only when the tmux server's cgroup is a systemd `.service` whose own process is either **the
+    server itself** — the system unit, `agentorc-tmux.service`, the server's parent systemd (§4.1,
+    TD-495) — or **the agent**: the server's cgroup is the agent's own and the agent was started by
+    systemd itself (the user units: `KillMode=process` keeps the tmux server, and every pane, inside
+    `agentorc-agent.service`). The unit's name is asked as well as the parent, because a server that
+    daemonised inside a test runner's `.service` is reparented to init too.
+    The agent's parent condition is what CI taught on the first push of this module: a test runner is often
     inside *some* `.service` together with the person standing in it, and so is any agent a worker
     starts from inside an `ao` pane — there the cgroup tells nobody apart, and with the check on
     the person read as *unknown*. A tmux server that predates the unit, a dev run from a shell, a
@@ -178,6 +241,8 @@ def detached_check(reader: ProcReader, *, agent_pid: int, tmux_pid: int | None) 
     if not tmux_pid:
         return None
     mine, theirs = reader.cgroup(agent_pid), reader.cgroup(tmux_pid)
+    if server_placement(theirs) == "system" and (srv := reader.stat(tmux_pid)) and reader.comm(srv.ppid) == "systemd":
+        return theirs
     if not mine or mine != theirs or not mine.rstrip("/").endswith(".service"):
         return None
     me = reader.stat(agent_pid)
