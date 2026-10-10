@@ -116,6 +116,20 @@ def filled_for(cause: dict[str, Any] | None) -> str | None:
     return f"{FILLED_FOR}{cause['by']}" + (f" — {what}" if what else "")
 
 
+def _carry_live(reading: dict[str, Any], old: dict[str, Any]) -> None:
+    """A live check in `reading` takes the `live` the same id held in `old`, the checkout's last
+    reading, when the live commit is unknown (`_read_repos`, TD-516); one `old` does not hold keeps
+    the `no` it was read with."""
+    was = {
+        str(e.get("id")): e["live"]
+        for e in (old.get("ledger") or {}).get("entries") or []
+        if isinstance(e, dict) and e.get("kind") == "live-check" and e.get("live") in ("yes", "no")
+    }
+    for e in (reading.get("ledger") or {}).get("entries") or []:
+        if isinstance(e, dict) and e.get("kind") == "live-check" and str(e.get("id")) in was:
+            e["live"] = was[str(e.get("id"))]
+
+
 class TickMixin:
     # -- reconcile -------------------------------------------------------------------------------
     #
@@ -2598,7 +2612,7 @@ class TickMixin:
             prev = {r: self._repos.get(r) or {} for r in todo}
             # a checkout read for the first time gets the whole reading at once, not in five minutes
             full = {r for r in todo if due or r not in self._repos}
-            live = self._live_commits()
+            live = self._live_commits() if self._promotes_read else None  # None: unknown (TD-516)
             got = await asyncio.to_thread(self._read_repos, todo, prev, full, roots, live) if todo else {}
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
@@ -2794,7 +2808,10 @@ class TickMixin:
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
         the rest carried from `prev`. One checkout's read that raises keeps its last reading with
         the error beside it and never costs the others theirs. `live` is `_live_commits`: a live
-        check's build is read against its repo's (§4.9b)."""
+        check's build is read against its repo's (§4.9b). `None` — no promote reading since the
+        host agent started — is unknown, not *not live*: each live check keeps the `live` its last
+        reading gave it (§6 rule 6, TD-516), so a restart never takes one out of a lane and brings
+        it back as new."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
@@ -2807,6 +2824,8 @@ class TickMixin:
             try:
                 reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
                 out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote, resolve, reader)
+                if live is None:  # no promote reading yet since the start: unknown is not *not live* (TD-516)
+                    _carry_live(out[root], old)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
                 log.exception("reading the repo facts of %s failed", root)
                 why = f"the read failed: {type(e).__name__}"

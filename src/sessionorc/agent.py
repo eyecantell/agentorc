@@ -658,6 +658,8 @@ class HostAgent(
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}
+        # Until the first pass lands, a live check's `live` is unknown, not *not live* (TD-516).
+        self._promotes_read = False
         # An attachment's upload in pieces (§4.4 *Attachment drop*, TD-478): its id → the session,
         # the `.part`, the name and the file's `total`. In memory: a restart drops it, and the hour's
         # sweep the `.part` it leaves.

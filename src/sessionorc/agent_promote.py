@@ -51,6 +51,7 @@ class PromoteMixin:
                     log.warning("promote: skipping %s: %s", root, why)
             self._promote_bad = bad
             self._promotes = readings
+            self._promotes_read = True
             for text in notes:
                 log.info("promote: %s", text)
                 self._system_note(PERSON, text)

@@ -109,3 +109,63 @@ def test_the_repo_facts_carry_live_from_the_promote_reading(tmp_path, monkeypatc
 
     assert Home()._live_commits() == {"r": sha}, "a reading that carries live_why names no live commit"
     assert ledger.lane_matches(["free-pick"], got[str(root)]["ledger"]["entries"][0])
+
+
+def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
+    """TD-516, §6 rule 6 *Unknown is not* not live: before the promote's first reading since a start
+    (`_read_repos` given `live=None`), a live check keeps the `live` its checkout's last reading gave
+    it, so the anchor's `lane_seen` neither loses it nor is told it again when the survey lands; a
+    known reading (`{}` — no live commit for the repo) still reads `no`, and a live check the last
+    reading did not hold reads `no` until the promote is known."""
+    from sessionorc import work
+    from sessionorc.agent_tick import TickMixin
+    from sessionorc.models import Session
+
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    _git(root, "init", "-q", "-b", "main")
+    text = _ledger("live-check #5", owner="anchor") + (
+        "\n## TD-002: a check after the restart\n\n**Priority:** High\n**Owner:** anchor\n"
+        "**Kind:** live-check #5\n**Status:** Built\n"
+    )
+    (root / "docs" / "technical_debt.md").write_text(_ledger("live-check #5", owner="anchor"))
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "the build (#5)")
+    _git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    sha = _git(root, "rev-parse", "HEAD").strip()
+    r = str(root)
+
+    def live_of(reading: dict) -> dict:
+        return {e["id"]: e["live"] for e in reading[r]["ledger"]["entries"]}
+
+    before = TickMixin._read_repos([r], {}, {r}, None, {"r": sha})  # the reading saved before the restart
+    assert live_of(before) == {"TD-001": "yes"}
+    seat = Session(
+        id="ao-r-anchor", name="anchor", kind="interactive", adapter="shell", dir=r, lane=["anchor"],
+        lane_seen={"at": "x", "ids": ["TD-001"]},
+    )  # fmt: skip
+    (root / "docs" / "technical_debt.md").write_text(text)  # an entry added while the agent was down
+    restarted = TickMixin._read_repos([r], before, {r}, None, None)  # `_promotes` empty: unknown
+    assert live_of(restarted) == {"TD-001": "yes", "TD-002": "no"}
+    seen, new = work.reread(seat, restarted[r]["ledger"]["entries"])
+    assert seen is seat.lane_seen and new == [], "nothing pruned, nothing new"
+    surveyed = TickMixin._read_repos([r], restarted, {r}, None, {"r": sha})  # the survey lands
+    assert live_of(surveyed) == {"TD-001": "yes", "TD-002": "yes"}
+    seen, new = work.reread(seat, surveyed[r]["ledger"]["entries"])
+    assert new == ["TD-002"], "the one entry the lane gained is told, once; TD-001 is not"
+    # known with no live commit for the repo is *not live*, as before
+    assert live_of(TickMixin._read_repos([r], before, {r}, None, {})) == {"TD-001": "no", "TD-002": "no"}
+
+
+async def test_the_promote_reading_turns_unknown_into_known(agent, monkeypatch):
+    """The host agent's flag: unknown from the start until the promote pass assigns its readings (the
+    fixture's agent has ticked already, so the start is put back by hand)."""
+    from sessionorc import promote as promote_mod
+    from sessionorc.agent import HostAgent
+
+    assert HostAgent(tmux=agent.tmux)._promotes_read is False  # a start knows no live commit
+    agent._promotes_read, agent._promote_read_at = False, float("-inf")
+    monkeypatch.setattr(promote_mod, "survey", lambda *a, **k: ({}, [], {}))
+    monkeypatch.setattr(promote_mod, "pulls", lambda *a, **k: ({}, None))
+    await agent._refresh_promotes()
+    assert agent._promotes_read is True
