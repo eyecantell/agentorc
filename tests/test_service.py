@@ -223,6 +223,14 @@ def test_ao_service_install_prints_the_root_line_only_when_staged(tmp_path, monk
     assert "root's to install" in capsys.readouterr().err
 
 
+def test_the_watch_reads_as_not_loaded_on_a_host_without_systemd(monkeypatch):
+    def missing(argv, **kw):
+        raise FileNotFoundError("systemctl")
+
+    monkeypatch.setattr(service.subprocess, "run", missing)
+    assert service.watch_reading() == {"loaded": False}
+
+
 def test_status_names_the_watch_timer(monkeypatch):
     class Out:
         def __init__(self, stdout):

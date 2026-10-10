@@ -4,6 +4,7 @@ fake socket (answering or silent), a fake `systemctl` and a fake clock through `
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -106,6 +107,58 @@ def test_a_broken_state_file_starts_afresh(home):
     (home / "watch.json").write_text("{not json")
     assert drive(home, [(0, False, False)]) == [[]]
     assert json.loads((home / "watch.json").read_text())["silent_since"] == T0.isoformat()
+
+
+def test_a_state_file_that_is_not_a_mapping_starts_afresh(home):
+    home.mkdir()
+    (home / "watch.json").write_text("[1, 2]")
+    assert drive(home, [(0, False, False)]) == [[]]
+    assert json.loads((home / "watch.json").read_text())["silent_since"] == T0.isoformat()
+
+
+def test_a_sent_line_is_logged_and_a_child_that_cannot_run_is_a_log_line(monkeypatch):
+    class Sent:
+        returncode, stdout, stderr = 0, "", ""
+
+    logged: list[str] = []
+    monkeypatch.setattr(watch.subprocess, "run", lambda argv, **kw: Sent())
+    watch.tell("agentorc · a line", "a/b", logged.append)
+    assert logged == ["told: agentorc · a line"]
+    for err in (FileNotFoundError("doppler"), subprocess.TimeoutExpired("doppler", 10)):
+
+        def fail(argv, err=err, **kw):
+            raise err
+
+        monkeypatch.setattr(watch.subprocess, "run", fail)
+        logged.clear()
+        watch.tell("agentorc · a line", "a/b", logged.append)
+        assert logged == [f"send failed: {type(err).__name__}"]
+
+
+def test_main_wires_the_switch_the_host_and_the_home(monkeypatch, tmp_path):
+    """The run the system timer makes: the manager it started told, through the child with the
+    switch's secrets, in the host's name, and the state kept under the home."""
+    from sessionorc import hosts, settings
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "ao"))
+    monkeypatch.setattr(watch, "manager_started", lambda: True)
+    monkeypatch.setattr(watch, "ask", lambda: False)
+    monkeypatch.setattr(settings, "telegram", lambda doc: {"secrets": "a/b", "link": ""})
+    monkeypatch.setattr(hosts, "local_host", lambda: hosts.Host(name="kmaster", vscode_host="kmaster"))
+
+    class Sent:
+        returncode, stdout, stderr = 0, "", ""
+
+    sent = []
+    monkeypatch.setattr(watch.subprocess, "run", lambda argv, **kw: sent.append((argv, kw["input"])) or Sent())
+    assert watch.main() == 0
+    assert len(sent) == 1
+    argv, line = sent[0]
+    assert argv[:6] == ["doppler", "run", "--project", "a", "--config", "b"]
+    assert line.startswith("agentorc · kmaster's user manager was stopped; started again at ")
+    state = json.loads((tmp_path / "ao" / "watch.json").read_text())
+    assert state["told"] == ["manager"] and state["manager_started_at"]
+    assert (tmp_path / "ao" / "watch.log").read_text().endswith(f"told: {line}\n")
 
 
 def fake_systemctl(entered, began):
