@@ -62,6 +62,10 @@
          when on hover; always in the page and hidden until true, kept current from the delta. #}
       <span class="badge bc{% if not s.brief_changed %} hidden{% endif %}" id="fbc"
             title="{{ (s.brief_changed or {}).full }}">brief changed</span>
+      {# design §4.5a **restarted** chip (TD-485, TD-487): beside *brief changed*, `ao status -v`'s
+         words; hidden until the record holds a restart inside the window, kept current from the delta #}
+      <span class="badge restarted{% if not s.restarted %} hidden{% endif %}" id="frestarted" data-until="{{ (s.restarted or {}).until }}"
+            title="{{ (s.restarted or {}).hover }}">{{ (s.restarted or {}).text }}</span>
       {# design §4.5a **paused · usage** (§6 *Usage gate*, TD-100): shown regardless of what else
          the slot holds, and not pressable — the way out is Take over, or a lower reserve. Always in
          the page and hidden until true, kept current from the pushed delta as the two above are. #}

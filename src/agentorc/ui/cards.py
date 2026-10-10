@@ -13,11 +13,11 @@ from typing import Any
 
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig
-from agentorc.ending import NO_CLOSER, closer_words, ending_hover, exit_words, waiting_words
+from agentorc.ending import NO_CLOSER, closer_words, ending_hover, exit_words, restart_words, waiting_words
 from agentorc.org import ANCHOR_WHEN, MANAGER_WHEN
 from sessionorc import hosts, identity, mail, naming, work
 from sessionorc.adapters import short_model
-from sessionorc.agent_common import CLOSED_KEEP
+from sessionorc.agent_common import CLOSED_KEEP, RESTART_CEILING, RESTART_WINDOW, _counted
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
@@ -353,6 +353,9 @@ def view(
     # same thing to happen next, and nothing will. What made it early is the home's reading too
     # (§4.9a *Early is decided from the record*, TD-249 slice 6): `repeat`, the entry a run reported
     # again or left a third time, and `decided`, the words — nothing here reads a clock.
+    # design §4.5a **restarted** chip (§6 *Keeping a team running*, TD-485, built by TD-487): where this
+    # run came from — never on a seat, which ends and is filled by design
+    d["restarted"] = None if s.get("seat") or s.get("id") in seats else restarted_view(s.get("restarts"), now)
     rw = s.get("restart_wanted")
     rw = rw if isinstance(rw, dict) else {}
     d["restart_wanted"] = (
@@ -628,6 +631,37 @@ def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
     if node and s.get("relaunch") and s.get("state") == "idle":
         return {"text": NODE_RESTART, "full": f"{NODE_RESTART}: the tick does not restart a member on a node"}
     return None
+
+
+def restarted_view(restarts: Any, now: datetime) -> dict[str, str] | None:
+    """The **restarted** chip (design §4.5a, TD-485, TD-487): the `restarts` entries younger than
+    `RESTART_WINDOW` whose `why` is a restart — every one but `start`, a scheduled start's own create,
+    and `fill`, a seat's. `text` is the Focus header's, *restarted ·* and the newest entry in
+    `ending.restart_words`' words, as `ao status -v` says it; `short` the card's, the why's words alone
+    (*restarted · cache lapsed*); `hover` every entry in the window, newest first, in the full words
+    with its age, and the count toward the ceiling by the ceiling's own rule (*2 of 3 in 2 h*); `until`
+    when the window passes the newest entry, so the chip and the ceiling keep one clock. None when no
+    entry is one; a malformed entry is passed over."""
+    entries = [r for r in restarts if isinstance(r, dict)] if isinstance(restarts, list) else []
+    window = []
+    for r in entries:
+        at = _instant(r.get("at"))
+        if at is not None and now - at < RESTART_WINDOW and r.get("why") not in ("start", "fill"):
+            window.append((at, r))
+    if not window:
+        return None
+    window.sort(key=lambda p: p[0], reverse=True)
+    newest = window[0][1]
+    short = "cache lapsed" if newest.get("why") == "cache" else str(newest.get("why") or "") or "restarted"
+    hours = round(RESTART_WINDOW.total_seconds() / 3600)
+    lines = [f"{restart_words(r)}, {_age(r.get('at'), now)} ago" for _, r in window]
+    lines.append(f"{len(_counted(entries, now))} of {RESTART_CEILING} in {hours} h")
+    return {
+        "short": f"restarted · {short}",
+        "text": f"restarted · {restart_words(newest)}",
+        "hover": "\n".join(lines),
+        "until": (window[0][0] + RESTART_WINDOW).isoformat(),  # the page hides it then, delta or not
+    }
 
 
 def brief_changed_view(bc: Any) -> dict[str, str] | None:
