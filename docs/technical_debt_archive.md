@@ -8607,3 +8607,39 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-494 (#1428), TD-493.
 
 **Resolved:** 2026-10-10 (PR #1443) — `tests/test_ui_focus_links.py::test_a_row_is_joined_only_below_a_full_row_and_only_when_it_begins_with_a_url_character` reads three new `CUT_PROBE` screens (a URL ending a row that is not full, a full row ending in a written space, an indented URL under a full row); each of the three probes in the Why now fails it, and the fourth condition still fails `test_two_rows_that_merely_meet_at_the_width_stay_two`.
+
+## TD-517: `rpc_paths` realpaths its roots and no test puts a symlink there: the line can go and `test_paths_rpc.py` stays green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`_resolve_paths`, the `real_roots = [Path(os.path.realpath(r)) for r in roots]` line), `tests/test_paths_rpc.py`
+
+**Why:** The test-audit of #1429 (TD-501). `_resolve_paths` compares each run's `realpath` with `is_relative_to` the roots' `realpath`s: a record whose `dir` is itself reached through a symlink (a home or a worktree path that is a link) has a resolved run that is not under the unresolved root, so every file reads as `None` and no pane path is a link. The tests' `checkout()` builds `tmp_path/repo/...` with no link in the root's own path, so the line is never exercised. Probe: `real_roots = [Path(r) for r in roots]` in `src/sessionorc/agent.py`, `pytest -q tests/test_paths_rpc.py` — **passes**. The docstring says *the real path of the record's `dir` or of its `repo`*; nothing asserts it.
+
+**Fix:** Add a case to `test_a_run_answers_only_as_a_regular_file_inside_the_checkout` (or beside it): `dir` given as a path through a symlink to the worktree, and `src/a.py` answers with the resolved file. **Done when** the probe in the Why fails the test.
+
+**Related:** TD-501 (#1429), TD-493.
+
+**Resolved:** 2026-10-10 (PR #1442) — `test_a_checkout_reached_through_a_symlink_answers_its_files` gives the record a `dir` and a `repo` reached through a symlink: its files answer as their real paths and a link out still answers `null`. The probe in the Why (`real_roots = [Path(r) for r in roots]`) fails it.
+
+## TD-519: `"paths"` is in `identity.READS` and no test says it must be: removing it leaves the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/identity.py` (`READS`), `tests/test_identity.py` (line ~626, the loop over `sorted(identity.READS)`), `tests/test_paths_rpc.py`
+
+**Why:** The test-audit of #1429 (TD-501). The PR adds `"paths"` to `READS`, the never-gated set that §4.4a serves on every channel, and `test_paths_rpc.py` says *a read: ungated* about a call from `LocalClient(caller=sid)`. Probe: the `"paths",` line deleted from `READS`, `pytest -q tests/test_paths_rpc.py` — **passes**. The suite patches `DEFAULT_MODE` to `off` (identity.py's own comment), so the gate in `agent_serve.py` (`identity_mode == "enforce" and method not in identity.READS`) never runs on a `paths` call; `test_identity.py` only iterates what is already in the set (the pin that a read must not decide on `caller`), and `tests/test_doctor.py:49` is the only test that names a member (`"doctor"`). On a host in `enforce`, the Focus page's `paths` call from a channel the socket cannot place would be refused with `CHECK_FAILED` and no pane path would be a link.
+
+**Fix:** Under `identity_mode == "enforce"`, call `paths` from an unclassified channel and assert it answers (the way `tests/test_doctor.py:49` pins `doctor`, or an enforce-mode case in `test_identity.py`). **Done when** the probe in the Why fails a test.
+
+**Related:** TD-501 (#1429), TD-493.
+
+**Resolved:** 2026-10-10 (PR #1442) — `test_paths_is_served_under_enforce_from_a_channel_nobody_can_place`: under `enforce`, with the channel check made to fail, `paths` answers while `doing` is refused. The probe in the Why (`"paths",` deleted from `identity.READS`) fails it.

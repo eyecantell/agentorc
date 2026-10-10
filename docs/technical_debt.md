@@ -60,8 +60,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
 | TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
 | TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Built (#1436); live check: no anchor fill after a promote's restart |
-| TD-517 | `rpc_paths` resolves its roots with `realpath`, and no test has a root that is a symlink: dropping that line leaves `test_paths_rpc.py` green though every path of a symlinked checkout would read as not a file | Medium | Open |
-| TD-519 | `"paths"` can leave `identity.READS` and no test fails: the Focus pane's file check would be refused under `enforce` for a caller the socket cannot place, and only the suite's `off` mode runs | Low | Open |
 
 ---
 
@@ -933,35 +931,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a promote's restart is followed by no anchor fill when the lane gained nothing, and the tests above pass.
 
 **Related:** TD-386 (the anchor seat's `work` trigger), TD-407 (`reread`), TD-323 (a live check's `live`).
-
-## TD-517: `rpc_paths` realpaths its roots and no test puts a symlink there: the line can go and `test_paths_rpc.py` stays green
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`_resolve_paths`, the `real_roots = [Path(os.path.realpath(r)) for r in roots]` line), `tests/test_paths_rpc.py`
-
-**Why:** The test-audit of #1429 (TD-501). `_resolve_paths` compares each run's `realpath` with `is_relative_to` the roots' `realpath`s: a record whose `dir` is itself reached through a symlink (a home or a worktree path that is a link) has a resolved run that is not under the unresolved root, so every file reads as `None` and no pane path is a link. The tests' `checkout()` builds `tmp_path/repo/...` with no link in the root's own path, so the line is never exercised. Probe: `real_roots = [Path(r) for r in roots]` in `src/sessionorc/agent.py`, `pytest -q tests/test_paths_rpc.py` — **passes**. The docstring says *the real path of the record's `dir` or of its `repo`*; nothing asserts it.
-
-**Fix:** Add a case to `test_a_run_answers_only_as_a_regular_file_inside_the_checkout` (or beside it): `dir` given as a path through a symlink to the worktree, and `src/a.py` answers with the resolved file. **Done when** the probe in the Why fails the test.
-
-**Related:** TD-501 (#1429), TD-493.
-
-## TD-519: `"paths"` is in `identity.READS` and no test says it must be: removing it leaves the suite green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/identity.py` (`READS`), `tests/test_identity.py` (line ~626, the loop over `sorted(identity.READS)`), `tests/test_paths_rpc.py`
-
-**Why:** The test-audit of #1429 (TD-501). The PR adds `"paths"` to `READS`, the never-gated set that §4.4a serves on every channel, and `test_paths_rpc.py` says *a read: ungated* about a call from `LocalClient(caller=sid)`. Probe: the `"paths",` line deleted from `READS`, `pytest -q tests/test_paths_rpc.py` — **passes**. The suite patches `DEFAULT_MODE` to `off` (identity.py's own comment), so the gate in `agent_serve.py` (`identity_mode == "enforce" and method not in identity.READS`) never runs on a `paths` call; `test_identity.py` only iterates what is already in the set (the pin that a read must not decide on `caller`), and `tests/test_doctor.py:49` is the only test that names a member (`"doctor"`). On a host in `enforce`, the Focus page's `paths` call from a channel the socket cannot place would be refused with `CHECK_FAILED` and no pane path would be a link.
-
-**Fix:** Under `identity_mode == "enforce"`, call `paths` from an unclassified channel and assert it answers (the way `tests/test_doctor.py:49` pins `doctor`, or an enforce-mode case in `test_identity.py`). **Done when** the probe in the Why fails a test.
-
-**Related:** TD-501 (#1429), TD-493.
