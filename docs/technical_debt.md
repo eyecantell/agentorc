@@ -24,7 +24,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, the `orchestrate` grant `control`, orc-of-orcs director, a lead's tick a round, the daemon always *host agent*; nudge, supervisor and fleet retired | Medium | Partly done |
 | TD-060 | The name `agentorc` is taken: rename the project — `shiftlead` leads, undecided; two packages, seven env vars, a state directory, two systemd units and a per-repo config file carry the name onto machines, so it is a migration and not a text sweep | Medium | Open — decided 2026-09-22: `shiftlead`; step 1 done, step 2 in a quiet window the anchor picks |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 built 2026-09-23 (PR #499); 8 is Paul's canvas |
-| TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Low | Designed 2026-10-09 — TD-468 builds it |
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
@@ -40,7 +39,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
 | TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Designed 2026-10-09 — TD-470 builds it |
-| TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
@@ -267,21 +265,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** each idea is either built (its own PR, §4.5a first) or struck here.
 
 **Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
-
-## TD-110: A night report, generated from the records
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-09-22 (the anchor session; the design review — a feature the review recommended)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1337): §4.9a *The home's note says more* — rule 9's wind-down note, the one morning read now that teams wind down several times a day, gains five lines written only when non-empty, after its two: claims left (`claimed` still standing, `dropped` since the start with its why), restarts since the start by `why` and any member at `restart_ceiling`, standing identity alarms, open questions to the person about a reference with their bounds, and each profile's usage reading against the one at the team's start, which every start writes as `teams.<team>.usage_at_start`; the first paragraph stays the two lines; still one note, only when the manager wrote none; the manager's own two-line report and brief unchanged; no `ao team report` and no board line. §6 rule 9 points at it. The build is TD-468. Was: Open — **Read 2026-10-08 (the anchor): most of it is built, as rule 9's note, so what is left is a small design.** §6 rule 9 (TD-240) already writes one `system` note to the person when a team winds down. The note lists the PRs the members reported `done` since the team's start and each member's `out_of_work.why`, and it is sent only when the manager sent none. Teams now also start again by themselves when their lanes gain work (rule 8, `on_work: start`), so a "night" is no longer a run with clean edges, and the note is the one morning read there is. Still missing from it, of this entry's list: claims dropped and left open, restarts against the ceiling, usage consumed per profile over the run, identity alarms, and what was left on the board. **Recommended:** grow rule 9's note by those lines rather than add `ao team report` or a board line. A note already reaches the person, and a board line per wind-down would be noise now that teams wind down several times a day. Lowered to Low, since what a person most needs (the PRs and why each member stopped) arrives already. Was: for evaluation. At wind-down (or at a stop time, or on `ao team report <team>` for a running one) the home writes one summary per team from what it already holds: PRs merged from members' branches (the derived reports), claims done, dropped and still open, `out_of_work` and `restart_wanted` reasons, mail and wake counts against the bounds, usage consumed per profile over the run, restarts against the ceiling, identity alarms, and what was left on the board. One FYI in the person inbox and one line on `docs/user_attention.md` (the §4.9a announcement grows into it). It replaces the manager's prose round log as the thing a person reads in the morning, and it is the first consumer of the records as a whole rather than one card at a time. **Next:** the designer's round: the fields the note gains, and whether a running team gets a report on asking.
-**Blocked by:** TD-468
-**Location:** design §4.9a (*A wind-down is announced*), §4.5a (an Inbox row), `src/sessionorc/reports.py`, `src/agentorc/teamrun.py`
-
-**Why:** "what happened overnight" is answered today by reading a manager's log on a launch branch and several transcripts; the records already know.
-
-**Related:** TD-053 (the wind-down's board line), TD-079 (outcomes), TD-069 (the Inbox), TD-087 (usage readings).
 
 ## TD-112: The adapter contract has grown Claude-shaped and neutrality is untested
 
@@ -592,25 +575,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design §4.2a: a profile whose `billing` is `metered` launches its claude-code sessions with `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` (the subagents' `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL` left at its default), unless the profile's own environment sets one. Say whether the person can turn it off and where. Then build it in the adapter's launch environment, with a test that a metered profile's launch carries the key and a subscription's does not. **Done when** a metered profile's session starts with the one-hour lifetime and §4.2a says so.
 
 **Related:** TD-378 (archived; the research), TD-151 (metered profiles), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
-
-## TD-459: The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1336): §4.10 *A lapsed cache is started again, not rung* — when the doorbell has decided to ring (every check passed, the wake charged) a member idle longer than `CACHE_LIFETIME` (1 h) whose context reading is over `CACHE_FLOOR` (100k), the home restarts it on its brief by rule 7's tick restart under rule 7's precondition (hook-confirmed idle, no claim in progress, declared nothing, git clean and known, not past its stop, not gated, not suspended), `restarts: [{why: cache, idle, context}]`; without the precondition it rings as today; the restart is the wake (one unit, the watermark advanced); not a seat (rule 3's grace closes an idle seat), never a person's session (invariant 5), not on a node yet (as rule 7); the two numbers live in `agent_common`, not in settings; `read_when`'s idle sentence says which. §6 rule 7 names the third trigger. The build is TD-467. Was: Open — decided by Paul 2026-10-08 (option 3 of the ADR); the design in §4.10 and §6 first, then its build entry.
-**Blocked by:** TD-467
-**Location:** design §4.10 (the doorbell), §6 (rule 5's precondition, restarts and their `why`); `src/sessionorc/agent_wake.py`, `src/sessionorc/agent_tick.py`
-
-**Why:**
-- From 2026-10-01 to 10-08, the doorbell (§4.10) caused 23 of the 44 whole-context re-writes after a lapsed cache. Each rang a grinder idle for a median 5.4 h and re-wrote a median 191k tokens at the one-hour write price, 2× base input ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
-- Re-writes after a lapse were 6.0% of the week's weighted cost. A restart on the brief writes about 23k new tokens rather than about 190k at 2×, which saves roughly 2–2.5% of the week's cost. The saving grows with the number of overnight rings.
-
-**Fix:** design: when the doorbell is about to ring a member that has been idle longer than the cache lifetime (an hour) and holds a context over about 100k, the host agent restarts it on its brief instead of ringing it. The new run reads the mail because its brief reads the inbox first. The restart takes rule 5's precondition (§6): the member is idle, holds no claim in progress, and has pushed its work. Without the precondition, the doorbell rings as today. The restart's `why` names the cause, so the card and `restarts` say it. Decide where the two numbers live (the lifetime, the context floor), whether a seat is covered, and how a person's own session is excluded. Then file the build entry and block this one by it. **Done when** a lapsed member is restarted rather than rung, and the design says when.
-
-**Related:** TD-378 (archived; the research), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 3, TD-460 (the context-bound trial; both change how often a grinder restarts).
 
 ## TD-460: Read back the one-week trial of a 200k context bound on ao-grind's grinders
 
