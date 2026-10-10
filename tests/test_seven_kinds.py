@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 from test_ui_repo_page import client, fake
 from test_ui_team_summary import NOW, member
@@ -132,6 +133,22 @@ def test_the_kind_bar_draws_the_seven_kinds_in_order_with_a_legend():
         "evaluation",
         "other",
     ]
+
+
+def test_a_priority_segment_keeps_its_word_apart_so_a_narrow_one_drops_it():
+    """TD-506: the word is its own element, which a segment too narrow for it wraps out of sight (the CSS
+    below), then the count; the hover keeps both. The browser's half is the PR's UI check."""
+    r = _reading("/r/samscrape")
+    r["ledger"]["by_priority"] = {"high": 4, "medium": 26, "low": 34}
+    s = ui.team_summary("grind", [member("g1", "idle")], {"/r/samscrape": r}, {}, now=NOW)
+    html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
+    bar = html[html.index('aria-label="open entries by priority"') :]
+    bar = bar[: bar.index("</div>")]
+    assert 'title="4 High">4<span class="bw"> High</span></a>' in bar
+    assert 'title="26 Medium">26<span class="bw"> Medium</span></a>' in bar
+    css = (Path(ui.__file__).parent / "static" / "app.css").read_text(encoding="utf-8")
+    assert ".bar .bseg { flex-wrap: wrap; align-content: flex-start; }" in css
+    assert '.bar .bseg::before { content: ""; height: 100%; }' in css
 
 
 def test_the_repo_page_draws_a_list_per_kind_and_flags_the_other(tmp_path, monkeypatch):

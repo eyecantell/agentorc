@@ -560,6 +560,12 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .bar, .blocks { display: flex; gap: 2px; height: 26px; }  /* one height, so the bars and the blocks line up (TD-418) */
 .bseg, .blk { display: flex; align-items: center; justify-content: center; min-width: 22px; padding: 0 4px; border-radius: 2px; color: var(--seg-fg); font-size: var(--t-small); font-weight: 600; text-decoration: none; white-space: nowrap; overflow: hidden; }
 .blk { font-weight: 500; gap: 4px; } .blk b { font-weight: 700; }
+/* a bar's segment too narrow for its words (TD-506): the word wraps out of sight, then the count; the hover keeps both.
+   The full-height ::before holds the first line, so what does not fit beside it falls to a second line the
+   segment clips; centring and the visible line are unchanged when it all fits. */
+.bar .bseg { flex-wrap: wrap; align-content: flex-start; }
+.bar .bseg::before { content: ""; height: 100%; }
+.bar .bseg .bw { white-space: pre; }
 .bseg.p-high { background: var(--p-high); } .bseg.p-medium { background: var(--p-medium); } .bseg.p-low { background: var(--p-low); color: var(--p-high); }
 .bseg.k-pickable, .legend .k-pickable { background: var(--k-pickable); } .bseg.k-design, .legend .k-design { background: var(--k-design); }
 .bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }

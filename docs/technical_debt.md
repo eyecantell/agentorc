@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-513 | The client half of TD-484's lane-count patch is pinned by no test: deleting the `syncGroups` block leaves every UI test green | Medium | Open |
@@ -885,22 +884,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Focus of a session that printed `src/agentorc/cli.py:364` underlines it on hover and Ctrl+click opens VS Code at that file and line; `build/review` in the same pane's prose, and a path outside the checkout, never underline; `open_in: none` registers no provider and the hover asks nothing (the network tab is empty); a read-only Focus and a popped-out window link as the interactive one does; a node's record is asked through `read`; `pdm run test` covers the RPC's bounds and the provider's runs.
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
-
-## TD-506: The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (grinder-ao-1, TD-428's live check)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/templates/team_summary.html` (the `bseg` links of both bars: `{{ b.n }} {{ b.label }}` inside a `flex-basis: {{ b.pct }}%` segment), `src/agentorc/ui/static/app.css` (`.bseg`), and the Repo page's bars if they share the rule; design §4.5a row *Repo facet* (*the counts inside*)
-
-**Why:** on the live Org page of 2026-10-09 (e708109, 1600 and 1400 wide) the ledger held 4 High of 64 open, so the High segment is ~6% of the bar and its centred text *4 High* overflows both sides: the number is cut off and the word clipped. The count is still on the segment's hover (`title`), but the bar reads wrong at a glance. The mockup's after-shot had 9 High and never showed it.
-
-**Fix:** a segment whose words do not fit draws the count alone, and one too narrow for the count draws nothing inside (its hover keeps *n label*) — measured on render, or by a width threshold on `pct`; both bars, light and dark. Test: a facet with 4 High of 64 renders no clipped text (the segment's `scrollWidth` ≤ its `clientWidth` in a Playwright check on a scratch home), and 26 Medium still reads *26 Medium*. **Done when** the narrow segment reads cleanly on a scratch home with a ledger of 4 / 26 / 34, a UI check on the PR.
-
-**Related:** TD-428 (the declutter, whose live check found it), TD-418 (the design).
 
 ## TD-507: `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte
 

@@ -351,6 +351,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-10 (TD-506, grinder-ao-2; found by grinder-ao-1 in TD-428's live check, where *4 High* of 64 read *l High*): **team card: Repo facet** — a priority segment too narrow for its words draws its count alone, and one too narrow for the count nothing inside; its hover keeps both. Every `.bar` segment wraps what does not fit to a second line it clips, so the kind and phase bars drop a count that does not fit too.
 - 2026-10-09 (TD-498 slice 2, grinder-ao-2, building TD-490): the **state pill hover** row gains *observed by the host agent, not reported by the tool* for a `tick` state that is not an ending (`stalled?`), which §4.2 makes the tick's own and which *reported by the tool* misdescribed.
 - 2026-10-09 (TD-491, the designer): the **bar** row — the fold, the overlay, the draft on the bar, `person.composer`; `c` in the keys row; the You card's composer pick; the mockup's composer redrawn as the bar (`FocusReady.dc.html` draws the bar, `Focus.dc.html`'s unattended session none, shot `docs/mockups/reviews/2026-10-09-td491-focus-composer-bar.png`). Built by TD-500.
 - 2026-10-09 (TD-490, the designer): the **state pill hover** row — the pill's title on each state, the ending's words on `exited` and `closed`, *guessed* only on a `scraped` state. Built by TD-498.
