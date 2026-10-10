@@ -768,18 +768,8 @@ def focus():
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="input" style="height: 26px; width: 150px; font-size: 12px; color: #9ca3af;">why? (optional)</span><span class="meta">Bash · git push -u origin td301-fix · 9m 12s</span>
       <span class="badge">stops 06:00</span>''',
                 next_act='<span class="btn sm next">Take over</span>', member=True)}
-    <div class="term" style="height: 560px;">{term}</div>
-    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 64px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt… multi-line, paste-friendly. Drop files or paste a screenshot here; the terminal above takes keys directly for menus and questions.</div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="btn">{ICON["clip"]}Attach</span>
-        <span class="badge">~/.agentorc/attachments/tdgrind-1/spec.pdf</span><span class="badge">screenshot-1402.png</span>
-        <span class="meta" style="max-width: none; white-space: nowrap; overflow: visible;" title="an upload past one piece (§4.5a Attach, TD-473): the file goes up in 2 MiB pieces, its progress here, and ✕ cancels it leaving nothing on disk">Attaching q3-deck.pptx · 37%</span><span class="btn sm ghost" title="cancel the upload">✕</span>
-        <span class="btn sm ghost" title="Review the PR I name next as the cadence says, then report.">review PR</span><span class="btn sm ghost" title="/stranded-work">sweep</span><span class="btn sm ghost" title="What is waiting on me across this repo's board and my inbox?">waiting on me</span><span class="meta" title="the role's prompts: (design §4.8, TD-161) — a press sends it; Shift+press fills the composer">·</span>
-        <span style="flex-grow: 1;"></span>
-        <span class="btn primary">{ICON["send"]}Send</span>
-      </div>
-    </div>
+    <div class="term" style="height: 760px;">{term}</div>
+    <!-- an unattended session: Focus watches (§4.5), so no composer and no bar — the terminal takes the height (TD-491) -->
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     {PUT_AWAY}
@@ -838,10 +828,11 @@ Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
       <span class="badge ready" title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
       <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>''',
                 next_act='<span class="btn sm next">Close session</span>')}
-    <div class="term" style="height: 420px;">{term}</div>
-    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
-      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{ICON["clip"]}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{ICON["send"]}Send</span></div>
+    <div class="term" style="height: 520px;">{term}</div>
+    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px;" title="design §4.5a Focus composer — the bar (TD-491): the composer folded to one line, the terminal taking the height down to it; a click, c, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal">
+      <span class="btn sm" style="flex-grow: 1; justify-content: flex-start; text-align: left; opacity: .75; font-weight: 400;">✎ Compose a prompt… <span class="meta" style="margin-left: 8px;">(c · or paste / drop a file)</span></span>
+      <span class="btn sm">{ICON["clip"]}Attach</span>
+      <span class="btn primary sm">{ICON["send"]}Send</span>
     </div>
     <div class="note">Paul took this member over, so it is <b>interactive</b> — his to close. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight; Kill is under more ▾. An unattended team member shows none of this: its team's Wind down or Start closes it, its Ready to close is folded, and its Close is the more ▾ entry.</div>
   </div>
