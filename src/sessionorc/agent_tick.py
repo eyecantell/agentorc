@@ -1474,7 +1474,7 @@ class TickMixin:
             try:
                 rec = teams.get(team) or {}
                 old = rec.get("work_waiting")
-                on_work = (settings.get(team) or {}).get("on_work", "ask")
+                on_work = (settings.get(team) or {}).get("on_work", settings_mod.ON_WORK_DEFAULT)
                 new = self._work_mark(team, old, by_team.get(team) or [], on_work, now, firsts)
                 starts = rec.get("work_started")
                 if new is not None and on_work == "start":
@@ -1579,7 +1579,9 @@ class TickMixin:
         if self.mode != "home" or not (team and name and ref):
             return
         try:
-            on_work = (settings_mod.teams(settings_mod.load()).get(team) or {}).get("on_work", "ask")
+            on_work = (settings_mod.teams(settings_mod.load()).get(team) or {}).get(
+                "on_work", settings_mod.ON_WORK_DEFAULT
+            )
         except Exception:  # noqa: BLE001 — a policy's surprise is a log line, never the answer's failure
             log.exception("reading %s's settings for rule 8's question failed", team)
             return

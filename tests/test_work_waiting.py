@@ -255,6 +255,7 @@ async def test_a_questions_end_is_work_for_a_wound_down_team(agent, tmp_path, mo
     `questions` — which the tick keeps with no lane news; an answer on another adds to it keeping
     `at`; Dismiss clears it and writes no question's reference to `lane_seen`."""
     await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "ask"}}})  # `start` is the default (TD-466)
     monkeypatch.setattr(agent, "_replay", lambda *a, **k: None)
     repo = str(tmp_path)
     agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": []}}

@@ -322,6 +322,9 @@ async def test_a_child_past_its_time_is_killed_with_its_group(agent, monkeypatch
 
 async def test_a_blocked_outcome_a_restart_row_and_a_team_with_work_are_told(agent, sent, tmp_path):
     _on(link="")
+    doc = settings_mod.load()
+    doc["teams"] = {t: {"on_work": "ask"} for t in ("cm-grind", "held-grind", "run-grind")}  # `start` is the default
+    settings_mod.save(doc)
     t0 = datetime.now(UTC)
     s = _session(agent, tmp_path, state="exited", since=_z(t0))
     s.restart_ceiling = {"at": _z(t0), "count": 3}
@@ -336,12 +339,19 @@ async def test_a_blocked_outcome_a_restart_row_and_a_team_with_work_are_told(age
         "work_waiting": {"at": _z(t0), "repo": "/r", "members": {"a": ["TD-1", "TD-2"], "b": ["TD-2", "TD-3"]}}
     }
     teams["held-grind"] = {"work_waiting": {"at": _z(t0), "members": {"a": ["TD-9"]}, "held": {"why": "gate"}}}
+    # a team that runs on names its finished member (§6 rule 8, TD-466): a live seat, a closed grinder
+    _session(agent, tmp_path, sid="ao-run-seat", name="anchor-run", team="run-grind", state="idle", unattended=True)
+    _session(agent, tmp_path, sid="ao-run-g", name="grinder-run-1", team="run-grind", state="closed", unattended=True)
+    # a person's own session in a wound-down team keeps nothing live (§4.9 *A person in the team*): still *wound down*
+    _session(agent, tmp_path, sid="ao-cm-person", name="ao-paul", team="cm-grind", state="idle")
+    teams["run-grind"] = {"work_waiting": {"at": _z(t0), "repo": "/r", "members": {"grinder-run-1": ["TD-7"]}}}
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
         texts = sorted(t for _, t in sent)
         assert texts == [
             "agentorc · cm-grind wound down and has work: 3 entries",
             "agentorc · grinder-x-1 (x-grind) reports blocked · TD-142",
+            "agentorc · run-grind's grinder-run-1 finished and has work: 1 entry",
             "agentorc · x-grind: grinder-x-1 was not restarted",
         ], texts
         assert "the box is down" not in "".join(texts)
@@ -349,27 +359,36 @@ async def test_a_blocked_outcome_a_restart_row_and_a_team_with_work_are_told(age
         agent.person_inbox[:] = [e for e in agent.person_inbox if e.id != "m-q1"]
         teams.pop("cm-grind", None)
         teams.pop("held-grind", None)
+        teams.pop("run-grind", None)
         agent.sessions.pop(s.id, None)
+        agent.sessions.pop("ao-run-seat", None)
+        agent.sessions.pop("ao-run-g", None)
+        agent.sessions.pop("ao-cm-person", None)
 
 
-async def test_a_team_with_settings_of_its_own_and_no_on_work_key_is_told_as_ask(agent, sent):
-    # an absent `on_work` means `ask` (design §5, §6 rule 8), for a team with other settings as for one with none
+async def test_a_team_with_no_on_work_key_is_told_as_start(agent, sent):
+    # an absent `on_work` means `start` (design §5, §6 rule 8; TD-457, TD-466): the home's own start, so
+    # nobody is told, for a team with other settings as for one with none; `ask` is told
     settings_mod.save(
         {
             "notify": {"telegram": {"on": True, "secrets": "samscrape/prd", "link": ""}},
-            "teams": {"cm-grind": {"reserve": 20}, "off-grind": {"reserve": 20, "on_work": "off"}},
+            "teams": {
+                "cm-grind": {"reserve": 20},
+                "ask-grind": {"reserve": 20, "on_work": "ask"},
+                "off-grind": {"reserve": 20, "on_work": "off"},
+            },
         }
     )
     t0 = datetime.now(UTC)
     teams = agent._host_rec.setdefault("teams", {})
-    for team in ("cm-grind", "off-grind"):
+    for team in ("cm-grind", "ask-grind", "off-grind", "bare-grind"):
         teams[team] = {"work_waiting": {"at": _z(t0), "repo": "/r", "members": {"a": ["TD-1"]}}}
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
-        assert [t for _, t in sent] == ["agentorc · cm-grind wound down and has work: 1 entry"], sent
+        assert [t for _, t in sent] == ["agentorc · ask-grind wound down and has work: 1 entry"], sent
     finally:
-        teams.pop("cm-grind", None)
-        teams.pop("off-grind", None)
+        for team in ("cm-grind", "ask-grind", "off-grind", "bare-grind"):
+            teams.pop(team, None)
 
 
 async def test_a_row_whose_hold_ends_while_a_page_is_visible_is_not_told_then_or_later(agent, sent, tmp_path):

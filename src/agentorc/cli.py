@@ -1823,7 +1823,7 @@ def _team_setting_line(name: str, t: dict[str, Any]) -> str:
         parts.append(f"schedule {t['schedule']}")
     if t.get("balance"):  # §6 *Balance*: off until a person sets it
         parts.append(f"balance {_balance_words(t['balance'])}")
-    if t.get("on_work"):  # §6 rule 8: said only where the file holds the key; absent, the team asks
+    if t.get("on_work"):  # §6 rule 8: said only where the file holds the key; absent, the team starts (TD-457)
         parts.append(f"when work appears: {ON_WORK_WORDS.get(t['on_work'], t['on_work'])}")
     return f"{name}: " + " · ".join(parts)
 

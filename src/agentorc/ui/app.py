@@ -268,6 +268,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     unclosed_mark,  # noqa: F401
     unreached,
     with_standings,
+    work_finished,  # noqa: F401
     work_held,  # noqa: F401
     work_ids,  # noqa: F401
     work_note,  # noqa: F401
@@ -848,7 +849,11 @@ def create_app() -> FastAPI:
         # §4.5a *Inbox row: team start* (§6 rule 8, TD-227): the home's `work_waiting` marks, each
         # with the card's own *wound down* instant
         work = home.get("work") or {}
-        return rows + promote_rows(home.get("promotes")) + work_rows(work, wound_of(fleet) if work else None)
+        return (
+            rows
+            + promote_rows(home.get("promotes"))
+            + work_rows(work, wound_of(fleet) if work else None, records=fleet)
+        )
 
     def wound_of(fleet: list[dict[str, Any]]) -> dict[str, Any]:
         """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
@@ -1103,7 +1108,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos = [] if agent_down else promote_rows((info or {}).get("promotes"))
         # …and the team start rows (§4.5a, §6 rule 8), from the same reading
         work = {} if agent_down else (info or {}).get("work") or {}
-        promos += work_rows(work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")})
+        promos += work_rows(
+            work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")}, records=sessions
+        )
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)
         if entries or handed or vs or boards or promos:
             secs = inbox_sections(
@@ -3146,6 +3153,20 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not repo:
                 raise HTTPException(400, f"{action} names the repo")
             got = await call(action, repo=repo)
+            return JSONResponse({"ok": True, **got})
+        if action == "work_start":
+            # design §4.5a **Inbox row: team start** for a team that runs on (§6 rule 8 *A member that
+            # finished while its team runs on*, TD-466): **Start** replays the named members alone through
+            # `work_start`, the person's own; a bound holding it back is refused in the row's words, which the
+            # page puts after its own *not starting:*
+            team = str(body.get("team") or "").strip()
+            if not team:
+                raise HTTPException(400, "work_start names the team")
+            got = await call("work_start", team=team)
+            if got.get("held"):
+                raise HTTPException(409, work_held(got["held"], datetime.now(UTC)))
+            if not got.get("started"):
+                raise HTTPException(409, f"{team}: no work is waiting for its members")
             return JSONResponse({"ok": True, **got})
         if action == "clear_work":
             # design §4.5a **Inbox row: team start** (§6 rule 8, TD-227): **Dismiss** — `clear_work`,
