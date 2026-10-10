@@ -40,7 +40,7 @@
 {# design §4.5a **team header** → *PRs waiting* (§4.9b *The reader*, TD-093): the held PRs the
    team's reader has not answered — a count and the oldest's age, never pressable; the entries are
    `ao inbox <seat>`'s #}
-{% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
+{% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for the {{ g.prs_waiting.by }} (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
 {# *n ready to close* (TD-156 (b)): the idle sessions the checklist passes, a mark on every header #}
 {% if g.ready %}<span class="meta readymark" title="idle sessions whose ready-to-close checklist passes — Close each on its card">{{ g.ready }} ready to close</span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}

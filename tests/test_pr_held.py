@@ -226,19 +226,21 @@ def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
     from agentorc.ui.app import prs_waiting, team_groups, templates
 
     now = datetime(2026, 9, 23, 12, tzinfo=UTC)
-    seat = {"prs_waiting": {"n": 2, "oldest": "2026-09-23T10:30:00Z"}}
-    assert prs_waiting([seat, {"prs_waiting": None}, {}], now) == {"n": 2, "age": "1h 30m"}
+    seat = {"role": "techlead", "prs_waiting": {"n": 2, "oldest": "2026-09-23T10:30:00Z"}}
+    assert prs_waiting([seat, {"prs_waiting": None}, {}], now) == {"n": 2, "age": "1h 30m", "by": "techlead"}
     assert prs_waiting([{"prs_waiting": None}, {}], now) is None  # nothing waits, or an older agent
-    two = [seat, {"prs_waiting": {"n": 1, "oldest": "2026-09-23T09:00:00Z"}}]
-    assert prs_waiting(two, now) == {"n": 3, "age": "3h 0m"}  # the sum, and the oldest across records
+    two = [seat, {"name": "x", "prs_waiting": {"n": 1, "oldest": "2026-09-23T09:00:00Z"}}]
+    # the sum, the oldest across records, and each seat named by its role (its name with none; TD-428)
+    assert prs_waiting(two, now) == {"n": 3, "age": "3h 0m", "by": "techlead and the x"}
 
     def v(sid, **kw):
         return {"id": sid, "name": sid, "team": "t", "state": "idle", "state_class": "idle", "state_label": "idle",
                 "scraped": False, "rank": 5, "controllers": [], "capabilities": [], **kw}  # fmt: skip
 
-    (team,) = team_groups([v("w"), v("tl", prs_waiting={"n": 1, "oldest": "2026-09-23T10:30:00Z"})])
+    (team,) = team_groups([v("w"), v("tl", role="techlead", prs_waiting={"n": 1, "oldest": "2026-09-23T10:30:00Z"})])
     head = templates.get_template("group_head.html").render(g=team)
     assert "1 PR waiting · oldest" in head
+    assert 'title="held PRs waiting for the techlead (design §4.9b)' in head  # the seat by its role (TD-428)
     (quiet,) = team_groups([v("w")])
     assert "PR waiting" not in templates.get_template("group_head.html").render(g=quiet)
 

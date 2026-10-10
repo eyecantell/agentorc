@@ -74,7 +74,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
           <option value="">none</option>
           {% for t in form_teams %}<option value="{{ t.name }}"{% if t.name == prefill.team %} selected{% endif %} data-dirs='{{ t.dirs | tojson }}' data-roles="{{ t.roles | join(',') }}" data-manager="{{ t.manager }}" data-host="{{ t.host }}">{{ t.name }}{% if t.host != host %} · on {{ t.host }}{% endif %}</option>{% endfor %}
         </select>
-        <span class="note" id="teamnote">optional: its badge and group, its manager as a controller, the team's reader for its held PRs</span>
+        <span class="note" id="teamnote">optional: its badge and group, its manager as a controller, the team's techlead for its held PRs</span>
       </div>
       {# design §4.5a New session **Project** picker (§4.9): picking one narrows the Directory list
          to that project's repos with their checkouts on this host, badges the session, and puts the
