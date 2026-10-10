@@ -3661,7 +3661,8 @@ class TickMixin:
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
         if isinstance(f := event.get("file"), str) and f and not stale:
-            # a main-thread edit's path (§4.2, TD-527): to the top of `files`, once, the newest twenty
+            # a main-thread edit's path (§4.2, TD-527): to the top of `files`, once, the newest twenty; a
+            # stale queued edit is dropped, since at the top it would read newer than the edits after it
             s.files = [{"path": f, "at": now_iso()}, *(x for x in s.files if x.get("path") != f)][:RECENT_FILES]
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
             # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
