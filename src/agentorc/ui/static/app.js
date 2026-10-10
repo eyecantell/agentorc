@@ -155,7 +155,9 @@
   // with `put`, the terminal's paste of a file (TD-479), each path goes to `put` and not to the caret,
   // and the composer need not be open. The folded composer (§4.5a **the bar**, TD-500): `unfold()` opens
   // it before a path goes to its caret, and `mirror`, the bar's own Attach and ✕, says the upload there too.
-  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel, unfold, mirror }) {
+  // `token()`, where given, is read when a batch is queued and handed to each of its files as `ctl.token`,
+  // so an upload can tell the batch's moment from now (the Message dialog closed since, TD-531).
+  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel, unfold, mirror, token }) {
     const buttons = [button, ...(mirror ? [mirror.button] : [])];
     const cancels = [cancel, ...(mirror ? [mirror.cancel] : [])].filter(Boolean);
     const labels = buttons.map((b) => b.lastChild), word = labels[0].textContent;
@@ -165,7 +167,7 @@
     let stopNow = () => {};
     const cancelOff = (off) => cancels.forEach((c) => c.classList.toggle("hidden", off));
     for (const c of cancels) c.addEventListener("click", () => { stopNow(); cancelOff(true); });
-    async function each(list, put) {
+    async function each(list, put, tok) {
       buttons.forEach((b) => { b.disabled = true; });
       for (const f of list) {
         say(`Attaching ${f.name}…`);
@@ -175,6 +177,7 @@
           // the ✕ goes once only the last piece is left: that one links the file into place, past cancelling
           progress: (pct, last) => { say(`Attaching ${f.name} · ${pct}%`); cancelOff(stopped || !!last); },
           cancelled: () => stopped,
+          token: tok,
         };
         try {
           const path = await upload(f, ctl);
@@ -190,7 +193,8 @@
       const list = Array.from(files || []);
       if (!list.length || (!put && shut())) return attaching;
       if (!put && unfold) unfold();
-      attaching = attaching.then(() => each(list, put)).catch((e) => fail(`Attach failed: ${e.message}`));
+      const tok = token ? token() : undefined;
+      attaching = attaching.then(() => each(list, put, tok)).catch((e) => fail(`Attach failed: ${e.message}`));
       return attaching;
     }
     buttons.forEach((b) => b.addEventListener("click", () => input.click()));
@@ -508,8 +512,9 @@
   // composer's road on `#mailbox`, wired once, for the session the open dialog addresses (`AO.mailTo`).
   // With none — a seat with nobody in it, a board's Reply — the button is hidden, the note says why, and
   // a drop or a paste attaches nothing (the dialog reads as a closed composer). Each path goes in at the
-  // caret and nothing is sent until **Mail it**; an upload that ends after its dialog closed inserts
-  // nothing into the next one. `els` are the dialog's parts, handed in so it runs under node.
+  // caret and nothing is sent until **Mail it**. A batch belongs to the dialog it was given in: once that
+  // closes, its file in flight is cancelled, inserts nothing, and the files queued behind it are never
+  // sent, to that addressee or the next. `els` are the dialog's parts, handed in so it runs under node.
   AO.mailTo = "";
   AO.wireMailAttach = function (els, upload) {
     const { dlg, button, input, cancel, text, note } = els;
@@ -517,10 +522,11 @@
     const attach = AO.wireAttach({
       button, input, compose: text, targets: [dlg], cancel,
       composer: { classList: { contains: () => !AO.mailTo } },
-      fail: (m) => AO.toast(m),
+      fail: (m) => AO.toast(m), token: () => opened,
       upload: async (f, ctl) => {
-        const was = opened, path = await upload(AO.mailTo)(f, ctl);
-        return was === opened ? path : null;
+        if (ctl.token !== opened) return null;
+        const path = await upload(AO.mailTo)(f, ctl);
+        return ctl.token === opened ? path : null;
       },
     });
     // the ✕ of an upload still running is pressed when the dialog closes: its rest is not wanted

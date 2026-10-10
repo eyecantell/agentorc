@@ -808,10 +808,11 @@ async function run() {
   await m.attach([]);
   out.with_id = { hidden: button.hidden, title: note.title || "", dragover: over.prevented, drop: drop.prevented,
     text_paste: withText.prevented, shot_paste: shot.prevented, value: text.value, sent: [...sent] };
-  // an upload still running when the dialog closes and opens again inserts nothing into the next one
-  m.attach([file("slow.png")]); await tick();
+  // a batch whose dialog closes: the upload in flight inserts nothing into the next dialog, and the files
+  // queued behind it are never sent, to the old addressee or the new one
+  m.attach([file("slow.png"), file("queued.png")]); await tick();
   fire(dlg, "close", {}); m.open("ao-x-2"); text.value = ""; hold(); await m.attach([]);
-  out.late = { value: text.value, sent: sent.length };
+  out.late = { value: text.value, sent: sent.length, names: sent.map((x) => x[1]) };
   m.open("");
   const over2 = ev("dataTransfer", [], ["Files"]); fire(dlg, "dragover", over2);
   const drop2 = ev("dataTransfer", [file("b.png")]); fire(dlg, "drop", drop2);
@@ -839,8 +840,8 @@ run().catch((e) => { console.error(e); process.exit(1); });
 def test_the_message_dialog_attaches_for_its_addressee(tmp_path):
     """§4.5a *Message and Reply dialog: Attach / drop / paste* (TD-530, built by TD-531), under node:
     opened for a session, the dialog draws Attach, a drop on it and an image pasted into its text go up
-    the addressee's road, each path at the caret, and a paste carrying text is the text's; an upload
-    that ends after its dialog closed inserts nothing into the next; opened for nobody (a seat with no
+    the addressee's road, each path at the caret, and a paste carrying text is the text's; a batch whose
+    dialog closed inserts nothing into the next and sends none of its queued files; opened for nobody (a seat with no
     session, a board's Reply) Attach is hidden, the note says why, and nothing attaches; the shared
     upload posts to the addressee's own `/attach`."""
     got = _node(tmp_path, MAIL_PROBE)
@@ -849,7 +850,7 @@ def test_the_message_dialog_attaches_for_its_addressee(tmp_path):
     assert w["dragover"] is True and w["drop"] is True and w["shot_paste"] is True and w["text_paste"] is False
     assert w["sent"] == [["ao-x-1", "a.png"], ["ao-x-1", "image.png"]]
     assert w["value"] == "see /h/attachments/ao-x-1/a.png /h/attachments/ao-x-1/image.png "
-    assert got["late"] == {"value": "", "sent": 3}
+    assert got["late"] == {"value": "", "sent": 3, "names": ["a.png", "image.png", "slow.png"]}
     assert got["no_id"] == {
         "hidden": True,
         "title": "attach needs a session in the seat",
