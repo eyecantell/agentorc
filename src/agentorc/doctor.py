@@ -6,6 +6,7 @@ so each verdict is tested against a faked reading."""
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -59,11 +60,45 @@ def _since(iso: str | None) -> str:
         return "an unread start"
 
 
-def agent(version: str, promote: dict[str, Any] | None, ahead: dict[str, Any], node: bool) -> list[dict[str, Any]]:
+def agent(
+    version: str,
+    promote: dict[str, Any] | None,
+    ahead: dict[str, Any],
+    node: bool,
+    watch: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """The host agent answers (it did, or nothing below was read), its version, and this repo's live
     build against `main`: the promote's reading when the repo carries one (`host.promotes`, §6
     *Promote*), else the running build against `origin/main` in its source (`build.ahead`). Behind
-    is a warning: the policy may hold on purpose (§6 *A rollback*)."""
+    is a warning: the policy may hold on purpose (§6 *A rollback*). At the home the line also says
+    whether the watch stands (§4.10 *When the home itself is down*, TD-497): its timer and last run
+    on the line, or a warning of its own naming the press that installs it."""
+    rows = _build(version, promote, ahead, node)
+    if node or watch is None:
+        return rows
+    if watch.get("loaded") and watch.get("active") == "active":
+        rows[0]["text"] += f" · watch: {WATCH_TIMER}, last run {_hhmm(watch.get('last'))}"
+        rows[0]["watch"] = watch
+        return rows
+    why = "no watch timer" if not watch.get("loaded") else f"the watch timer is {watch.get('active') or 'inactive'}"
+    text = (
+        f"agent — {why}: nothing outside the user manager tells you the host agent is down "
+        "(`sudo ao service install --system`)"
+    )
+    return [*rows, _row("agent", WARNING, text, watch=watch)]
+
+
+WATCH_TIMER = "agentorc-watch.timer"
+_CLOCK = re.compile(r"\b(\d\d:\d\d):\d\d\b")
+
+
+def _hhmm(last: Any) -> str:
+    """systemd's `LastTriggerUSec` (*Fri 2026-10-09 14:35:02 BST*) as *14:35*; *none yet* before the first."""
+    m = _CLOCK.search(str(last or ""))
+    return m.group(1) if m else "none yet"
+
+
+def _build(version: str, promote: dict[str, Any] | None, ahead: dict[str, Any], node: bool) -> list[dict[str, Any]]:
     if node:
         return [_row("agent", HOME, f"agent — {version}; the build against main is read at the home")]
     if promote:

@@ -11,6 +11,11 @@ A third unit, `agentorc-tmux`, is a **system** unit (design §4.1, TD-488): the 
 `system.slice`, outside the user manager's subtree, so a stop of `systemd --user` takes the agent
 and the UI down and no session. It is root's to write: `install` stages its text under the home and
 prints the one command the person runs as root, `ao service install --system`, which writes it in.
+
+Beside it, the same press installs the **watch** (design §4.10 *When the home itself is down*, TD-497):
+`agentorc-watch.timer` runs `agentorc-watch.service` every five minutes, a oneshot as the person whose
+`ExecStartPre` (root's, by its `+`) starts the user manager when it is stopped; `agentorc-watch` itself
+(`agentorc.watch`) asks the home's socket and tells the person.
 """
 
 from __future__ import annotations
@@ -21,10 +26,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 UNIT_DIR = Path("~/.config/systemd/user").expanduser()
 UNITS = ("agentorc-agent", "agentorc-ui")
 TMUX_UNIT = "agentorc-tmux"  # the system unit (design §4.1, TD-495)
+WATCH_UNIT = "agentorc-watch"  # the watch's service and timer, system units beside it (§4.10, TD-497)
 SYSTEM_DIR = Path("/etc/systemd/system")
 # Where the UI listens (design §4.5: localhost, never the LAN) — the one source `ao ui`, `agentorc-ui`
 # and `ao service install` default to (TD-149 (7)); the unit carries whatever the install was given.
@@ -122,10 +129,54 @@ WantedBy=multi-user.target
 """
 
 
+def watch_service_text(user: str, uid: int, home: str | None = None) -> str:
+    """The watch's one run (design §4.10 *When the home itself is down*): a oneshot as the person;
+    `ExecStartPre=+` runs as root and starts the user manager — a no-op while it runs — before
+    `agentorc-watch` asks the home's socket; its `-` lets a start that fails still be followed by the
+    run, so a manager that will not start is told as silence rather than not at all. The same text
+    made by the person or by root for them."""
+    return f"""[Unit]
+Description=agentorc watch (the user manager runs; the host agent answers)
+
+[Service]
+Type=oneshot
+User={user}
+ExecStartPre=-+/usr/bin/systemctl start user@{uid}.service
+ExecStart={_bin("agentorc-watch")}
+Environment=PATH={_path_env(home)}
+Environment=LANG=C.UTF-8
+"""
+
+
+def watch_timer_text() -> str:
+    """Every `WATCH_EVERY` (5 min), the first two minutes after boot (§4.10)."""
+    return f"""[Unit]
+Description=agentorc watch, every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit={WATCH_UNIT}.service
+
+[Install]
+WantedBy=timers.target
+"""
+
+
+def system_units(user: str, uid: int, home: str | None = None) -> dict[str, str]:
+    """The system units' file names and texts, in the order they are enabled: the tmux server
+    (design §4.1), then the watch's service and timer (§4.10)."""
+    return {
+        f"{TMUX_UNIT}.service": tmux_unit_text(user, home),
+        f"{WATCH_UNIT}.service": watch_service_text(user, uid, home),
+        f"{WATCH_UNIT}.timer": watch_timer_text(),
+    }
+
+
 def _staged() -> Path:
     from sessionorc import paths
 
-    return paths.home() / "systemd" / f"{TMUX_UNIT}.service"
+    return paths.home() / "systemd"
 
 
 def system_line() -> str:
@@ -133,19 +184,21 @@ def system_line() -> str:
     return f"sudo {_bin('ao')} service install --system"
 
 
-def stage_tmux_unit(user: str | None = None) -> Path | None:
-    """`ao service install`'s third step (design §4.1, TD-495): when the installed system unit is
-    absent or differs from the text this install would write, the text is written under the home
-    for the person to read, and its path returned; None when the installed one is current."""
-    text = tmux_unit_text(user or getpass.getuser())
-    try:
-        if (SYSTEM_DIR / f"{TMUX_UNIT}.service").read_text() == text:
-            return None
-    except OSError:
-        pass
-    staged = _staged()
-    staged.parent.mkdir(parents=True, exist_ok=True)
-    staged.write_text(text)
+def stage_system_units(user: str | None = None) -> list[Path]:
+    """`ao service install`'s third step (design §4.1, TD-495; the watch, TD-497): each system unit
+    whose installed file is absent or differs from the text this install would write is written
+    under the home for the person to read, and its path returned; none when every one is current."""
+    staged = []
+    for name, text in system_units(user or getpass.getuser(), os.getuid()).items():
+        try:
+            if (SYSTEM_DIR / name).read_text() == text:
+                continue
+        except OSError:
+            pass
+        path = _staged() / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        staged.append(path)
     return staged
 
 
@@ -164,10 +217,11 @@ def _server_answers(uid: int) -> bool:
 
 
 def install_system() -> str:
-    """`ao service install --system`, as root (design §4.1): the unit written into
-    `/etc/systemd/system`, then `daemon-reload` and `enable --now`. The text is **made again here**
-    for `SUDO_USER`, never read from the staged file: that file is the person's, and any session can
-    write it, so copying it would hand root to whatever rewrote it. Refused for anyone but root,
+    """`ao service install --system`, as root (design §4.1): the tmux unit and the watch's service and
+    timer (§4.10) written into `/etc/systemd/system`, then `daemon-reload` and `enable --now` of the
+    tmux unit and the timer. The text is **made again here**
+    for `SUDO_USER`, never read from the staged files: they are the person's, and any session can
+    write them, so copying them would hand root to whatever rewrote them. Refused for anyone but root,
     naming the line; without a person to run it as; and while a server not the unit's still answers
     on the person's default socket — two servers on one socket orphan every session in the first."""
     import pwd
@@ -183,20 +237,23 @@ def install_system() -> str:
         raise RuntimeError(
             f"no person to run the tmux server as (SUDO_USER={person or 'unset'}): run `{system_line()}`"
         )
-    target = SYSTEM_DIR / f"{TMUX_UNIT}.service"
     active = subprocess.run(["systemctl", "is-active", f"{TMUX_UNIT}.service"], capture_output=True, text=True)
     if active.stdout.strip() != "active" and _server_answers(pw.pw_uid):
         raise RuntimeError(
             f"a tmux server already answers on {person}'s default socket: stop the teams and that server "
             "first (every session in it ends), then run this again"
         )
-    target.write_text(tmux_unit_text(person, pw.pw_dir))
-    target.chmod(0o644)
-    for args in (("daemon-reload",), ("enable", "--now", f"{TMUX_UNIT}.service")):
+    written = []
+    for name, text in system_units(person, pw.pw_uid, pw.pw_dir).items():
+        target = SYSTEM_DIR / name
+        target.write_text(text)
+        target.chmod(0o644)
+        written.append(str(target))
+    for args in (("daemon-reload",), ("enable", "--now", f"{TMUX_UNIT}.service", f"{WATCH_UNIT}.timer")):
         cp = subprocess.run(["systemctl", *args], capture_output=True, text=True)
         if cp.returncode != 0:
             raise RuntimeError(cp.stderr.strip() or cp.stdout.strip())
-    return str(target)
+    return written
 
 
 def tmux_placement() -> str:
@@ -222,6 +279,37 @@ def tmux_placement() -> str:
             "ends every session; `ao service install` prints the system unit"
         )
     return f"tmux: server {pid}, not under systemd ({cgroup or 'cgroup unknown'})"
+
+
+def watch_reading() -> dict[str, Any]:
+    """Whether the watch stands (design §4.7 **agent**, §4.10): its timer's load and active states and
+    its last run, `LastTriggerUSec` in systemd's words (*n/a* before the first). A read any user may
+    make of a system unit; `{"loaded": False}` with no systemd at all."""
+    try:
+        cp = subprocess.run(
+            [
+                "systemctl",
+                "show",
+                f"{WATCH_UNIT}.timer",
+                "-p",
+                "LoadState",
+                "-p",
+                "ActiveState",
+                "-p",
+                "LastTriggerUSec",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {"loaded": False}
+    got = dict(ln.split("=", 1) for ln in cp.stdout.splitlines() if "=" in ln)
+    return {
+        "loaded": got.get("LoadState") == "loaded",
+        "active": got.get("ActiveState", ""),
+        "last": got.get("LastTriggerUSec", ""),
+    }
 
 
 def _systemctl(*args: str) -> subprocess.CompletedProcess[str]:
@@ -304,4 +392,10 @@ def status() -> str:
     )
     lines.append(linger.stdout.strip() or "Linger: unknown")
     lines.append(tmux_placement())
+    watch = watch_reading()
+    lines.append(
+        f"{WATCH_UNIT}.timer: {watch.get('active') or 'inactive'}"
+        if watch["loaded"]
+        else f"{WATCH_UNIT}.timer: not installed"
+    )
     return "\n".join(lines)

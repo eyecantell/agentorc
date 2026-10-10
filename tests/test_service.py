@@ -93,17 +93,49 @@ def test_the_tmux_system_unit_text():
     assert "default.target" not in t, "a system unit, never the user manager's"
 
 
-def test_install_stages_the_system_unit_only_when_it_is_absent_or_differs(tmp_path, monkeypatch):
+def test_the_watch_unit_texts():
+    """Design §4.10 *When the home itself is down* (TD-497): a oneshot as the person whose
+    `ExecStartPre` is root's and starts the user manager, on a system timer every five minutes."""
+    t = service.watch_service_text("paul", 1000, "/home/paul")
+    for line in (
+        "Type=oneshot",
+        "User=paul",
+        "ExecStartPre=-+/usr/bin/systemctl start user@1000.service",
+        "Environment=LANG=C.UTF-8",
+    ):
+        assert f"{line}\n" in t
+    assert t.split("ExecStart=")[1].split("\n")[0].endswith("agentorc-watch")
+    assert ":/home/paul/.local/bin:" in t, "doppler and the venv resolve as the agent unit's PATH does"
+    assert "[Install]" not in t, "the timer is what is enabled, never the service"
+    timer = service.watch_timer_text()
+    for line in ("OnBootSec=2min", "OnUnitActiveSec=5min", "Unit=agentorc-watch.service", "WantedBy=timers.target"):
+        assert f"{line}\n" in timer
+    assert list(service.system_units("paul", 1000)) == [
+        "agentorc-tmux.service",
+        "agentorc-watch.service",
+        "agentorc-watch.timer",
+    ]
+
+
+def test_install_stages_the_system_units_only_when_absent_or_differing(tmp_path, monkeypatch):
+    import os
+
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(service, "SYSTEM_DIR", tmp_path / "etc")
-    staged = service.stage_tmux_unit("paul")
-    assert staged == tmp_path / "home" / "systemd" / "agentorc-tmux.service"
-    assert staged.read_text() == service.tmux_unit_text("paul")
+    units = service.system_units("paul", os.getuid())
+    staged = service.stage_system_units("paul")
+    assert staged == [tmp_path / "home" / "systemd" / name for name in units]
+    assert [p.read_text() for p in staged] == list(units.values())
     (tmp_path / "etc").mkdir()
+    for name, text in units.items():
+        (tmp_path / "etc" / name).write_text(text)
     (tmp_path / "etc" / "agentorc-tmux.service").write_text("[Service]\nExecStart=/old/tmux -D\n")
-    assert service.stage_tmux_unit("paul") == staged, "an installed unit that differs is staged again"
-    (tmp_path / "etc" / "agentorc-tmux.service").write_text(service.tmux_unit_text("paul"))
-    assert service.stage_tmux_unit("paul") is None, "the installed one is current: no root line"
+    assert service.stage_system_units("paul") == staged[:1], "an installed unit that differs is staged again"
+    (tmp_path / "etc" / "agentorc-tmux.service").write_text(units["agentorc-tmux.service"])
+    (tmp_path / "etc" / "agentorc-watch.timer").unlink()
+    assert service.stage_system_units("paul") == staged[2:], "the watch's timer absent beside a current tmux unit"
+    (tmp_path / "etc" / "agentorc-watch.timer").write_text(units["agentorc-watch.timer"])
+    assert service.stage_system_units("paul") == [], "every one current: no root line"
 
 
 def test_install_system_refuses_anyone_but_root(monkeypatch):
@@ -133,13 +165,17 @@ def test_install_system_writes_the_unit_made_again_as_root_and_starts_it(tmp_pat
     with pytest.raises(RuntimeError, match="no person to run the tmux server as"):
         service.install_system()
     monkeypatch.setenv("SUDO_USER", me)
-    staged = service.stage_tmux_unit(me)
-    staged.write_text("[Service]\nUser=root\nExecStart=/bin/sh -c 'evil'\n")  # rewritten by a session
-    assert service.install_system() == str(tmp_path / "etc" / "agentorc-tmux.service")
-    assert (tmp_path / "etc" / "agentorc-tmux.service").read_text() == service.tmux_unit_text(
-        me, pwd.getpwnam(me).pw_dir
-    )
-    assert ran[1:] == [["systemctl", "daemon-reload"], ["systemctl", "enable", "--now", "agentorc-tmux.service"]]
+    for staged in service.stage_system_units(me):  # rewritten by a session
+        staged.write_text("[Service]\nUser=root\nExecStart=/bin/sh -c 'evil'\n")
+    pw = pwd.getpwnam(me)
+    units = service.system_units(me, pw.pw_uid, pw.pw_dir)
+    assert service.install_system() == [str(tmp_path / "etc" / name) for name in units]
+    for name, text in units.items():
+        assert (tmp_path / "etc" / name).read_text() == text
+    assert ran[1:] == [
+        ["systemctl", "daemon-reload"],
+        ["systemctl", "enable", "--now", "agentorc-tmux.service", "agentorc-watch.timer"],
+    ]
     monkeypatch.setattr(service, "_server_answers", lambda uid: True)  # the old server, not the unit's
     with pytest.raises(RuntimeError, match="already answers on .* default socket"):
         service.install_system()
@@ -171,14 +207,36 @@ def test_ao_service_install_prints_the_root_line_only_when_staged(tmp_path, monk
 
     monkeypatch.setattr(service, "install", lambda **kw: ["u.service"])
     monkeypatch.setattr(service, "status", lambda: "agentorc-agent: active")
-    monkeypatch.setattr(service, "stage_tmux_unit", lambda: tmp_path / "agentorc-tmux.service")
+    monkeypatch.setattr(
+        service, "stage_system_units", lambda: [tmp_path / "agentorc-tmux.service", tmp_path / "agentorc-watch.timer"]
+    )
     assert cli.main(["service", "install"]) == 0
     out = capsys.readouterr().out
-    assert f"staged {tmp_path / 'agentorc-tmux.service'}; run once as root: sudo " in out
+    staged = f"{tmp_path / 'agentorc-tmux.service'}, {tmp_path / 'agentorc-watch.timer'}"
+    assert f"staged {staged}; run once as root: sudo " in out
     assert out.rstrip().endswith("ao service install --system")
-    monkeypatch.setattr(service, "stage_tmux_unit", lambda: None)
+    monkeypatch.setattr(service, "stage_system_units", lambda: [])
     assert cli.main(["service", "install"]) == 0
     assert "run once as root" not in capsys.readouterr().out
     monkeypatch.setattr(service.os, "geteuid", lambda: 1000)
     assert cli.main(["service", "install", "--system"]) == 1
     assert "root's to install" in capsys.readouterr().err
+
+
+def test_status_names_the_watch_timer(monkeypatch):
+    class Out:
+        def __init__(self, stdout):
+            self.stdout, self.stderr, self.returncode = stdout, "", 0
+
+    def fake(argv, **kw):
+        if argv[:2] == ["systemctl", "show"]:
+            return Out(shown)
+        return Out("active\n")
+
+    monkeypatch.setattr(service.subprocess, "run", fake)
+    monkeypatch.setattr(service, "tmux_placement", lambda: "tmux: no server")
+    shown = "LoadState=loaded\nActiveState=active\nLastTriggerUSec=Fri 2026-10-09 14:35:02 BST\n"
+    assert service.watch_reading() == {"loaded": True, "active": "active", "last": "Fri 2026-10-09 14:35:02 BST"}
+    assert service.status().endswith("tmux: no server\nagentorc-watch.timer: active")
+    shown = "LoadState=not-found\nActiveState=inactive\nLastTriggerUSec=n/a\n"
+    assert service.status().endswith("agentorc-watch.timer: not installed")

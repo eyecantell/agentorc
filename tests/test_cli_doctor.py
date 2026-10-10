@@ -182,6 +182,8 @@ def agent(monkeypatch):
     monkeypatch.setattr(cli, "call_sync", fake)
     monkeypatch.setattr(cli, "_build_ahead", lambda host: {"ref": "origin/main", "ahead": 0})
     monkeypatch.setattr(cli, "_doctor_org", lambda files, node: doctor.org({}, files, 1, node))
+    state["watch"] = None  # unread: the agent line as it was before the watch (TD-497 has its own test)
+    monkeypatch.setattr(cli.service, "watch_reading", lambda: state["watch"])
     return state
 
 
@@ -389,3 +391,24 @@ def test_a_failed_read_still_cleans_up_and_a_failed_cleanup_is_said(probed, monk
     assert texts[1][0] == "warning" and "ao-probe-grind not cleaned up (down)" in texts[1][1]
     made = next(p for m, p in calls if m == "create")
     assert not pathlib.Path(made["dir"]).exists()
+
+
+def test_the_agent_line_says_whether_the_watch_stands(agent, capsys):
+    """Design §4.7 **agent** (TD-497): the timer and its last run on the line, or a warning naming the press."""
+    agent["watch"] = {"loaded": True, "active": "active", "last": "Fri 2026-10-09 14:35:02 BST"}
+    assert cli.main(["doctor", "agent"]) == 0
+    assert capsys.readouterr().out.splitlines()[0].endswith(" · watch: agentorc-watch.timer, last run 14:35")
+    agent["watch"] = {"loaded": False}
+    assert cli.main(["doctor", "agent"]) == 0, "a warning, never a lack"
+    out = capsys.readouterr().out.splitlines()
+    assert out[1] == (
+        "warning: agent — no watch timer: nothing outside the user manager tells you the host agent is down "
+        "(`sudo ao service install --system`)"
+    )
+    assert out[-1] == "ok: 1 check, 1 warning"
+    agent["watch"] = {"loaded": True, "active": "inactive", "last": "n/a"}
+    assert cli.main(["doctor", "agent"]) == 0
+    assert "warning: agent — the watch timer is inactive: " in capsys.readouterr().out
+    assert doctor.agent("0.3.1", None, {}, True, None)[0]["verdict"] == "home only", "a node reads no watch"
+    standing = {"loaded": True, "active": "active", "last": "n/a"}
+    assert doctor.agent("0.3.1", None, {"ahead": 0}, False, standing)[0]["text"].endswith("last run none yet")
