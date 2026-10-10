@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-532 | A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward | Medium | Open |
-| TD-533 | `test_recent_files.py` holds no test for the stale queued edit: the `not stale` guard on `files` can be deleted and the module passes | Medium | Open |
 | TD-534 | The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes | Medium | Open |
 
 ---
@@ -644,20 +643,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a design round settles: (1) a file link sends the session's folder form first, exactly the editor button's link: a new window when none holds the worktree, the existing one brought forward when one does. After a short wait, it sends the file form, which carries no `windowId=_blank` since TD-526, so the file lands in the window just brought forward or opened. (2) The wait: how long, fixed or a setting. To confirm: how long a new remote window takes to connect, and whether a file link that lands before it goes to the previously used window, as the last-used rule (§4.6 ~L140) suggests. Say what the person sees when that happens. Consider skipping the folder launch when this page sent it for the same session moments ago. (3) The prompt: to confirm how each browser asks before handing a `vscode:` link to the editor, and whether allowing it for the site makes the two launches one press. Say so in the help. (4) A person's own template, a container node's form, and `open_in: none` each say what they do; the second launch applies only where a folder form exists. (5) The recent files list (TD-527) takes the same road. **Done when** the design says it and the build entry it names is ledgered.
 
 **Related:** TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (the Session card, #1476), TD-501 (the pane's links).
-
-## TD-533: `test_recent_files.py` holds no test for the stale queued edit: the `not stale` guard on `files` can be deleted and the module passes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing #1474)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` `_apply_event` (the `files` branch added by #1474, TD-527); `tests/test_recent_files.py`
-
-**Why:** #1474 added `if isinstance(f := event.get("file"), str) and f and not stale:` with the comment *a stale queued edit is dropped, since at the top it would read newer than the edits after it*. Probe, on `origin/main` 65ef7f0f: change that line to `... and f:` in the worktree and run `pytest -q tests/test_recent_files.py` — **3 passed**. The module's integration test sends only live hooks (`person.call("hook", ...)` with no `at` older than the last live one), so the drop of a stale edit, the one decision the guard makes, is held by no test; a later edit reordered under an older queued one would go unseen.
-
-**Fix:** add a test that applies a queued `PostToolUse` event carrying `file` whose `at` is older than the session's last live hook (`stale`, ~L3637) and asserts the record's `files` does not move, and that the same event with a newer `at` does. Revert the guard to confirm it fails, then restore it. **Done when** the test is named here under **Resolved:**.
 
 ## TD-534: The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes
 

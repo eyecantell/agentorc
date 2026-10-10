@@ -9191,3 +9191,19 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 
 
 **Related:** TD-525 (the design), TD-524 / TD-526 (the file form's line and window), TD-501 (the pane's links), TD-408 (the rail), TD-156 (the Session card).
+
+## TD-533: `test_recent_files.py` holds no test for the stale queued edit: the `not stale` guard on `files` can be deleted and the module passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1474)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` `_apply_event` (the `files` branch added by #1474, TD-527); `tests/test_recent_files.py`
+
+**Why:** #1474 added `if isinstance(f := event.get("file"), str) and f and not stale:` with the comment *a stale queued edit is dropped, since at the top it would read newer than the edits after it*. Probe, on `origin/main` 65ef7f0f: change that line to `... and f:` in the worktree and run `pytest -q tests/test_recent_files.py` — **3 passed**. The module's integration test sends only live hooks (`person.call("hook", ...)` with no `at` older than the last live one), so the drop of a stale edit, the one decision the guard makes, is held by no test; a later edit reordered under an older queued one would go unseen.
+
+**Fix:** add a test that applies a queued `PostToolUse` event carrying `file` whose `at` is older than the session's last live hook (`stale`, ~L3637) and asserts the record's `files` does not move, and that the same event with a newer `at` does. Revert the guard to confirm it fails, then restore it. **Done when** the test is named here under **Resolved:**.
+
+**Resolved:** 2026-10-10 (PR #1481) — `tests/test_recent_files.py::test_a_stale_queued_edit_leaves_files_alone`: a queued edit stamped before the last live hook leaves `files` alone (its adapter id applies), one stamped after moves to the top; with the guard reverted to `... and f:` it fails, restored it passes.
