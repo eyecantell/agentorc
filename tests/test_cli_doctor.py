@@ -320,6 +320,7 @@ def probed(agent, monkeypatch):
     monkeypatch.setattr(cli, "call_sync", fake)
     monkeypatch.setattr(cli.doctor, "PROBE_WAIT", 0.3)
     monkeypatch.setattr(cli, "_probe", lambda row, wait=0.3, every=0.01, f=cli._probe: f(row, wait, every))
+    state["fake"] = fake
     return calls, state
 
 
@@ -352,3 +353,39 @@ def test_a_probe_is_refused_to_a_session_and_outside_hooks_and_for_an_unknown_pr
     assert cli.main(["doctor", "--probe"]) == 1
     assert "a person's own" in capsys.readouterr().err
     assert not [m for m, _ in calls if m == "create"]
+
+
+def test_a_refused_launch_is_the_probes_lack_and_the_other_checks_still_print(probed, monkeypatch, capsys):
+    calls, state = probed
+
+    def refuse(method, **params):
+        if method == "create":
+            raise cli.AgentError("probe-grind is taken")
+        return state["fake"](method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    assert cli.main(["doctor", "--probe"]) == 1
+    out = capsys.readouterr().out
+    assert "lacking: hooks — probe grind: launch refused: probe-grind is taken" in out
+    assert "ok: org" in out
+
+
+def test_a_failed_read_still_cleans_up_and_a_failed_cleanup_is_said(probed, monkeypatch, capsys):
+    calls, state = probed
+
+    def broken(method, **params):
+        if method == "explain":
+            raise cli.AgentError("gone")
+        if method == "kill":
+            calls.append((method, params))
+            raise cli.AgentUnavailable("down")
+        return state["fake"](method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", broken)
+    assert cli.main(["--json", "doctor", "hooks", "--probe"]) == 1
+    rows = json.loads(capsys.readouterr().out)["checks"]
+    texts = [(r["verdict"], r["text"]) for r in rows if r.get("probe")]
+    assert texts[0] == ("lacking", "hooks — probe grind: record unread: gone")
+    assert texts[1][0] == "warning" and "ao-probe-grind not cleaned up (down)" in texts[1][1]
+    made = next(p for m, p in calls if m == "create")
+    assert not pathlib.Path(made["dir"]).exists()

@@ -166,6 +166,16 @@ def probe(profile: str, took: float | None, tail: list[str], wait: float = PROBE
     return _row("hooks", LACKING, f"hooks — probe {profile}: no hook in {int(wait)}s{last}", probe=profile, tail=tail)
 
 
+def probe_failed(profile: str, what: str, why: str) -> dict[str, Any]:
+    return _row("hooks", LACKING, f"hooks — probe {profile}: {what}: {why}", probe=profile)
+
+
+def probe_left(profile: str, sid: str, why: str) -> dict[str, Any]:
+    """A probe whose record could not be killed or removed: the person cleans it up by name."""
+    text = f"hooks — probe {profile}: {sid} not cleaned up ({why}): `ao kill {sid}`, then `ao forget {sid}`"
+    return _row("hooks", WARNING, text, probe=profile, id=sid)
+
+
 def identity(r: dict[str, Any]) -> list[dict[str, Any]]:
     """The mode, the detached-process check and the alarms standing (§4.8a)."""
     n = len(r.get("alarms") or []) + sum(len(a) for a in (r.get("sessions") or {}).values())

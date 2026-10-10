@@ -2385,7 +2385,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         elif check == "hooks":
             rows += doctor.hooks(reading["hooks"], datetime.now(UTC))
             if args.probe is not None:
-                rows += [_probe(row) for row in _probe_rows(reading["profiles"], args.probe)]
+                for row in _probe_rows(reading["profiles"], args.probe):
+                    if not args.json:  # up to 30 s each: say which is running
+                        print(f"probing {row['profile']}…", file=sys.stderr)
+                    rows += _probe(row)
         elif check == "identity":
             rows += doctor.identity(reading["identity"])
         elif check == "profiles":
@@ -2415,10 +2418,12 @@ def _probe_rows(profiles: list[dict[str, Any]], name: str) -> list[dict[str, Any
     raise AgentError(f"no profile {name!r}: the profiles are {', '.join(r['profile'] for r in rows) or 'none'}")
 
 
-def _probe(row: dict[str, Any], wait: float = doctor.PROBE_WAIT, every: float = 0.5) -> dict[str, Any]:
+def _probe(row: dict[str, Any], wait: float = doctor.PROBE_WAIT, every: float = 0.5) -> list[dict[str, Any]]:
     """One scratch launch (design §4.7 `--probe`): the profile under its layer, in a temporary
     directory, with no prompt; its record watched for the first hook (the SessionStart) up to `wait`;
-    then the pane killed and the record removed, whatever happened, and the directory with it."""
+    then the pane killed and the record removed, whatever happened, and the directory with it. A
+    refused launch is the probe's lack, never the command's failure; a cleanup that failed is a
+    warning naming the record, since a live session would otherwise be left unsaid."""
     import shutil
     import tempfile
     import time
@@ -2426,6 +2431,7 @@ def _probe(row: dict[str, Any], wait: float = doctor.PROBE_WAIT, every: float = 
     profile = str(row["profile"])
     tmp = tempfile.mkdtemp(prefix=f"ao-probe-{profile}-")
     sid = None
+    out: list[dict[str, Any]] = []
     try:
         s = call_sync("create", name=f"probe-{profile}", dir=tmp, adapter=str(row["adapter"]), profile=profile)
         sid = str(s["id"])
@@ -2434,17 +2440,23 @@ def _probe(row: dict[str, Any], wait: float = doctor.PROBE_WAIT, every: float = 
         while (took := time.monotonic() - start) < wait:
             got = call_sync("explain", id=sid)
             if got.get("last_hook"):
-                return doctor.probe(profile, took, [], wait)
+                out.append(doctor.probe(profile, took, [], wait))
+                break
             tail = list(got.get("tail") or [])
             time.sleep(every)
-        return doctor.probe(profile, None, tail[-5:], wait)
+        else:
+            out.append(doctor.probe(profile, None, tail[-5:], wait))
+    except AgentError as e:
+        out.append(doctor.probe_failed(profile, "launch refused" if sid is None else "record unread", str(e)))
     finally:
         if sid:
-            with contextlib.suppress(AgentError):
+            try:
                 call_sync("kill", id=sid)
-            with contextlib.suppress(AgentError):
                 call_sync("remove", id=sid)
+            except Exception as e:  # noqa: BLE001 — said, never raised over the probe's own result
+                out.append(doctor.probe_left(profile, sid, str(e)))
         shutil.rmtree(tmp, ignore_errors=True)
+    return out
 
 
 def _version() -> str:
@@ -3586,7 +3598,7 @@ def build_parser() -> argparse.ArgumentParser:
         const="",
         metavar="profile",
         help="hooks: launch a scratch session of each profile (or this one) and wait 30s for its first hook; "
-        "a person's own",
+        "a person's own; after the check: ao doctor hooks --probe [profile]",
     )
     p.set_defaults(fn=cmd_doctor)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
