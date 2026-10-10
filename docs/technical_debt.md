@@ -43,7 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448; the look sent to Paul (m-37f220f9e955) |
-| TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
@@ -630,23 +629,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §4.5a *Copy / Paste* says. (1) `pasteClip` reads `navigator.clipboard.read()`: an item carrying `text/plain` is pasted as text, as today; one carrying no text and a file type (`image/png` first) is turned into a `File` named by `AO.attachName` and handed to the attach road's `attach([file])`, and the path it answers is written with `term.paste(path)` (xterm wraps it in bracketed-paste marks when the tool has mode 2004 on, which Claude Code has, so it lands in the prompt and is not sent); nothing else is typed. (2) `AO.wireAttach` gains a way to attach for the terminal that does not need the composer open (`shut()` guards the composer's own paste and drop alone — today it also blocks a file dropped on the terminal while the composer is closed, which the Attach row says works: a terminal drop takes the same open road, its path pasted into the terminal as a terminal paste's is), and inserts nothing at the composer's caret for a terminal paste or drop — the caller takes the path. (3) Read-only Focus: the existing *watching: paste is off — Take over to type* toast, before the clipboard is read. (4) A refusal — past `person.attach.max`, a node's session, `read()` denied (no secure context, or a browser without `clipboard.read`, which falls back to `readText()` and toasts *this browser pastes text only*) — is a toast in the RPC's or the browser's words. (5) Desktop only, as the Attach row is. Tests (under node, as `tests/test_attach.py`'s `_node` harness runs the page's functions, TD-370): a file-only clipboard goes to `attach` and the answered path to `term.paste`; a text clipboard still goes to `term.paste` as text and never to `attach`; a read-only Focus toasts and reads nothing; the composer closed still attaches from the terminal. **Done when** the tests pass and a screenshot pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its path in the prompt, unsent.
 
 **Related:** TD-472 (the design), TD-002 (the attach), TD-473/TD-478 (the road in pieces and the bound), TD-096 (read-only Focus).
-
-## TD-485: The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-09 (grinder-ao-2, TD-467 slice 2)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer) — §4.5a's **restarted** chip row: the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every `why` but `start` and `fill`, the window's entries and the ceiling count on hover, drawn as the *brief changed* chip is and never in the slot, gone at the window, never on a seat; §4.5's identity line, §4.10 and §6 name it. Built by TD-487. Was: Open.
-**Blocked by:** TD-487
-**Location:** design §4.5 *The card's anatomy* (row 5), §4.5a (the card rows), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the row-5 slot), `src/agentorc/ending.py` (`restart_words`, which `ao status -v` already uses)
-
-**Why:** TD-459's design said *the card's restart note and `ao status -v` say cache lapsed · idle 5h · 191k*, but no card surface draws any restart (the `restarts` field is read only by the ceiling, rule 8's *work started* header note and, since TD-467 slice 2, `ao status -v`'s `restarts:` line). A page change follows a §4.5a row, so the grinder built the CLI half and left the card to a design: where the note sits (row 5's slot, the report line's hover, or a chip as *brief changed* is), which `restarts` entries it names (the newest only, inside `RESTART_WINDOW`, every `why` or the tick's and the doorbell's alone), and how long it stays.
-
-**Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
-
-**Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
 
 ## TD-489: A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m
 

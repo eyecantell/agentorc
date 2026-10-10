@@ -8829,3 +8829,20 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-485 (the design), TD-467 (`ao status -v`'s line), TD-459 (the doorbell's restart), TD-217 (rule 7's restart), TD-103 (the ceiling).
 
 **Resolved:** 2026-10-10 (PR #1452) — `cards.restarted_view` derives the chip from `restarts` (no `start`, no `fill`, inside `RESTART_WINDOW`, the count by `agent_common._counted`), drawn short in the card's row 4 and whole beside *brief changed* on the Focus, never on a seat; each carries `data-until` and the page hides it once the window passes, delta or not. On a scratch home a person's Restart of a supervised shell session drew *restarted · person* on its card and Focus, hover *person, 9s ago / 0 of 3 in 2 h* (`docs/mockups/reviews/2026-10-10-td487-*.png`); *restarted · brief* and the two-hour expiry are held by the unit tests, since a tick restart for a changed brief needs a running team on the scratch home.
+
+## TD-485: The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (grinder-ao-2, TD-467 slice 2)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Resolved:** 2026-10-10 (the designer; archived with its build TD-487, PR #1452) — `cards.restarted_view` derives the **restarted** chip from `restarts` (no `start`, no `fill`, inside `RESTART_WINDOW`), drawn short in the card's row 4 and whole beside *brief changed* on the Focus, never on a seat, the window's entries and the ceiling count on hover, hidden by the page once the window passes; screenshots `docs/mockups/reviews/2026-10-10-td487-*.png`. Was: Designed 2026-10-09 (the designer) — §4.5a's **restarted** chip row: the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every `why` but `start` and `fill`, the window's entries and the ceiling count on hover, drawn as the *brief changed* chip is and never in the slot, gone at the window, never on a seat; §4.5's identity line, §4.10 and §6 name it. Built by TD-487. Was: Open.
+**Location:** design §4.5 *The card's anatomy* (row 5), §4.5a (the card rows), §4.10 *A lapsed cache is started again, not rung*; `src/agentorc/ui/cards.py` (the row-5 slot), `src/agentorc/ending.py` (`restart_words`, which `ao status -v` already uses)
+
+**Why:** TD-459's design said *the card's restart note and `ao status -v` say cache lapsed · idle 5h · 191k*, but no card surface draws any restart (the `restarts` field is read only by the ceiling, rule 8's *work started* header note and, since TD-467 slice 2, `ao status -v`'s `restarts:` line). A page change follows a §4.5a row, so the grinder built the CLI half and left the card to a design: where the note sits (row 5's slot, the report line's hover, or a chip as *brief changed* is), which `restarts` entries it names (the newest only, inside `RESTART_WINDOW`, every `why` or the tick's and the doorbell's alone), and how long it stays.
+
+**Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
+
+**Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
