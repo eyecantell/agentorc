@@ -2671,6 +2671,8 @@
       } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }
       try { localStorage.setItem(AO.draftKey(got.id), got.text); } catch (_) { /* no storage: Focus opens with an empty composer */ }
+      // …and Focus opens it, filled and focused, once: a draft the person folded stays on the bar (TD-500)
+      try { sessionStorage.setItem("ao.draft.open", got.id); } catch (_) { /* no storage: it waits on the bar */ }
       location.href = `/focus/${encodeURIComponent(got.id)}`;
     };
     say(""); plan();
@@ -3607,9 +3609,14 @@
       fill();
     }
     // a draft (§4.5a **Open a session**, TD-219; **the bar**, TD-500): kept in this browser as the person
-    // writes it and dropped once it is sent; one waiting on load is opened, filled, focused and not sent
+    // writes it and dropped once it is sent. The Add entry form's is opened on load, filled, focused and
+    // not sent; one the person folded waits on the bar, named there
     const draft = (() => { try { return localStorage.getItem(AO.draftKey(id)); } catch (_) { return null; } })();
-    if (draft !== null && !compose.value) { compose.value = draft; if (cbar) cbar.open(); compose.focus(); }
+    const handed = (() => { try { const v = sessionStorage.getItem("ao.draft.open") === id; if (v) sessionStorage.removeItem("ao.draft.open"); return v; } catch (_) { return false; } })();
+    if (draft !== null && !compose.value) {
+      compose.value = draft;
+      if (!cbar || handed) { if (cbar) cbar.open(); compose.focus(); } else cbar.redraw();
+    }
     compose.addEventListener("input", () => { try { if (compose.value) localStorage.setItem(AO.draftKey(id), compose.value); else localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } });
     $("#send").addEventListener("click", async () => {
       const text = compose.value; if (!text.trim()) return;
