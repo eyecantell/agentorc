@@ -75,6 +75,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-09 (TD-490, the designer; after TD-488's outage three members read *exited · guessed from the screen*): **`confidence: tick`** for the host agent's own readings — a pane dead or gone, a kill, a close, `stalled?` — so only a classifier's verdict is dashed; the record's **`ended`** `{how, at, code?, reason?, by?, found?, down_since?}`, `down_since` from `host.json`'s `last_tick` at the agent's first tick after a start. Until this date a vanished pane and a kill were written `scraped`. Built by TD-498.
 - 2026-10-09 (TD-489, the designer): the table gains the row for a `Bash` call the kill guard refuses — `working`, and a `deny` with its reason (§4.3). Built by TD-496.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 12): §4.2 cut to the feed's rules — the dated build clauses left for this record: dev-cadence's TD-055 (b) of 2026-09-25 on the runner fallback; the composer landing since TD-336, built by TD-339, and the person's own session that read `working` with **→ Steer** until its first turn (TD-283); `scheduled` TD-026 designed 2026-09-25, built 2026-09-27 by TD-152; the incident behind the logged turn-start event (TD-201: an event that was not a turn's start turned a session `working` four seconds after a `Stop`, and it read `stalled?` unrung for 13 hours); *Outcomes reported* TD-079 built; *Mail read* TD-072 designed 2026-09-24, built by TD-141; TD-095 (e) and (f) and TD-017 on *Unseen idle*; *Waiting* TD-418 designed 2026-10-08, built by TD-428, its source TD-274; 3,124 → 3,067 words.
 - 2026-09-06: verified that a `--settings` file's hooks fire, which is what makes the per-launch settings layer viable.
@@ -256,6 +257,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-09 (TD-490, the designer): row 5 (b) gains **an exit, and how** — `ending.exit_words` from `ended`: the code, the tool's reason, *killed by <who>*, *pane gone · found <time>*, *… by a host agent down since <time>*, *· after wrap-up*. Built by TD-498.
 - 2026-10-09 (TD-485, the designer): the Focus identity line's marks gain *restarted · <why>*. Built by TD-487.
 - 2026-10-09 (TD-474, the designer): the Focus identity line's marks gain the terminal mark (§4.6 *Reconnect contract*). Built by TD-480.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 4): §4.5 cut to what each screen shows and does — every *designed/built — TD-NNN* clause, Paul's quotes, the incident stories, the *until TD-NNN* was-clauses and the *What it replaces* paragraphs left the text for this history, and what the code has since built reads as built. The section went from 18,406 to 16,799 words.
@@ -345,6 +347,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-490, the designer): the **state pill hover** row — the pill's title on each state, the ending's words on `exited` and `closed`, *guessed* only on a `scraped` state. Built by TD-498.
 - 2026-10-09 (TD-485, the designer; filed by grinder-ao-2 from TD-467 slice 2, which built `ao status -v`'s `restarts:` line and found no card surface for a restart): the **restarted** chip — the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every entry in the window on hover with the count toward the ceiling, a new badge in the card's row 4 beside the report line in a short form and the full words on the Focus header beside *brief changed*, never in the slot; `start` and `fill` are not restarts. Built by TD-487.
 - 2026-10-09 (TD-474, the designer): the **terminal mark** row — three marks, their graces and hovers. Built by TD-480.
 - 2026-10-09 (TD-472, the designer; Paul asked why a screenshot pastes into the composer and not the terminal): a paste on the terminal that carries a file and no text takes the attachment road and its path is pasted into the terminal as a bracketed paste; until then the terminal's Paste read the clipboard's text alone, so an image paste sent nothing and said nothing. Built by TD-479.
@@ -605,6 +608,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-09 (TD-490, the designer): `ao status -v` prints an exited record's ending as it prints a closer; `~` marks `scraped` alone. Built by TD-498.
 - 2026-10-09 (TD-489, the designer): the doctor's **agent** check says whether the watch timer stands, a warning naming the root press when it does not. Built by TD-497.
 - 2026-10-09 (TD-488, the designer): `ao doctor`'s tmux check says where the server runs — the system unit, or a warning under the user manager. Built by TD-495.
 - 2026-10-09 (TD-465 slice 1, grinder-ao-1): the `doctor` RPC built — a never-gated read (`identity.READS`) returning `{host, tmux, hooks, identity, profiles, nodes, files}` raw: the tmux server against the first one the agent read (`_id_tmux_first`, kept beside `_id_tmux`), each live hook-fed session's `confidence` and newest hook, the event queue's unapplied lines, `rpc_identity`, each profile through the adapter's new optional `doctor_profiles` (config dir, credentials, a metered profile's key, its settings layers and whether each command resolves) with its account's usage — the last reading when younger than `USAGE_FRESH`, else one request per account, none into a 429's cool-off — each node's link and a container node's build against the home's wheel, and the two files' parse errors. The command, its verdicts and `--probe` are the next slices.
