@@ -161,7 +161,8 @@ def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeo
     (no origin) or shares no merge base with `HEAD` — each path absolute. One the porcelain holds is the
     file's own: its modification time and no `sha` (a deleted one the newest commit's time, else the
     read's); any other is the newest of the branch's commits that touched it, from one `git log
-    --name-only`. None when a read fails, so the record keeps what it had. Computed on each read and never kept; nothing is fetched."""
+    --name-only`. None when a read fails, so the record keeps what it had. Computed on each read and never
+    kept; nothing is fetched."""
     top = toplevel(directory, timeout=timeout)
     if not top:
         return None
