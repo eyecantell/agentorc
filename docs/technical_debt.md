@@ -53,9 +53,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Built — live check of #1439: `ao doctor hooks` once live |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Built (#1436); live check: no anchor fill after a promote's restart |
 
 ---
 
@@ -808,24 +806,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
 
-## TD-507: `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (grinder-ao-2, TD-465's live check)
-**Owner:** grinder
-**Kind:** live-check #1439
-**Status:** Built — PR #1439 (2026-10-10): `layer_reading` leaves out every command naming one of `CADENCE_WIRED_MARKERS`, tested in `tests/test_doctor.py`. Left: once #1439 is live (`ao promote status`), `ao doctor hooks` on kmaster — a read — prints no *does not resolve* line for the `+cadence` layers; it holds → archive with `**Resolved:**`.
-**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`layer_reading`: `c != CADENCE_HOOK_LINE`; `_resolves`; `CADENCE_WIRED_MARKERS`), `tests/` beside the hooks reading
-
-**Why:** `ao doctor` on the live copy (c469063, 2026-10-09) printed *warning: hooks — layer grind+cadence.json names f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi, which does not resolve*, and the same for `grind+cadence+unattended.json`. Those two layers were last written on 2026-09-11 and 2026-09-23 and carry dev-cadence's runner line from before 2026-09-25. `layer_reading` is meant to leave dev-cadence's line out, but it drops only a command equal to today's `CADENCE_HOOK_LINE`. `_resolves` then reads the shell snippet's first word (`f=…/cadence_hooks.sh;`) as a path that is not there. The line is guarded by `[ -x ]` and is harmless, so the warning names something that is not wrong. A person reading `ao doctor` learns to skip the hooks warnings, and the check exists for those warnings.
-
-**Fix:** leave out of the reading every command that names one of `CADENCE_WIRED_MARKERS` (dev-cadence's lines of any vintage), not just today's line. Add a test with a layer that carries the old line and a resolving `agentorc-hook`, which must read no warning.
-
-**Done when** that test passes, and `ao doctor hooks` on kmaster, once live, prints no *does not resolve* line for the `+cadence` layers.
-
-**Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
-
 ## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
 
 **Priority:** Low
@@ -841,21 +821,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-516: Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (the anchor, filled for the eighth time that evening with nothing new in its lane)
-**Owner:** grinder
-**Kind:** live-check #1436
-**Status:** Built — PR #1436 (grinder-ao-1, 2026-10-10): `HostAgent._promotes_read` is False until the promote pass first assigns its readings; until then `_refresh_repos` reads the live commit as unknown, and `_read_repos` gives each live check the `live` its checkout's last reading gave it (`_carry_live`); §6 rule 6 says so. The tests the Fix names pass. **Left:** the *Done when*'s live half, once #1436 is live (`ao promote status`) — after the next promote's restart, read the user journal and the anchor seat's record (`ao status -v`): no *the seat is due (work) — filling it* five to six minutes after the restart, unless the anchor lane really gained an entry.
-**Location:** `src/sessionorc/agent.py` (`self._promotes = {}` at start), `src/sessionorc/agent_tick.py` (`_live_commits`, `_work_due`), `src/sessionorc/ledger.py` (a live check's `live` is `"no"` when `live` is unknown), `src/sessionorc/work.py` (`reread` prunes an id the reading holds and the lane no longer matches)
-
-**Why:** On 2026-10-09 the user journal shows the host agent restarted by a promote at 19:56, 20:49, 21:15, 23:06 and 23:42 MDT, and each restart followed, 5–6 minutes later, by *ao-agentorc-ao-grind-anchor: the seat is due (work) — filling it* (20:02, 20:55, 21:21, 23:12, 23:47). Each fill found every anchor entry already read that day (TD-292, TD-358, TD-413, TD-460, TD-463, TD-466, TD-497 — all waiting on an event or the calendar) and closed as *a seat with nothing due*. The mechanism, read in the code: `_promotes` starts empty, so `_live_commits()` is `{}` until the promote survey's first reading. A ledger reading taken in that window marks every live check `live: "no"`, so `lane_matches` drops it from the `anchor` lane; `work.reread` prunes each such id from `lane_seen` (it is held by the reading and no longer matches — the rule meant for a live check that goes live after the seat saw it as a build). When the survey lands, every live check matches again, is missing from `lane_seen`, and is *new*: `seat_due: {by: work, ids: [...]}`. Each cold fill reads the brief and the ledger for nothing. The same window reaches rule 6's lane news for any member whose lane holds a live check (a `free-pick` lane takes one whose build is live).
-
-**Fix:** Unknown is not *not live*. Until the promote reading has run once since the start, `_live_commits` answers None (or the reading marks a live check `live: "unknown"`), and `reread` neither prunes nor reports an id whose match turns on it — or the tick skips the `work` trigger and rule 6's lane news until the first promote reading. Say it in design §6 rule 6 (*`lane_seen` is the lane's memory*) beside the go-live case. Tests: a restart (empty `_promotes`) then a reading then the survey raises no `seat_due` for live checks already in `lane_seen`; a live check whose build goes live after the seat saw it as a build is still due once.
-
-**Done when** a promote's restart is followed by no anchor fill when the lane gained nothing, and the tests above pass.
-
-**Related:** TD-386 (the anchor seat's `work` trigger), TD-407 (`reread`), TD-323 (a live check's `live`).

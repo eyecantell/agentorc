@@ -8718,3 +8718,43 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-378 (archived; the research), TD-151 (metered profiles), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
 
 **Resolved:** 2026-10-10 — designed 2026-10-09 (PR #1341) and built by TD-470 (PR #1447), archived beside it; the lasting content is design §4.2a *A metered profile's prompt cache lives an hour*.
+
+## TD-516: Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (the anchor, filled for the eighth time that evening with nothing new in its lane)
+**Owner:** grinder
+**Kind:** live-check #1436
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`self._promotes = {}` at start), `src/sessionorc/agent_tick.py` (`_live_commits`, `_work_due`), `src/sessionorc/ledger.py` (a live check's `live` is `"no"` when `live` is unknown), `src/sessionorc/work.py` (`reread` prunes an id the reading holds and the lane no longer matches)
+
+**Why:** On 2026-10-09 the user journal shows the host agent restarted by a promote at 19:56, 20:49, 21:15, 23:06 and 23:42 MDT, and each restart followed, 5–6 minutes later, by *ao-agentorc-ao-grind-anchor: the seat is due (work) — filling it* (20:02, 20:55, 21:21, 23:12, 23:47). Each fill found every anchor entry already read that day (TD-292, TD-358, TD-413, TD-460, TD-463, TD-466, TD-497 — all waiting on an event or the calendar) and closed as *a seat with nothing due*. The mechanism, read in the code: `_promotes` starts empty, so `_live_commits()` is `{}` until the promote survey's first reading. A ledger reading taken in that window marks every live check `live: "no"`, so `lane_matches` drops it from the `anchor` lane; `work.reread` prunes each such id from `lane_seen` (it is held by the reading and no longer matches — the rule meant for a live check that goes live after the seat saw it as a build). When the survey lands, every live check matches again, is missing from `lane_seen`, and is *new*: `seat_due: {by: work, ids: [...]}`. Each cold fill reads the brief and the ledger for nothing. The same window reaches rule 6's lane news for any member whose lane holds a live check (a `free-pick` lane takes one whose build is live).
+
+**Fix:** Unknown is not *not live*. Until the promote reading has run once since the start, `_live_commits` answers None (or the reading marks a live check `live: "unknown"`), and `reread` neither prunes nor reports an id whose match turns on it — or the tick skips the `work` trigger and rule 6's lane news until the first promote reading. Say it in design §6 rule 6 (*`lane_seen` is the lane's memory*) beside the go-live case. Tests: a restart (empty `_promotes`) then a reading then the survey raises no `seat_due` for live checks already in `lane_seen`; a live check whose build goes live after the seat saw it as a build is still due once.
+
+**Done when** a promote's restart is followed by no anchor fill when the lane gained nothing, and the tests above pass.
+
+**Related:** TD-386 (the anchor seat's `work` trigger), TD-407 (`reread`), TD-323 (a live check's `live`).
+
+**Resolved:** 2026-10-10 (PR #1436; live check read by grinder-ao-1) — #1436 live in `c7182a4`, promoted at 01:17:39 MDT with the host agent restarted at 01:17:34. The user journal from the restart to 01:24 holds no *the seat is due (work) — filling it* for ao-grind-anchor, and `ao status -v` shows its seat still *closed by the tick*, 52m old, its anchor lane unchanged. The promote's restart filled nothing.
+
+## TD-507: `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, TD-465's live check)
+**Owner:** grinder
+**Kind:** live-check #1439
+**Status:** Resolved
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`layer_reading`: `c != CADENCE_HOOK_LINE`; `_resolves`; `CADENCE_WIRED_MARKERS`), `tests/` beside the hooks reading
+
+**Why:** `ao doctor` on the live copy (c469063, 2026-10-09) printed *warning: hooks — layer grind+cadence.json names f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi, which does not resolve*, and the same for `grind+cadence+unattended.json`. Those two layers were last written on 2026-09-11 and 2026-09-23 and carry dev-cadence's runner line from before 2026-09-25. `layer_reading` is meant to leave dev-cadence's line out, but it drops only a command equal to today's `CADENCE_HOOK_LINE`. `_resolves` then reads the shell snippet's first word (`f=…/cadence_hooks.sh;`) as a path that is not there. The line is guarded by `[ -x ]` and is harmless, so the warning names something that is not wrong. A person reading `ao doctor` learns to skip the hooks warnings, and the check exists for those warnings.
+
+**Fix:** leave out of the reading every command that names one of `CADENCE_WIRED_MARKERS` (dev-cadence's lines of any vintage), not just today's line. Add a test with a layer that carries the old line and a resolving `agentorc-hook`, which must read no warning.
+
+**Done when** that test passes, and `ao doctor hooks` on kmaster, once live, prints no *does not resolve* line for the `+cadence` layers.
+
+**Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
+
+**Resolved:** 2026-10-10 (PR #1439; live check read by grinder-ao-1) — with #1439 live (`c7182a4`), `ao doctor hooks` on kmaster reads *ok*, 0 warnings, 0 lacks. `grind+cadence.json` and `grind+cadence+unattended.json` read only their `agentorc-hook` commands, each `resolves: true`, so no *does not resolve* line is printed.
