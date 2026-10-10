@@ -9139,3 +9139,55 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Resolved:** 2026-10-10 (PRs #1472, #1475) — designed in #1472 (§4.5a *Message and Reply dialog: Attach / drop / paste*, §4.4 *Attachment drop*, §4.10 *A file for a session*) and built by TD-531 in #1475.
 
 **Related:** TD-002 (the Focus road), TD-473 / TD-478 (pieces), TD-419 / TD-469 (the attachment's life), TD-472 (paste on the terminal), TD-290 / TD-292 (`shots`, the envelope's only file today), TD-003 (the phone's share sheet).
+
+## TD-525: The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's idea and calls in conversation)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.5 (Focus side panel, the **Session** card ~L423), §4.5a (the header's **VS Code** editor button row, the **Session** card row ~L68, **a path is a link**), §4.6 *A path in the pane is a link*, §5 `settings.yml` (the editor's label and template); mockup `Focus.dc.html`, `FocusRail.dc.html`
+
+**Why:** Paul, 2026-10-10: a "recent files" list on the side panel under Session, with an **Open** button. The **Session** card exists already (the last card, folded at first: profile, adapter id, tmux, directory, started, last, mode, run log, the stops, the grants and controllers); this extends it. Talking it over, Paul agreed that **Open** replaces the header's VS Code button rather than duplicating it, and that a browse-the-repo picker behind Open is not needed: VS Code's own Ctrl+P does that once the worktree is open.
+
+**Fix:** a design round settles:
+1. **Recent files.** The files this session edited (and perhaps read), newest first, each a file link as in the pane, perhaps with a mark for uncommitted change (`git diff --stat` against the worktree). The source should be the hooks the host agent already receives: Claude Code's PostToolUse carries each Edit/Write/Read's path. It should not be a screen scrape. Say what a session from a tool with no such hook shows.
+2. **Open.** The editor button moves into the card with its setting unchanged (label, template, or none). TD-501's *no editor button, no file links* keys on the setting (`open_in` kind `none`), not on the button's place. The card starts folded, so say where Open sits so that it is not hidden: on the card's summary line, or the card unfolded, or Open outside it. The put-away rail carries an Open mark, so the worktree is reachable with the panel collapsed.
+3. **Paul's question: can a file link open the worktree first when it is not yet open, then the file?** The browser cannot see VS Code's windows. Options: (a) the page remembers, per browser, that it pressed Open for this session (wrong once VS Code is closed), and on a first file link sends the folder link and then the file link (two protocol-handler launches, timing-dependent, perhaps two browser prompts); (b) the host agent asks the VS Code server on the host: each open remote window has an IPC socket (`/run/user/<uid>/vscode-ipc-*.sock`, 305 on kmaster on 2026-10-10, many stale) that the server's `remote-cli` `code --reuse-window <file>` can use, if the window holding the worktree can be told apart (unproven; a spike first); (c) none, relying on TD-524's `windowId` choice. Recommend one with its reasons.
+
+**Done when** the design says all three and the build entries it names are ledgered.
+
+**Resolved:** 2026-10-10 (PRs #1474, #1476) — designed in the round (§4.5 item 4, §4.5a *Session card: VS Code*, *recent files*, *» put away*, §4.2 `file`, §4.6) and built by TD-527
+
+
+**Related:** TD-524 (the remote file link, decided with this), TD-493 / TD-501 (#1456, the pane's file links).
+
+## TD-527: Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (the designer, TD-525's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.5 item 4 (the **Session** card: recent files, the editor button on its summary line; the acts line without it; the rail's **‹›**), §4.5a **Focus side panel, Session card: VS Code**, **recent files**, **» put away** (the glyph), **a path is a link** (*where the Session card draws its editor button*), §4.2 (`file` on a `PostToolUse`), §5 `person.open_in`; `src/agentorc/adapters/claude_code/hook.py` (`file` on a main-thread `PostToolUse` of `Edit`, `Write`, `MultiEdit`, `NotebookEdit`: `tool_input.file_path` / `notebook_path`), `src/sessionorc/agent_tick.py` (`rpc_hook`: `files` kept — newest first, a path once, `RECENT_FILES = 20`, `{path, at}`), `src/sessionorc/models.py` (`files`), `src/agentorc/ui/templates/focus.html` (the header's editor button removed; the Session card's summary line and its row), `src/agentorc/ui/static/app.js` (the row kept current from the delta; the click by `AO.pathLink`'s form with the modifier not required; the rail glyph), `src/agentorc/ui/help.py` and §4.5a *The help text* (**a path is a link**'s last sentence: *without an editor button on the Session card there are no file links*), mockup `Focus.dc.html`, `FocusRail.dc.html` (#TD-525's shots)
+
+**Why:** TD-525: Paul wants the files a session touched one press away, beside the button that opens its worktree, and one editor button on Focus rather than two.
+
+**Fix:**
+1. The adapter: a `PostToolUse` of an edit on the main thread reports `file` (the tool's absolute path); a subagent's reports nothing, as the state rule. No read is reported.
+2. The record: `files: [{path, at}]`, the newest first, a path moved to the top when edited again, at most twenty; part of the pushed view and its delta; empty on a new record (a restart starts over).
+3. The Session card: a **recent files** row under *run log*, drawn only when non-empty — each path relative to the record's `repo` (else `dir`), a link by the page's `editor.file` form filled as `AO.pathLink` fills it (line `1`), opening on a plain click; hover the absolute path and the edit's time; **M** before a path the record's `git.files` holds (`gitinfo`'s porcelain lines, as the Git card draws them). Text without links where `editor.file` is not served.
+4. The editor button: gone from the header's acts line (`focus.html`), drawn at the right of the Session card's summary line with the same label and `href`, kept when the card is folded; `open_in: none` draws none. The rail: a **‹›** glyph after **✓**, drawn whenever the button is, its press the button's `href`, its hover *VS Code — opens the worktree*.
+5. The help: §4.5a *The help text* **a path is a link** — *without an editor button on the header* becomes *without an editor button on the Session card*; `help.py` follows word for word (`tests/test_help.py`). *» put away*'s paragraph is unchanged.
+6. Tests: the hook's `file` on each edit tool and not on a Read or a subagent's; the record's twenty, the move-to-top; the card's row from a view with `files` and `git.files`; the header without the button; the rail's glyph.
+7. On a scratch home: a session edits two files; the card shows them newest first with **M** on the uncommitted one; a click opens the file; the header has no VS Code button and the rail's **‹›** opens the worktree. Shots `docs/mockups/reviews/2026-10-10-td527-*.png` in the PR.
+
+**Done when** the Session card lists a run's edits as links with their marks, the editor button sits on its summary line and on the rail and nowhere else on Focus, the help says so, and the tests pin the hook, the record and the page.
+
+**Resolved:** 2026-10-10 (PRs #1474, #1476) — the record half in #1474 (the hook's `file`, the record's `files`); the page half in #1476: `AO.recentFiles` draws the Session card's **recent files** from the view and each delta, relative to `dir` (else `repo`), links by the file form at line 1 (`AO.fileUrl`) opened on a plain click, **M** from `git.files`, text without `editor.file`; the editor button on the card's summary line and gone from the header; the rail's last glyph **‹›** opens the worktree; the help's *a path is a link* says *on the Session card*. `tests/test_ui_focus_recent_files.py` and `tests/test_recent_files.py` pin it; the UI check on a scratch home is in #1476's body.
+
+
+**Related:** TD-525 (the design), TD-524 / TD-526 (the file form's line and window), TD-501 (the pane's links), TD-408 (the rail), TD-156 (the Session card).
