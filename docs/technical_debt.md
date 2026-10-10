@@ -40,11 +40,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
-| TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
-| TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448; the look sent to Paul (m-37f220f9e955) |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
+| TD-523 | Ctrl+V on the Focus terminal makes the browser draw a *Paste* button the person must press: the page reads the clipboard by script (`clipboard.read()`) instead of the paste event's own data | Medium | Open |
 
 ---
 
@@ -578,40 +577,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-457 (the design), TD-214 / TD-227 (rule 8), TD-240 / TD-241 (rule 9), TD-407 (no hold for an untold entry), TD-271 (a question's end is work: unchanged).
 
-## TD-472: An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (ao-paul, Paul asked why a screenshot pastes into the composer and not the terminal)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer) — §4.5a's *Copy / Paste* row says a paste carrying a file and no text takes the attachment road and its path is pasted into the terminal as a bracketed paste, whether or not the composer is open, under the Attach row's bounds; the *Attach* row and §4.4 *Attachment drop* name the terminal beside the composer. Built by TD-479. Was: Open.
-**Blocked by:** TD-479
-**Location:** design §4.5a (the *Copy / Paste* row and the *Attach / drop / paste* row), §4.4 *Attachment drop*; `src/agentorc/ui/` (the terminal's paste handler beside the composer's)
-
-**Why:** the terminal's Paste sends the clipboard's text through the terminal as keys (§4.5a *Copy / Paste*); a clipboard holding only an image has no text, so the paste sends nothing and says nothing. Claude Code's own image paste reads the clipboard of the machine it runs on, never the browser's, so tmux is not the gap. A file *dropped* on the terminal already takes the attachment road; a *pasted* one is the one way in that does not, and the terminal is where a person's eyes are.
-
-**Fix:** design first: a paste on the terminal that carries a file and no text takes the composer's road — `attach`, named `paste-<date>-<time>.<ext>` — and the returned path goes into the terminal as a bracketed paste, so it lands in the tool's own input (not sent; Enter stays the person's). Inert where Paste already is (a read-only Focus); a paste that carries text stays the text's; the same bounds as the composer (desktop, a session on this host, `ATTACH_BYTES_MAX`); a refusal toasts, never silence. **Done when** §4.5a's two rows say it, the build lands, and a screenshot pasted on the terminal of an interactive Claude Code session puts its path in the prompt.
-
-**Related:** TD-002 (the attach), TD-096 (read-only Focus), TD-469 (the attachment's life).
-
-## TD-479: Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-472's round)
-**Owner:** grinder
-**Kind:** live-check #1448
-**Status:** Built — PR #1448 (grinder-ao-2, 2026-10-10): `AO.clipPaste` reads `clipboard.read()`; a file and no text goes up the attach road whether or not the composer is open and its path is pasted into the terminal; checked on a scratch home with a shell session (the path at bash's prompt as a bracketed paste, unsent). A file dropped on the terminal still goes to the composer's caret, as §4.5a's Attach row says. **To read once #1448 is live:** a screenshot copied to the clipboard and pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its `~/.agentorc/attachments/<session>/paste-…png` path in the tool's prompt, unsent. Only a person's own press shows it, so it ends in a look (design §4.10 *A look*). **Live (ef9e93d), 2026-10-10:** the look was sent to Paul (m-37f220f9e955, grinder-ao-1) with #1448's scratch-home screenshot; *Works* archives this entry, *Not right: …* is an entry of its own.
-**Blocked by:** decision (paul) — the look m-37f220f9e955
-**Location:** design §4.5a *Copy / Paste* and *Attach / drop / paste*, §4.4 *Attachment drop*; `src/agentorc/ui/static/app.js` (`pasteClip` ~L3266 — the one road every terminal paste takes: Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click, the header's Paste; `AO.wireAttach` ~L152 and its `shut()` rule; `AO.attachName` ~L131; the Focus wiring ~L3353)
-
-**Why:** TD-472: `pasteClip` reads `navigator.clipboard.readText()`, so a clipboard holding only an image pastes nothing and says nothing, while the same screenshot pasted into the composer is attached; the terminal is where a person's eyes are.
-
-**Fix:** as §4.5a *Copy / Paste* says. (1) `pasteClip` reads `navigator.clipboard.read()`: an item carrying `text/plain` is pasted as text, as today; one carrying no text and a file type (`image/png` first) is turned into a `File` named by `AO.attachName` and handed to the attach road's `attach([file])`, and the path it answers is written with `term.paste(path)` (xterm wraps it in bracketed-paste marks when the tool has mode 2004 on, which Claude Code has, so it lands in the prompt and is not sent); nothing else is typed. (2) `AO.wireAttach` gains a way to attach for the terminal that does not need the composer open (`shut()` guards the composer's own paste and drop alone — today it also blocks a file dropped on the terminal while the composer is closed, which the Attach row says works: a terminal drop takes the same open road, its path pasted into the terminal as a terminal paste's is), and inserts nothing at the composer's caret for a terminal paste or drop — the caller takes the path. (3) Read-only Focus: the existing *watching: paste is off — Take over to type* toast, before the clipboard is read. (4) A refusal — past `person.attach.max`, a node's session, `read()` denied (no secure context, or a browser without `clipboard.read`, which falls back to `readText()` and toasts *this browser pastes text only*) — is a toast in the RPC's or the browser's words. (5) Desktop only, as the Attach row is. Tests (under node, as `tests/test_attach.py`'s `_node` harness runs the page's functions, TD-370): a file-only clipboard goes to `attach` and the answered path to `term.paste`; a text clipboard still goes to `term.paste` as text and never to `attach`; a read-only Focus toasts and reads nothing; the composer closed still attaches from the terminal. **Done when** the tests pass and a screenshot pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its path in the prompt, unsent.
-
-**Related:** TD-472 (the design), TD-002 (the attach), TD-473/TD-478 (the road in pieces and the bound), TD-096 (read-only Focus).
-
 ## TD-489: A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m
 
 **Priority:** High
@@ -660,3 +625,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
+
+## TD-523: Ctrl+V on the Focus terminal makes the browser draw a *Paste* button the person must press: the page reads the clipboard by script (`clipboard.read()`) instead of the paste event's own data
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-1, from Paul's answer to TD-479's look)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.pasteKey` ~L286, which cancels the keydown and calls the paste road; Focus `pasteClip` ~L3598 and `AO.clipPaste`, which read `navigator.clipboard.read()` / `readText()`; `term.attachCustomKeyEventHandler` ~L3606), `tests/test_attach.py` (the node harness); design §4.5a **Copy / Paste**
+
+**Why:** Paul, 2026-10-10, answering TD-479's look (m-071d09fa4a08): *This works, but on hitting ctrl-v a white "paste" option (looks like a right click menu item) appears that must be pressed for the paste to happen. Is that desired/required?* It is neither. Since TD-520 (#1449), `AO.pasteKey` cancels Ctrl+V's keydown and the page reads the clipboard itself through the async Clipboard API. Firefox and Safari guard a script's clipboard read outside a paste event with exactly that one-time *Paste* button; Chrome asks a site permission once. A real paste event carries the clipboard in `event.clipboardData` (text and files alike) with no prompt in any browser. Every Ctrl+V on the terminal therefore costs a second press.
+
+**Fix:** let the paste chords (Ctrl+V, Ctrl+Shift+V, Shift+Insert) raise the browser's own `paste` event rather than cancelling their keydown. Catch it on the terminal's element in the capture phase, before xterm.js's textarea handler, `preventDefault()` + `stopPropagation()` so it is pasted once (TD-520's doubling stays fixed). Read `e.clipboardData`: a `text/plain` item pastes its text, a file and no text takes the attach road (TD-479). Keep the read-only toast first. Right-click and the header's **Paste** have no paste event, so they keep `AO.clipPaste`'s script read; a prompt there is the browser's and expected. Factor the pick of text vs file so the event road and `clipPaste` share it. Tests under node: a stub paste event with text pastes once and no `clipboard.read()` is called; one with a PNG and no text uploads once; the chords no longer `preventDefault()` their keydown. A UI check on a scratch home (headless Chromium, as #1448's): text and a PNG each pasted once with Ctrl+V. **Done when** the tests pass, and a look to Paul confirms Ctrl+V on the terminal pastes with no *Paste* button in his browser.
+
+**Related:** TD-479 (the file paste, whose look found it), TD-520 (#1449, the doubled paste whose fix moved Ctrl+V to the script read), TD-472.
