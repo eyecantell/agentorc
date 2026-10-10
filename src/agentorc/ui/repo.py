@@ -13,7 +13,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import repoconfig, review, teamrun, teams
-from sessionorc import mail
+from sessionorc import ledger, mail
 from sessionorc.models import (
     has_control,
     stop_note,
@@ -76,7 +76,17 @@ def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, 
 
 # -- the Repo page (design §4.5 screen 11, TD-176 slice 5) -------------------------------------------
 
-LEDGER_LISTS = (("pickable", "pickable"), ("design-first", "design-first"), ("for-you", "for you"), ("other", "other"))
+# the page's seven kinds, each a list with its `#debt-<key>` anchor (§4.5 screen 11, §4.4 *Repo facts*, TD-418)
+LEDGER_LISTS = (
+    ("pickable", "pickable"),
+    ("design", "design"),
+    ("for-you", "for you"),
+    ("live-check", "live check"),
+    ("blocked", "blocked"),
+    ("evaluation", "evaluation"),
+    ("other", "other"),
+)
+LEDGER_FLAG = ledger.NO_KIND  # an *other* row's flag (§4.4 *Repo facts*), the words `ledger.flags` uses
 LEDGER_FOLD = 4  # a list folds past this many rows, with *+n more*
 PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
 
@@ -118,11 +128,12 @@ def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) ->
 def ledger_lists(
     r: Mapping[str, Any], motion: Collection[dict[str, Any]], lanes: Mapping[str, Mapping[str, Any]] | None = None
 ) -> list[dict[str, Any]]:
-    """**Technical debt** (§4.5 screen 11): the open entries in four lists by the page's kind, each
+    """**Technical debt** (§4.5 screen 11): the open entries in seven lists by the page's kind, each
     row id, title, priority and owner, *held by <name>* when a member claims it and *blocked by …*
     from the entry's `blocked_by` (§4.4 *Repo facts*), and a live check *live check* or *waits for
     its build to be live* with its build's PRs (§4.9b, TD-323; the template's), sorted by priority
-    then id; `fold` the rows past the fold. The board's open decided lines, the lanes' work orders
+    then id; `fold` the rows past the fold; an *other* row carries `flag`, this reader's flag on it.
+    The board's open decided lines, the lanes' work orders
     (§4.5a *Repo page: decided lines*, TD-384), come first in *pickable*, each with its `decided`
     and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it, None
     where the ledger was not read and the lanes could not be (`lanes` None or the entries unread)."""
@@ -142,7 +153,11 @@ def ledger_lists(
     out = []
     for key, label in LEDGER_LISTS:
         rows = sorted(
-            ({**e, "held": held.get(e["id"], "")} for e in entries if e.get("for_page") == key),
+            (
+                {**e, "held": held.get(e["id"], ""), **({"flag": LEDGER_FLAG} if key == "other" else {})}
+                for e in entries
+                if e.get("for_page") == key
+            ),
             key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"]),
         )
         if key == "pickable":

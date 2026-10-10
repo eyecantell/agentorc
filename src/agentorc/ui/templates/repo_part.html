@@ -25,7 +25,7 @@
   </div>
 </section>
 
-{# (2) Technical debt — the ledger's open entries in four lists; an entry is edited in its file #}
+{# (2) Technical debt — the ledger's open entries in seven lists, one per kind; an entry is edited in its file #}
 <section class="rsec" id="debt">
   <div class="row gap rsh"><span class="h2">Technical debt</span>
     <span class="meta">{% for l in lists %}{{ l.rows | length }} {{ l.label }}{{ ' · ' if not loop.last }}{% endfor %}</span>
@@ -45,7 +45,7 @@
       <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?{% if teams %}team={{ teams[0] }}&{% endif %}kind=board" title="the line on the board, in the Inbox">board →</a></div>
     {% else %}
     <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
-      {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}</div>
+      {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}</div>
     {% endif %}
     {% endfor %}
     {% if l.fold %}<button class="rrow meta mono more" type="button" data-unfold="{{ l.key }}">+{{ l.fold }} more</button>{% endif %}

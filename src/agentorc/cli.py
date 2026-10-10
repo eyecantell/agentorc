@@ -1462,13 +1462,16 @@ def _repo_line(r: dict[str, Any]) -> str:
             + ")"
             for t, x in lanes.items()
         )
-        designs = "".join(f" ({t} {len(x['design_first'])})" for t, x in lanes.items())
+        designs = "".join(f" ({t} {len(x['design'])})" for t, x in lanes.items())
+        checks = "".join(f" ({t} {len(x['live_check'])})" for t, x in lanes.items())
         orders = teamrun.work_orders(r)
         decided = f", {len(orders)} decided board line{'' if len(orders) == 1 else 's'}" if orders else ""
+        # the page's seven kinds as the kind bar names them (§4.4 *Repo facts*, §4.7, TD-418)
         led_part = (
             f"{len(led['entries'])} open entries{decided}: {k.get('pickable', 0) + len(orders)} pickable{picks},"
-            f" {k.get('design-first', 0)}"
-            f" design-first{designs}, {k.get('for-you', 0)} for you, {k.get('other', 0)} other"
+            f" {k.get('design', 0)} design{designs}, {k.get('for-you', 0)} for you,"
+            f" {k.get('live-check', 0)} live check{checks}, {k.get('blocked', 0)} blocked,"
+            f" {k.get('evaluation', 0)} evaluation, {k.get('other', 0)} other"
         )
         if led.get("error"):
             led_part += f" (could not look: {led['error']})"
@@ -1532,11 +1535,15 @@ PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def _repo_list(e: dict[str, Any]) -> str:
-    """Which of `ao repo`'s lists an entry is on: the page's kind, and `live-check` for a live check
-    whose build is not live yet, which the page has under *other* (design §4.9b, TD-323)."""
-    if e.get("kind") == "live-check" and e.get("for_page") == "other" and e.get("live") != "yes":
-        return "live-check"
-    return str(e.get("for_page") or "")
+    """Which of `ao repo`'s lists an entry is on (design §4.7's mapping, TD-418): the *pickable* rows
+    are the kind *pickable* and a live check nothing blocks whose build is live — the grinder's pick
+    list (§4.9b, TD-323); the *design* rows the kind *design*; the *live-check* line a live check
+    nothing blocks whose build is not live; anything else, a live check blocked by a decision among
+    it, is on no list ('')."""
+    page = str(e.get("for_page") or "")
+    if page == "live-check" and e.get("pickable") == "yes":
+        return "pickable" if e.get("live") == "yes" else "live-check"
+    return page if page in ("pickable", "design") else ""
 
 
 def _live_mark(e: dict[str, Any]) -> str:
@@ -1642,7 +1649,7 @@ def cmd_promote(args: argparse.Namespace) -> int:
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs with their
-    ages and the reader's standing, the window counts, the pickable and design-first entries, what
+    ages and the reader's standing, the window counts, the pickable and design entries, what
     the servicing team's members hold and say, and the board items due. A read, never a write."""
     got: dict[str, dict[str, Any]] = call_sync("repos")
     if args.all:
@@ -1688,6 +1695,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
             print(_repo_line(r))
             if args.all:
                 continue
+            # an entry no page kind takes, flagged under the first line (§4.7, §4.4 *Repo facts*, TD-418)
+            for flag in ledger_mod.flags((r.get("ledger") or {}).get("entries") or []):
+                print(f"  {flag}")
             for p in (r.get("prs") or {}).get("open") or []:
                 draft = " (draft)" if p.get("draft") else ""
                 age = _age(p.get("created") or "")
@@ -1699,7 +1709,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 d = e.get("decided") or {}
                 said = f" · decided {d.get('text') or '?'} {d.get('date') or ''}".rstrip()
                 print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'board':<11}  {e.get('title') or ''}{said}")
-            for kind in ("pickable", "design-first", "live-check"):
+            for kind in ("pickable", "design", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
                 # the pick order is cadence's (design §4.4 *Repo facts*, §4.8 *Choosing in a free-pick
                 # lane*, TD-202, TD-228): High, then Medium, then Low, then an entry with none; debt
@@ -1710,8 +1720,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # whose it is (TD-228): pickable reads no owner, so the line says the entry's
                     # `Owner:` and a lane's reader passes over what is not its own
                     owner = str(e.get("owner") or "") or "-"
-                    # a decision owed to the designer is design-first by it alone (§4.7, TD-367)
-                    designers = kind == "design-first" and e.get("kind") != "design-first"
+                    # a decision owed to the designer is design by it alone (§4.7, TD-367)
+                    designers = kind == "design" and e.get("kind") != "design-first"
                     if designers and ledger_mod.decided_by(e, ledger_mod.DESIGNER_OWNER):
                         owner += " decision"
                     print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")

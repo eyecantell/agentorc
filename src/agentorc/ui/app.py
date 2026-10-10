@@ -315,6 +315,7 @@ from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     ENTRY_PREFIX,
     ENTRY_TRIES,
+    LEDGER_FLAG,  # noqa: F401
     LEDGER_FOLD,  # noqa: F401
     LEDGER_LISTS,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401

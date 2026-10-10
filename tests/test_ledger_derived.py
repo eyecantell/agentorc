@@ -203,22 +203,52 @@ def test_lane_words_read_the_derived_field_with_build_for_no_kind(kind, owner, l
 
 
 def test_the_page_kinds_in_order():
-    def kind(block: str) -> str:
-        return ledger.entries(f"## TD-040: x\n\n{block}\n\n## TD-041: open\n")[0]["for_page"]
+    """§4.4 *Repo facts*' seven kinds (TD-418, built by TD-428 slice 6), each entry in the first that
+    takes it: for you → blocked → design → live check → pickable → evaluation → other."""
+
+    def kind(block: str, live=None) -> str:
+        return ledger.entries(f"## TD-040: x\n\n{block}\n\n## TD-041: open\n", live=live)[0]["for_page"]
 
     assert kind("**Owner:** paul") == "for-you"
     assert kind("**Kind:** design-first\n**Blocked by:** decision (Paul)") == "for-you"
-    assert kind("**Kind:** design-first\n**Blocked by:** TD-041") == "design-first"
+    assert kind("**Kind:** build\n**Blocked by:** TD-041, decision (paul)") == "for-you"  # the person's first
+    # *blocked*: any item other than a decision, whatever the Kind and whatever decision stands beside it
+    for block in (
+        "**Kind:** build\n**Blocked by:** TD-041",
+        "**Kind:** build\n**Blocked by:** TD-041, decision (anchor)",
+        "**Kind:** design-first\n**Blocked by:** TD-041",
+        "**Kind:** build\n**Blocked by:** TD-041, decision (designer)",
+        "**Kind:** live-check #12\n**Blocked by:** TD-041",
+        "**Owner:** anchor\n**Kind:** decision\n**Blocked by:** TD-041",  # TD-077's shape
+        "**Owner:** anchor\n**Kind:** live-check #343\n**Blocked by:** TD-041",  # TD-052's shape
+        "**Kind:** build\n**Blocked by:** other#TD-002",  # a cross-repo blocker no registry resolves
+        "**Kind:** build\n**Blocked by:** soon",  # an item the reader cannot read
+    ):
+        assert kind(block) == "blocked", block
+    assert kind("**Kind:** design-first") == "design"
+    assert kind("**Kind:** build\n**Blocked by:** decision (designer)") == "design"
+    assert kind("**Kind:** design-first\n**Blocked by:** decision (anchor)") == "design"
+    assert kind("**Kind:** live-check #12") == "live-check"
+    assert kind("**Kind:** live-check #12", live=lambda n: True) == "live-check"  # live or not
+    assert kind("**Kind:** live-check #12\n**Blocked by:** decision (anchor)") == "live-check"
     assert kind("**Kind:** build") == "pickable" and kind("") == "pickable"
-    assert kind("**Kind:** build\n**Blocked by:** TD-041") == "other"
-    assert kind("**Kind:** live-check") == "other"
+    assert kind("**Kind:** evaluation") == "evaluation"
+    assert kind("**Kind:** build\n**Blocked by:** decision (anchor)") == "evaluation"
+    assert kind("**Owner:** anchor\n**Kind:** decision") == "evaluation"
+    # the residue, flagged: a decision owed to anyone else, and a `Kind: decision` the anchor does not own
+    assert kind("**Kind:** build\n**Blocked by:** decision (techlead)") == "other"
+    assert kind("**Owner:** grinder\n**Kind:** decision") == "other"
+    got = ledger.entries("## TD-040: x\n\n**Blocked by:** decision (techlead)\n\n## TD-042: y\n")
+    assert ledger.flags(got) == ["TD-040: fits no page kind — check its Owner, Kind and Blocked by"]
+    assert ledger.KINDS == ("for-you", "blocked", "design", "live-check", "pickable", "evaluation", "other")
 
 
 def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_designers():
     """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is `Owner: paul` or a
-    `decision (paul)`, any case; an entry of any kind on `decision (designer)` is design-first and
+    `decision (paul)`, any case; an entry of any kind on `decision (designer)` is *design* and
     in the designer's lane, pickable or not, though its `Owner:` is the grinder's; the anchor's
-    `Kind: decision` and a build on `decision (anchor)` are *other* and in no lane."""
+    `Kind: decision` and a build on `decision (anchor)` are its *evaluation* (TD-418) and in no grinder
+    or designer lane."""
     text = (
         "## TD-050: the person's\n\n**Owner:** paul\n**Kind:** evaluation\n\n"
         "## TD-051: on the person's decision\n\n**Owner:** grinder\n**Kind:** build\n"
@@ -231,9 +261,9 @@ def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_desi
     assert {i: e["for_page"] for i, e in got.items()} == {
         "TD-050": "for-you",
         "TD-051": "for-you",
-        "TD-052": "design-first",
-        "TD-053": "other",
-        "TD-054": "other",
+        "TD-052": "design",
+        "TD-053": "evaluation",
+        "TD-054": "evaluation",
     }
     designer, grinder = ["design-first", "owner:designer"], ["free-pick", "owner:grinder"]
     assert [i for i, e in got.items() if ledger.lane_matches(designer, e)] == ["TD-052"]
