@@ -647,7 +647,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 ## TD-533: `test_recent_files.py` holds no test for the stale queued edit: the `not stale` guard on `files` can be deleted and the module passes
 
 **Priority:** Medium
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-10 (test-audit-ao-1, auditing #1474)
 **Owner:** grinder
 **Kind:** build
