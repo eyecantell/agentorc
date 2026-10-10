@@ -66,14 +66,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
-| TD-488 | Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09) | High | Designed 2026-10-09 — build TD-495 |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-490 | An `exited` pill says *guessed from the screen*, never why the session ended | Medium | Designed 2026-10-09 — build TD-498 |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
 | TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
-| TD-495 | Build the tmux server's system unit (TD-488): `agentorc-tmux.service` under `Delegate=yes`, `ao service install --system`, the pane cgroup the host agent makes, §4.8a's clause for it, the doctor's and `service status`' line, the person's one-time install | High | Built — live check of #1396 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Open |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | Open |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
@@ -1047,23 +1045,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-485 (the design), TD-467 (`ao status -v`'s line), TD-459 (the doorbell's restart), TD-217 (rule 7's restart), TD-103 (the ceiling).
 
-## TD-488: Every session dies with the user session: the tmux server runs inside `user@1000`, so one stop of the user manager killed every session on kmaster for 4h20m (2026-10-09)
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-09 (ao-paul, Paul asked why the ao grinders had exited)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1387): §4.1 *the installed home's tmux server runs as a system unit* — `agentorc-tmux.service`, `User=` the person, `tmux -D` on the default socket, `Restart=always`, `KillMode=control-group`, `Delegate=yes`, no user bus in its environment; root's to write, so `ao service install` writes the text under `~/.agentorc/systemd/` and prints `sudo ao service install --system` for the person's one press; the host agent's and the UI's units stay user units (steered as `m-67567527ee50`: a promote restarts them unprivileged, TD-489's alarm covers their absence); §4.8a's *unknown* clause on for a `.service` whose own process the server is, and the fourth signal under the unit a `pane-<name>` cgroup the host agent makes; §4.7's doctor line, §9 invariant 8, §4's diagram. The build is TD-495, and this entry archives with it.
-**Blocked by:** TD-495
-**Location:** design §4.4 (the host agent and its tmux server), §4.4a and §6 (a session survives the host agent's restart), §9 (tmux, not the host agent, holds the process); `ao service install` (the systemd units); the journal of 2026-10-09 12:30:53–16:50:26
-
-**Why:** at 12:30:53 the user manager (`systemd --user`, pid 1920) was sent SIGTERM (TD-489 says by whom) and ran `exit.target`: it stopped `agentorc-agent` and `agentorc-ui` and then SIGKILLed what was left in `user@1000.service`, the `tmux: server` among them (it sits in `agentorc-agent`'s cgroup, which outlives the unit's own stop, but not the manager's), so every Claude Code session on kmaster ended at once. Linger was on, but linger only starts the manager at boot. Nothing restarted it until Paul's ssh login at 16:50:26 started a new one, so kmaster ran no session, no host agent and no UI for 4h20m. The design promises that a session survives the host agent's restart (§4.4a, §6), and it does across a restart of `agentorc-agent`, but they are no safer than the user manager they run under.
-
-**Fix:** design first: where the session tmux server lives so that it outlives both the host agent and the user manager. Candidates are its own user unit, which survives an agent restart but not a manager stop, or a system unit with `User=kmaster` (`KillMode=process`, the socket where the host agent expects it), which survives both. Also decide whether the host agent's units move with it. Weigh what `ao service install` may write as a non-root user, and say what a person runs once as root. **Done when** the design says where the server runs and why, the build lands, and on a scratch home a `systemctl --user exit` leaves the scratch tmux sessions alive and the host agent finds them again when it comes back.
-
-**Related:** TD-489 (the kill and the missing alarm), TD-490 (what the card says afterwards), TD-062 (the promote's restart).
-
 ## TD-489: A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m
 
 **Priority:** High
@@ -1164,22 +1145,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-421 / TD-422 (the URL link), TD-493 (a path as a link), TD-174 (the mouse is the browser's).
 
-## TD-495: Build the tmux server's system unit (TD-488): `agentorc-tmux.service` under `Delegate=yes`, `ao service install --system`, the pane cgroup the host agent makes, §4.8a's clause for it, the doctor's and `service status`' line, the person's one-time install
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-488's round)
-**Owner:** grinder
-**Kind:** live-check #1396
-**Status:** Built — slice 1 #1392 (the host agent's half) and slice 2 #1396 (`ao service install`'s stage and root line, `--system`, `status`'s line). **The live check:** once #1396 is live (`ao promote status`), read `ao service status` for the tmux line (expected today: the *under the user manager* warning). Then write (4)'s board line for Paul, `Due:` a week out, in the Fix's words, with the printed root line (`sudo <abs ao> service install --system`) and the proof (`systemctl --user exit`, then an ssh login: every session still live, `ao status` finding them).
-**Location:** design §4.1 (the host agent bullet: the unit), §4.8a (*unknown* clause; the fourth signal), §4.7 `ao doctor`'s tmux check, §9 invariant 8; `src/agentorc/service.py` (the unit texts, `install`, `status`), `src/agentorc/cli.py` (`ao service`), `src/sessionorc/identity.py` (`detached_check`), the host agent's create path (`src/sessionorc/agent.py`, `tmux.py` — the pane cgroup write), the `doctor` RPC's tmux reading (TD-465 slice 1); `docs/briefs/` untouched
-
-**Why:** TD-488: on 2026-10-09 one SIGTERM to `systemd --user` emptied `user@1000.service`, the tmux server and every session with it, for 4h20m; §4.1 now says the server runs outside that subtree.
-
-**Fix:** as §4.1 says. (1) `service.py`: a third unit text, `agentorc-tmux.service` — `[Service] Type=simple, User=<the person>, ExecStart=<tmux> -D, Restart=always, KillMode=control-group, Delegate=yes`, no `Environment=` carrying `XDG_RUNTIME_DIR` or `DBUS_SESSION_BUS_ADDRESS`, `[Install] WantedBy=multi-user.target` — written by `install` to `~/.agentorc/systemd/agentorc-tmux.service` when `/etc/systemd/system/agentorc-tmux.service` is absent or differs, with the one line `run once as root: sudo ao service install --system` printed; `install --system` (root) copies it in, `daemon-reload`, `enable --now`, and refuses as a non-root user naming the line. `status` and the `doctor` RPC's tmux reading add where the server runs, read from `/proc/<server pid>/cgroup`: `…/agentorc-tmux.service` → *system unit*; under `user@<uid>.service` → *under the user manager*, the doctor's warning in §4.7's words; `ao service install`'s existing restart of the agent is unchanged. (2) `identity.detached_check`: on when the server's cgroup is a `.service` and either the server's parent is systemd (`comm`) or the cgroup is the agent's own and the agent's parent is systemd — the docstring and §4.8a's words; a fake `/proc` fixture for each: the system unit (on), the user unit (on, as before), a dev run (off), a test runner's `.service` (off). (3) The create path: after `new-session`, when the server's cgroup directory under `/sys/fs/cgroup` is writable, `mkdir pane-<tmux name>` there and write the pane pid to its `cgroup.procs`; on failure, nothing — the pane keeps tmux's scope or none; the cgroup the identity tick reads for the pane is then that directory, and `kill`/`remove` leave an empty directory the next create or the tick removes (`rmdir` of an empty `pane-*` the pane list no longer names). (4) The person's step is a board line the grinder writes when the code is live: *Paul: at a quiet moment with the teams stopped — `sudo ao service install --system`, then `ao service install` (the agent restarts and finds the new server); the proof is `systemctl --user exit` followed by an ssh login, with every session still live and `ao status` finding them* — `Due:` a week out. **Done when** the three unit texts are pinned by tests, `install` prints the root line only when the system file is absent or differs, `install --system` refuses non-root, `status` and the doctor read each of the three placements from a fake `/proc`, `detached_check`'s four fixtures pass, the pane cgroup write is exercised against a temporary directory standing in for the cgroup root and leaves nothing when it cannot write, and the board line is written.
-
-**Related:** TD-488 (the design), TD-489 (the guard and the alarm), TD-362 (the fourth signal), TD-465 (the doctor RPC), TD-062 (the promote restarts the user units only).
-
 ## TD-497: Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line
 
 **Priority:** High
@@ -1188,7 +1153,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-495
 **Location:** design §4.10 *When the home itself is down: the watch*, §4.1 (the press), §4.4a *When the home is lost*, §4.7 **agent**, §5 `notify:`; a new `src/agentorc/watch.py` (the `agentorc-watch` console script, `pyproject.toml`), `src/agentorc/service.py` (the two unit texts, `install`'s file under `~/.agentorc/systemd/`, `--system`, `status`), `src/sessionorc/notify.py` (the child, reused), the `doctor` RPC's agent reading, `src/sessionorc/agent_common.py` (`WATCH_EVERY`, `WATCH_SILENCE`)
 
 **Why:** TD-489: nothing outside `user@1000` noticed the host agent gone for 4h20m, and nothing started the user manager again; the design now says the watch does both.
