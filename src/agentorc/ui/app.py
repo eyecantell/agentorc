@@ -2106,18 +2106,43 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return JSONResponse({"ok": True, "id": new["id"]})
 
     @app.post("/api/sessions/{sid}/attach")
-    async def attach_file(sid: str, file: UploadFile):
-        """design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002):
-        one file, multipart, handed to the host agent's `attach` — a person's act — which writes it
-        under `attachments/<session>/` and answers its path; the page inserts the path into the
-        composer and sends nothing. Past `paths.ATTACH_BYTES_MAX` it is refused here (413), before the
-        host agent is asked — the upload itself has arrived by then, since the form is parsed first."""
-        raw = await file.read(paths.ATTACH_BYTES_MAX + 1)
-        if len(raw) > paths.ATTACH_BYTES_MAX:
-            mib = paths.ATTACH_BYTES_MAX // (1024 * 1024)
-            raise HTTPException(413, f"{file.filename or 'the file'} is past the {mib} MiB a file may be")
-        got = await call("attach", id=sid, name=file.filename or "", data=base64.b64encode(raw).decode("ascii"))
-        return JSONResponse({"ok": True, "path": got["path"]})
+    async def attach_file(
+        sid: str,
+        file: UploadFile | None = None,
+        upload: str = Form(""),
+        offset: int = Form(0),
+        total: int | None = Form(None),
+        cancel: str = Form(""),
+    ):
+        """design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002), in
+        pieces (TD-478): one piece of one file, multipart, handed to the host agent's `attach` — a
+        person's act — with the form's `upload`, `offset` and `total`. The first piece carries the
+        file's name and `total` and is answered `{upload, bytes}` when more follow; every later piece
+        names the `upload` and its `offset`; the piece that makes `total` is answered `{path}`, which
+        the page inserts into the composer, sending nothing. `cancel` with the `upload` deletes its
+        `.part`. A piece past `paths.ATTACH_PIECE_BYTES` is refused here (413) before the host agent is
+        asked; the file's bound, `person.attach.max`, is the host agent's, in its words. One piece is
+        read, never the file."""
+        if cancel:
+            if not upload:
+                raise HTTPException(400, "attach: cancel names the upload it cancels")
+            await call("attach", id=sid, upload=upload, cancel=True)
+            return JSONResponse({"ok": True, "cancelled": True})
+        if file is None:
+            raise HTTPException(400, "attach: send the file's piece as `file`")
+        raw = await file.read(paths.ATTACH_PIECE_BYTES + 1)
+        if len(raw) > paths.ATTACH_PIECE_BYTES:
+            mib = paths.ATTACH_PIECE_BYTES // (1024 * 1024)
+            raise HTTPException(413, f"a piece of {file.filename or 'the file'} is past the {mib} MiB a piece may be")
+        params: dict[str, Any] = {"id": sid, "name": file.filename or "", "data": base64.b64encode(raw).decode("ascii")}
+        if upload:
+            params.update(upload=upload, offset=offset)
+        elif total is not None:
+            params["total"] = total
+        got = await call("attach", **params)
+        if "path" in got:
+            return JSONResponse({"ok": True, "path": got["path"]})
+        return JSONResponse({"ok": True, "upload": got["upload"], "bytes": got["bytes"]})
 
     @app.post("/api/sessions/{sid}/{action}")
     async def action(sid: str, action: str, request: Request):
@@ -2734,9 +2759,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/settings/you")
     async def settings_you(request: Request):
         """§4.5a *Settings page: You* → **Save**: `{open_in?, terminal?: {size?, face?, copy_on_select?},
-        inbox?: {board_show?}}` into `person:` through `set_settings`, which validates each and refuses a
-        session. `open_in` is `vscode`, `none` or `{label, url}` — a template the UI would refuse (§5: its scheme) is
-        refused here in the same words, before it is written; a `null` clears a key."""
+        inbox?: {board_show?}, attach?: {max?}}` into `person:` through `set_settings`, which validates each and
+        refuses a session. `open_in` is `vscode`, `none` or `{label, url}` — a template the UI would refuse (§5:
+        its scheme) is refused here in the same words, before it is written; a `null` clears a key."""
         body = await body_of(request)
         change: dict[str, Any] = {}
         if "open_in" in body:
@@ -2756,8 +2781,13 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not isinstance(inbox, dict) or not set(inbox) <= {"board_show"}:
                 raise HTTPException(400, "you: inbox takes board_show")
             change["inbox"] = inbox
+        attach = body.get("attach")
+        if attach is not None:  # **attachment bound** (§4.5 screen 8, TD-478); `set_settings` refuses a bad value
+            if not isinstance(attach, dict) or not set(attach) <= {"max"}:
+                raise HTTPException(400, "you: attach takes max")
+            change["attach"] = attach
         if not change:
-            raise HTTPException(400, "you: send open_in, terminal or inbox")
+            raise HTTPException(400, "you: send open_in, terminal, inbox or attach")
         return answer(await call("set_settings", person=change))
 
     @app.post("/api/settings/notify")

@@ -39,8 +39,6 @@ def attachments_dir() -> Path:
 # A Focus attachment travels to the host agent in pieces (design §4.4 *Attachment drop*, TD-478), each
 # base64 on the RPC's one line, and a line is 8 MiB (`client.LINE_LIMIT`).
 ATTACH_PIECE_BYTES = 2 * 1024 * 1024
-# The page's one-call bound until its half of TD-478 sends pieces; the host agent no longer reads it.
-ATTACH_BYTES_MAX = 4 * 1024 * 1024
 # A `.part` nothing has written to for this long goes on the hourly sweep (§4.6 *Run-log retention*).
 ATTACH_PART_IDLE_S = 3600
 # An upload's `.part`, `<safe name>.<upload>.part`, the upload id `secrets.token_hex(8)`.

@@ -151,9 +151,11 @@
         {#- design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002):
             the picker, a file dropped on the terminal or the composer, or an image pasted into the
             composer — each uploaded to `attachments/<session>/` and its path inserted at the caret;
-            nothing is sent until Send -#}
-        <button type="button" class="btn sm" id="attach" title="attach files: their paths go into the prompt (or drop them on the terminal or here, or paste an image)"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
+            nothing is sent until Send. A file goes up in pieces of `data-piece` bytes, and past one
+            piece the ✕ beside it cancels the upload (TD-478) -#}
+        <button type="button" class="btn sm" id="attach" data-piece="{{ attach_piece }}" title="attach files: their paths go into the prompt (or drop them on the terminal or here, or paste an image)"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
         <input type="file" id="attachfile" multiple hidden>
+        <button type="button" class="btn sm hidden" id="attachcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
         <span class="note" id="composehint"></span>
         <span class="grow"></span>
         {#- design §4.5a *Focus composer* **prompt chips** (§4.8, TD-161, built by TD-170): the role's

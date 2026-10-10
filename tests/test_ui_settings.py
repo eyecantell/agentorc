@@ -289,10 +289,27 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         assert client.post("/api/settings/you", json={"inbox": {"colour": "red"}}).status_code == 400
         assert call_sync("settings")["person"]["inbox"] == {"board_show": "14d"}
 
+        # **attachment bound** (§4.5 screen 8, TD-478): the default beside an empty field, written, refused
+        # out of 1M–4G in the RPC's words, and an empty Save (`max: null`) back to the default
+        page = client.get("/settings").text
+        assert 'name="attach_max" value="" placeholder="256M"' in page and "256M by default" in page
+        assert client.post("/api/settings/you", json={"attach": {"max": "1G"}}).json()["ok"]
+        assert call_sync("settings")["person"]["attach"] == {"max": "1G"}
+        assert 'name="attach_max" value="1G"' in client.get("/settings").text
+        bad = client.post("/api/settings/you", json={"attach": {"max": "9G"}})
+        assert bad.status_code == 400 and "1M to 4G" in bad.json()["detail"]
+        assert client.post("/api/settings/you", json={"attach": {"colour": "red"}}).status_code == 400
+        assert client.post("/api/settings/you", json={"attach": {"max": None}}).json()["ok"]
+        assert "attach" not in call_sync("settings")["person"]
+
         nope = client.post("/api/settings/teams", json={"team": "nobody", "reserve": "10"})
         assert nope.status_code == 400 and "the org defines" in nope.json()["detail"]
     finally:
-        call_sync("set_settings", person={"open_in": None, "terminal": None, "inbox": None}, repos={"agentorc": None})
+        call_sync(
+            "set_settings",
+            person={"open_in": None, "terminal": None, "inbox": None, "attach": None},
+            repos={"agentorc": None},
+        )
 
 
 def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):

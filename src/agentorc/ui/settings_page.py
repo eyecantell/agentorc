@@ -466,7 +466,8 @@ def org_cards(defs: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
     """**You**, *yours everywhere* (§4.5 screen 8): `open_in` as the field takes it back and the
-    terminal's size and face — what `settings.yml` holds, the defaults where it holds nothing."""
+    terminal's size and face, the attachment bound — what `settings.yml` holds, the defaults where it
+    holds nothing."""
     person = person or {}
     o = person.get("open_in")
     if isinstance(o, dict):
@@ -475,6 +476,7 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
         mode, label, url = (str(o) if o in ("vscode", "none") else "vscode"), "", ""
     term = person.get("terminal") if isinstance(person.get("terminal"), dict) else {}
     lo, hi = settings_mod.TERMINAL_SIZE
+    attach = person.get("attach") if isinstance(person.get("attach"), dict) else {}
     # **board items shown** (§4.5a, TD-220 slice 4): the pick of four and its two numbers, 10 and 7 until typed
     inbox = person.get("inbox") if isinstance(person.get("inbox"), dict) else {}
     try:
@@ -501,6 +503,9 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
         "face": str(term.get("face") or ""),
         "copy_on_select": term.get("copy_on_select") is not False,  # on by default (§4.5a, TD-164)
         "size_bounds": (lo, hi),
+        # **attachment bound** (§4.5 screen 8, §5 `person.attach.max`, TD-478): as written, the default beside it
+        "attach_max": str(attach.get("max") or ""),
+        "attach_default": settings_mod.ATTACH_MAX_DEFAULT,
     }
 
 
