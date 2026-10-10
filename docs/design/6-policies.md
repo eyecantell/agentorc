@@ -482,7 +482,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `work` trigger (rule 3) never disagree on what is new; it keys on the id alone, since
      *matches the lane now and did not when last seen* is what being news means, and no kind or
      workability is written beside the id. The promote tells nobody itself: it is one of the ways
-     an entry comes back, and the reading sees them all. It is mail, so the doorbell is what
+     an entry comes back, and the reading sees them all. **Unknown is not *not live***: until the
+     promote's first reading since the host agent started, no live commit is known, and a reading
+     taken then gives each live check the `live` its checkout's last reading gave it (`no` for one
+     that reading did not hold), so a restart never takes a live check out of a lane and brings it
+     back as news (TD-516). It is mail, so the doorbell is what
      wakes the member, under every rule the doorbell has (§4.10: hook-confirmed idle, an empty
      composer, a pending stop beats it, **one unit of the wake budget**), and a node's member is
      reached as any mail reaches it. What the member does is its own: a claim clears
