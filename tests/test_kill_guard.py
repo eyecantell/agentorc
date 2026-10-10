@@ -34,6 +34,11 @@ REFUSED = [
     "true && /usr/bin/killall -9 tmux",
     "timeout 5 pkill x",
     "pp=$(ps -o ppid= -p 1234)\nkill $pp",
+    "sudo -u bob pkill x",
+    "timeout -s KILL 5 pkill x",
+    "nice -n 5 killall x",
+    "\\pkill x",
+    "cat <<EOF\nnothing here\nEOF\npkill x",  # past the body, a command again
 ]
 
 ALLOWED = [
@@ -52,6 +57,15 @@ ALLOWED = [
     "ps -o ppid= -p $$",  # reading a parent is not killing it
     "git commit -m 'kill the guard: pkill, killall, kill -1'",
     "pdm run test tests/test_kill_guard.py",
+    # a here-document's body is text a command reads (this repo's own commit idiom), and so is a comment
+    "cat <<'EOF'\npkill -f x\nEOF",
+    "cat <<EOF\nkill -9 $PPID\nEOF",
+    "cat <<-EOF\n\tkillall x\n\tEOF",
+    "git commit -m \"$(cat <<'EOF'\nTD-489: the pkill guard\nkill -1\nEOF\n)\"",
+    "kill 1234 # ppid note",
+    "ls # pkill x",
+    "grep -c x <<< 'pkill'",
+    "tmux kill-session -t scratch",
 ]
 
 

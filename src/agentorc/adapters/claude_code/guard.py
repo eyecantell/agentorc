@@ -18,6 +18,14 @@ REASON = (
 
 # Words that run the command after them, skipped to find the command word (with their own options).
 WRAPPERS = {"sudo", "env", "nohup", "exec", "command", "builtin", "nice", "setsid", "time", "xargs", "timeout"}
+# A wrapper's options that take the next word as their value: `sudo -u bob pkill x` runs `pkill`.
+WRAPPER_VALUES = {
+    "sudo": {"-u", "-g", "-C", "-h", "-p", "-U", "-r", "-t", "-D"},
+    "env": {"-u", "-C", "-S"},
+    "nice": {"-n"},
+    "timeout": {"-s", "-k", "--signal", "--kill-after"},
+    "xargs": {"-I", "-n", "-P", "-L", "-d", "-E", "-s", "-a"},
+}
 # Shell keywords a command word may follow inside a compound command.
 KEYWORDS = {"do", "then", "else", "elif", "!", "if", "while", "until", "{", "}"}
 BY_PATTERN = {"pkill", "killall"}
@@ -30,18 +38,58 @@ KILL_OF_A_SEARCH = re.compile(r"(?:^|[^\w-])kill\b[^;&|\n]*(?:\$\(|`)\s*(?:sudo\
 PARENT_PID = re.compile(r"\bppid\b", re.IGNORECASE)
 # A parameter expansion inside double quotes, kept by the mask: `kill "$PPID"` is `kill $PPID`.
 EXPANSION = re.compile(r"\$(?:[A-Za-z_][A-Za-z0-9_]*|\{[^}\"]*\})")
+# A here-document's operator and delimiter (`<<EOF`, `<<-'EOF'`); `<<<` is a here-string, not one.
+HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+
+
+def blank_bodies(command: str, i: int, out: list[str], pending: list[tuple[str, bool]]) -> int:
+    """At the newline at `i` that ends a line with here-documents open: blank each body to `_`
+    through its delimiter's line, keeping the newlines, and return where the command goes on."""
+    out.append("\n")
+    i += 1
+    for word, tabs in pending:
+        while i < len(command):
+            end = command.find("\n", i)
+            end = len(command) if end < 0 else end
+            line = command[i:end]
+            done = (line.lstrip("\t") if tabs else line) == word
+            out.append(line if done else "_" * len(line))
+            if end < len(command):
+                out.append("\n")
+            i = end + 1
+            if done:
+                break
+    pending.clear()
+    return i
 
 
 def mask(command: str) -> str:
     """The command with quoted text blanked to `_`, so a word only echoed or matched is no command;
-    a `$( … )` or backtick substitution and a `$NAME` inside double quotes are kept, since they run."""
+    a `$( … )` or backtick substitution and a `$NAME` inside double quotes are kept, since they run.
+    A here-document's body and a `#` comment are blanked too: text a command reads, never runs."""
     out: list[str] = []
+    pending: list[tuple[str, bool]] = []  # here-documents opened on the current line: (delimiter, `<<-`)
     i, n = 0, len(command)
     quote = ""  # "", "'" or '"'
     depth = 0  # open `$(` inside the current double quote
     tick = False  # inside a backtick inside the current double quote
     while i < n:
         c = command[i]
+        code = quote == "" or (quote == '"' and (depth or tick))
+        if code and c == "<" and not command.startswith("<<<", i) and (m := HEREDOC.match(command, i)):
+            pending.append((m.group(3), m.group(1) == "-"))
+            out.append(m.group())
+            i = m.end()
+            continue
+        if code and c == "\n" and pending:
+            i = blank_bodies(command, i, out, pending)
+            continue
+        if quote == "" and c == "#" and (not out or out[-1][-1:] in " \t\n;&|("):
+            end = command.find("\n", i)
+            end = n if end < 0 else end
+            out.append("_" * (end - i))
+            i = end
+            continue
         if quote == "'":
             if c == "'":
                 quote = ""
@@ -93,12 +141,13 @@ def command_word(words: list[str]) -> tuple[str, list[str]]:
         w = words[i]
         if ASSIGNMENT.match(w) or w in KEYWORDS:
             i += 1
-        elif w.rsplit("/", 1)[-1] in WRAPPERS:
+        elif (name := w.rsplit("/", 1)[-1]) in WRAPPERS:
             i += 1
             while i < len(words) and (words[i].startswith("-") or re.fullmatch(r"[\d.]+[smhd]?", words[i])):
-                i += 1  # the wrapper's own options, and `timeout`'s duration
+                # the wrapper's own options, a value its option takes, and `timeout`'s duration
+                i += 2 if words[i] in WRAPPER_VALUES.get(name, ()) else 1
         else:
-            return w.rsplit("/", 1)[-1], words[i + 1 :]
+            return w.lstrip("\\").rsplit("/", 1)[-1], words[i + 1 :]  # `\pkill` skips an alias, nothing else
     return "", []
 
 
