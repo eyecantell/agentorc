@@ -45,12 +45,11 @@ lead: every send it makes is refused, and its own log is the only place that say
 The one case that needs nothing is a worker the **lead itself** started — a session lists
 its creator from birth (§4.8), which is what the brief's restart rule relies on.
 
-Two briefs are written but **not launchable yet**, so that their rules are decided before the day
-they are needed: `guardians-orchestrator.md` (blocked — the repos are not on this host, and the
-devcontainer question in design §10 is open) and `director.md` (needs two managers before
-it is worth running). The guardians brief carries the restart ceiling and `one_for_one` scope
-from TD-036; the director's round reads that ceiling as the mark the tick's restarts leave, and ends
-in `ao wait`, as a manager's does.
+One brief is written but **not launchable yet**, so that its rules are decided before the day it
+is needed: `director.md` (needs two managers before it is worth running). Its round reads the
+restart ceiling (TD-036) as the mark the tick's restarts leave, and ends in `ao wait`, as a
+manager's does. guardians' team is defined in its own repo (`guardians-devenv`, its
+`docs/briefs/team-setup.md`); the old `guardians-orchestrator.md` is under `archive/`.
 
 `techlead-context.md` is the techlead's **primer** (design §4.9b): its first read on every fill —
 the team definition's `techlead: {…, context: docs/briefs/techlead-context.md}` names it and the
@@ -61,5 +60,6 @@ that exist.
 
 `archive/` holds the briefs of one-off step workers that are finished: the `td052-step*.md` set,
 whose steps merged, and `td036-migration.md`, a migration never run because `ao team start`
-(TD-040) superseded it. Kept for the record, never started again. A new one-off brief moves there
+(TD-040) superseded it. It also holds `guardians-orchestrator.md`, a lead brief retired unlaunched
+on 2026-10-09 once guardians' team moved to its own repo. Kept for the record, never started again. A new one-off brief moves there
 when its step merges.
