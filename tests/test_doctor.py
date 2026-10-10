@@ -219,6 +219,14 @@ def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, m
         {"command": f"{hook} --statusline", "resolves": True},
     ], "dev-cadence's own line is not ours to read"
     assert {c["resolves"] for c in g["layers"][0]["commands"]} == {False}
+    # a layer written before dev-cadence's runner line changed carries the older line: not ours to read either (TD-507)
+    old_line = 'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi'
+    nudge = "python3 scripts/nudge_user_attention.py --session-start"
+    hooks = {"SessionStart": [{"hooks": [{"command": str(hook)}, {"command": old_line}, {"command": nudge}]}]}
+    (layers / "grind+cadence.json").write_text(json.dumps({"hooks": hooks}))
+    cad = next(r for r in ClaudeCodeAdapter().doctor_profiles() if r["profile"] == "grind")["layers"][0]
+    assert cad["path"].endswith("grind+cadence.json")
+    assert cad["commands"] == [{"command": str(hook), "resolves": True}]
     api = rows["grind-api"]
     assert api["metered"] is True and api["key"] is True and api["credentials"] is None
     assert rows["nobody"]["credentials"] is None and rows["nobody"]["layers"] == []
