@@ -251,6 +251,9 @@
   // a file type (a screenshot: `image/png` first) is handed to `file` as a File named for the moment,
   // for the attach road. A browser without `read()`, or one that refuses it, pastes text alone through
   // `readText()`, and says so when that finds nothing; a clipboard it cannot read at all is a toast.
+  // The file type a clipboard's paste takes, of the types it carries: `image/png` first, else the first
+  // that is not text; none when it carries only text. Shared by `AO.clipPaste` and `AO.pasteData`.
+  AO.clipFileType = (types) => (types.includes("image/png") ? "image/png" : types.find((t) => !t.startsWith("text/")));
   AO.clipPaste = async function (clip, { text, file, toast, now }) {
     const blocked = () => toast("clipboard blocked (needs https or localhost)");
     const plain = async (says) => {
@@ -269,8 +272,7 @@
         if (t) { text(t); return; }
       }
       for (const it of items || []) {
-        const types = it.types || [];
-        const type = types.includes("image/png") ? "image/png" : types.find((t) => !t.startsWith("text/"));
+        const type = AO.clipFileType(it.types || []);
         if (!type) continue;
         const blob = await it.getType(type);
         file(new File([blob], AO.attachName({ name: "", type }, now || new Date()), { type }));
@@ -279,17 +281,38 @@
     } catch (e) { blocked(); }
   };
 
-  // The terminal's paste chords — Ctrl+V, Ctrl+Shift+V, Shift+Insert — taken by `paste` (the one road,
-  // `AO.clipPaste`) and the browser's own paste cancelled: a key handler's `false` stops xterm.js from
-  // reading the key, not the browser from raising `paste` on xterm's textarea, which xterm.js pastes
-  // itself, so the text went in twice (TD-520). True when it took the key.
-  AO.pasteKey = function (e, paste) {
+  // The terminal's paste chords — Ctrl+V, Ctrl+Shift+V, Shift+Insert — kept from xterm.js (which reads
+  // Ctrl+V as ^V) and left to the browser, which raises its own `paste` event: that event carries the
+  // clipboard in `clipboardData` with no prompt, where a script's `clipboard.read()` costs a *Paste*
+  // button in Firefox and Safari (TD-523). The keydown is never cancelled — that would cancel the paste.
+  // True when the key is a paste chord.
+  AO.pasteKey = function (e) {
     if (e.type !== "keydown") return false;
     const v = e.key === "v" || e.key === "V";
-    if (!((e.ctrlKey && v && (e.shiftKey || !e.altKey)) || (e.shiftKey && e.key === "Insert"))) return false;
-    e.preventDefault();
-    paste();
+    return !!((e.ctrlKey && v && (e.shiftKey || !e.altKey)) || (e.shiftKey && e.key === "Insert"));
+  };
+  // A browser `paste` event's data, as `AO.clipPaste` reads a clipboard: non-empty `text/plain` is the
+  // text's, handed to `text`; else a file (`AO.clipFileType`'s pick) is handed to `file`. True when it
+  // took one.
+  AO.pasteData = function (cd, { text, file }) {
+    if (!cd) return false;
+    const t = [...(cd.types || [])].includes("text/plain") ? cd.getData("text/plain") : "";
+    if (t) { text(t); return true; }
+    const files = Array.from(cd.files || []);
+    const type = AO.clipFileType(files.map((f) => f.type || ""));
+    const f = type && files.find((f) => f.type === type);
+    if (!f) return false;
+    file(f);
     return true;
+  };
+  // The terminal's paste event, caught on `el` (the terminal's box) in the capture phase, before
+  // xterm.js's textarea pastes it itself (TD-520's doubling): read-only first, then `AO.pasteData`.
+  AO.wireTermPaste = function (el, { readOnly, text, file, toast }) {
+    el.addEventListener("paste", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (readOnly()) { toast("watching: paste is off — Take over to type"); return; }
+      AO.pasteData(e.clipboardData, { text, file });
+    }, true);
   };
 
   // One file up the attach road in pieces (§4.4 *Attachment drop*, TD-478): sliced by `piece` (the
@@ -3595,22 +3618,23 @@
     // its path is pasted here — a bracketed paste, so it lands in the tool's input unsent (TD-479)
     let attachFiles = null;
     const live = () => ws && ws.readyState === 1;
+    const pasteText = (t) => { if (live()) term.paste(t); };
+    const pasteFile = (f) => attachFiles && attachFiles([f], (path) => { if (live()) term.paste(path); });
+    // the menu's Paste and right-click have no paste event: they read the clipboard by script
     const pasteClip = () => {
       if (readOnly) { AO.toast("watching: paste is off — Take over to type"); return; }
-      AO.clipPaste(navigator.clipboard, {
-        text: (t) => { if (live()) term.paste(t); },
-        file: (f) => attachFiles && attachFiles([f], (path) => { if (live()) term.paste(path); }),
-        toast: AO.toast,
-      });
+      AO.clipPaste(navigator.clipboard, { text: pasteText, file: pasteFile, toast: AO.toast });
     };
+    // the keys' paste: the browser's own event, read where it lands (TD-523)
+    AO.wireTermPaste($("#term"), { readOnly: () => readOnly, text: pasteText, file: pasteFile, toast: AO.toast });
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) { copySel(); return false; }
       if (e.ctrlKey && !e.shiftKey && (e.key === "c" || e.key === "C") && term.hasSelection()) { copySel(); term.clearSelection(); return false; }
-      // Plain Ctrl+V pastes text too, as Ctrl+Shift+V and Shift+Insert do: passed through, Claude Code
+      // Plain Ctrl+V pastes too, as Ctrl+Shift+V and Shift+Insert do: passed through, Claude Code
       // reads ^V as "paste an image from the clipboard", which over ssh only produces a "try scp"
-      // message (first-use finding).
-      if (AO.pasteKey(e, pasteClip)) return false;
+      // message (first-use finding). The paste itself is the browser's event (`AO.wireTermPaste`).
+      if (AO.pasteKey(e)) return false;
       if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown")) { ws && ws.readyState === 1 && ws.send(JSON.stringify({ scroll: e.key === "PageUp" ? "up" : "down" })); return false; }
       return true;
     });
