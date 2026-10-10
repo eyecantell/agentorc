@@ -185,7 +185,7 @@
         <span class="note">the card's and Focus's button; none removes it</span></label>
       <div class="settemplate{% if you.open_in != 'template' %} hidden{% endif %}" id="settemplate">
         <label class="setrow"><span class="setlabel">label</span><input class="input setin" name="label" value="{{ you.label }}" placeholder="Cursor" autocomplete="off"></label>
-        <label class="setrow"><span class="setlabel">url</span><input class="input setin mono" name="url" value="{{ you.url }}" placeholder="cursor://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank" autocomplete="off" spellcheck="false"><span class="note"><span class="mono">{path}</span> the directory or file, <span class="mono">{remote}</span> the host</span></label>
+        <label class="setrow"><span class="setlabel">url</span><input class="input setin mono" name="url" value="{{ you.url }}" placeholder="cursor://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank" autocomplete="off" spellcheck="false"><span class="note"><span class="mono">{path}</span> the directory or file, <span class="mono">{remote}</span> the host, <span class="mono">{line}</span> the line, on a file link; a folder drops it with the <span class="mono">:</span> before it</span></label>
       </div>
       <label class="setrow"><span class="setlabel">terminal size</span>
         <input class="input setin" name="size" type="number" min="{{ you.size_bounds[0] }}" max="{{ you.size_bounds[1] }}" value="{{ you.size or '' }}" placeholder="13">

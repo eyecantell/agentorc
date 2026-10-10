@@ -9023,3 +9023,35 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Resolved:** 2026-10-10 (PRs #1462, #1464) — the paste chords no longer cancel their keydown; the terminal's box catches the browser's own `paste` event in the capture phase and reads `clipboardData` (`AO.pasteKey`, `AO.wireTermPaste`, `AO.pasteData` in `app.js`; design §4.5a **Copy / Paste**; `tests/test_attach.py`). Paul's look (m-c34d930db6db) answered *Works* (m-e9f8fcb175ac): Ctrl+V pastes with no *Paste* button in his browser.
 
 **Related:** TD-479 (the file paste, whose look found it), TD-520 (#1449, the doubled paste whose fix moved Ctrl+V to the script read), TD-472.
+
+## TD-529: Build the folder form's drop of a template's `{line}` (TD-528): `editor_link` strips `:{line}`, the Settings note names `{line}`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (the designer, TD-528's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §5 `person.open_in` (*a folder form drops it with the one `:` before it*), §4.5a **Settings page: You** (the *url* note); `src/agentorc/ui/uiconf.py` (`editor_link`: the template branch), `src/agentorc/ui/templates/settings.html` (the note under *url*, ~L188), `tests/test_ui_open_in.py`
+
+**Why:** TD-528: a template written for the file links, `…{path}:{line}`, drew every folder button with a literal `:{line}` at its tail, and the Settings page never said `{line}` exists.
+
+**Resolved:** 2026-10-10 (PR #1471) — `uiconf.editor_link`'s template branch drops `:{line}` (or a bare `{line}`) before filling, so every folder form opens the directory; the Settings note under *url* names `{line}`; `tests/test_ui_open_in.py` pins both, and the UI check on a scratch home read the links and the note (PR body).
+
+**Done when** a `{line}` template's folder buttons open the directory, the note names `{line}`, and the tests pin both.
+
+**Related:** TD-528 (the design), TD-526 (the file form's `{line}`), TD-524.
+
+## TD-528: A template `person.open_in` with `{line}` draws the folder button with `{line}` unfilled, and the Settings page's url note names only `{path}` and `{remote}`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-2, found by the independent review of TD-526's #1467)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §5 `person.open_in` (`{line}`: *the file form only*), §4.5a **Settings page** rows for `open_in`; `src/agentorc/ui/uiconf.py` (`editor_link`, which fills `{path}` and `{remote}`), `src/agentorc/ui/templates/settings.html` (the template url's note)
+
+**Why:** TD-524's round gave a template `{line}` beside `{path}` and `{remote}`, filled on the file form (built by TD-526, #1467). The folder form — the Session card's and the card's editor button, *edit yml*, Settings' **Open file** — fills only `{path}` and `{remote}`, so a template such as `zed://ssh/{remote}{path}:{line}`, which the file links invite, draws a folder button whose link ends `:{line}` literally. The design says `{line}` is the file form's only and is silent on what the folder form does with it; the Settings page's note under the url names `{path}` and `{remote}` alone, so a person never learns `{line}` exists.
+
+**Resolved:** 2026-10-10 (PRs #1469, #1471) — designed in #1469 (§5 `person.open_in`: a folder form drops `{line}` with the one `:` before it; §4.5a **Settings page: You**, the *url* note) and built by TD-529 in #1471.
