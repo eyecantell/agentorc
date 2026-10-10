@@ -2778,9 +2778,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/you")
     async def settings_you(request: Request):
-        """§4.5a *Settings page: You* → **Save**: `{open_in?, terminal?: {size?, face?, copy_on_select?},
-        inbox?: {board_show?}, attach?: {max?}, composer?}` into `person:` through `set_settings`, which validates
-        each and refuses a session. `open_in` is `vscode`, `none` or `{label, url}` — a template the UI would
+        """§4.5a *Settings page: You* → **Save**: `{open_in?, file_link?: {folder_first?, wait?}, terminal?: {size?,
+        face?, copy_on_select?}, inbox?: {board_show?}, attach?: {max?}, composer?}` into `person:` through
+        `set_settings`, which validates each and refuses a session. `open_in` is `vscode`, `none` or `{label, url,
+        file}` (TD-536) — a template the UI would
         refuse (§5: its scheme) is refused here in the same words, before it is written; a `null` clears a key."""
         body = await body_of(request)
         change: dict[str, Any] = {}
@@ -2791,6 +2792,11 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if got.error:
                     raise HTTPException(400, got.error)
             change["open_in"] = o
+        fl = body.get("file_link")
+        if fl is not None:  # **file link** (§4.5a, §5 `person.file_link`, TD-536); `set_settings` refuses a bad value
+            if not isinstance(fl, dict) or not set(fl) <= {"folder_first", "wait"}:
+                raise HTTPException(400, "you: file_link takes folder_first and wait")
+            change["file_link"] = fl
         term = body.get("terminal")
         if term is not None:
             if not isinstance(term, dict) or not set(term) <= {"size", "face", "copy_on_select"}:
@@ -2809,7 +2815,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if "composer" in body:  # **the bar** (§4.5a *Focus composer*, TD-500); `set_settings` refuses a bad value
             change["composer"] = body["composer"]
         if not change:
-            raise HTTPException(400, "you: send open_in, terminal, inbox, attach or composer")
+            raise HTTPException(400, "you: send open_in, file_link, terminal, inbox, attach or composer")
         return answer(await call("set_settings", person=change))
 
     @app.post("/api/settings/notify")

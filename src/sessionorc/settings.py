@@ -323,7 +323,9 @@ ATTACH_KEYS = ("max",)
 ATTACH_MAX_DEFAULT = "256M"  # §4.4 *Attachment drop*: the most a Focus attachment may be when nothing is set
 ATTACH_MAX = (1 << 20, 4 << 30)  # `1M` to `4G`: the bound is for the disk the sweep frees, not for the tool
 COMPOSER = ("folded", "open")  # §4.5a *Focus composer* **the bar** (TD-491): the first is the default
-PERSON_KEYS = ("open_in", "terminal", "inbox", "attach", "composer")
+FILE_LINK_KEYS = ("folder_first", "wait")
+FILE_LINK_WAIT = (0, 4)  # §4.6: seconds between a file link's launches, under the browser's five-second activation
+PERSON_KEYS = ("open_in", "file_link", "terminal", "inbox", "attach", "composer")
 
 
 def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
@@ -492,18 +494,41 @@ def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
 
 
 def parse_open_in(v: Any) -> str | dict[str, str]:
-    """`open_in:`'s shape (§5): `vscode`, `none`, or `{label, url}` — any other word is kept too, so
-    the UI can name it (`cursor` is refused there with the reason, not silently dropped here)."""
+    """`open_in:`'s shape (§5): `vscode`, `none`, or `{label, url, file}` with `file` optional (TD-536) —
+    any other word is kept too, so the UI can name it (`cursor` is refused there with the reason, not
+    silently dropped here)."""
     if isinstance(v, str) and v.strip():
         return v.strip()
-    if isinstance(v, dict) and set(v) == {"label", "url"} and all(isinstance(x, str) and x.strip() for x in v.values()):
-        return {"label": v["label"].strip(), "url": v["url"].strip()}
-    raise ValueError(f"open_in is vscode, none or {{label, url}}, not {v!r}")
+    if (
+        isinstance(v, dict)
+        and {"label", "url"} <= set(v) <= {"label", "url", "file"}
+        and all(isinstance(x, str) and x.strip() for x in v.values())
+    ):
+        return {k: v[k].strip() for k in ("label", "url", "file") if k in v}
+    raise ValueError(f"open_in is vscode, none or {{label, url, file}}, not {v!r}")
+
+
+def parse_file_link(v: Any, drop: bool = False) -> dict[str, Any]:
+    """`person.file_link` (§5, §4.6; TD-536): `{folder_first: bool, wait: 0–4}`, what a file link sends."""
+
+    def folder_first(b: Any) -> bool:
+        if not isinstance(b, bool):
+            raise ValueError(f"file_link.folder_first is true or false, not {b!r}")
+        return b
+
+    def wait(n: Any) -> int | float:
+        lo, hi = FILE_LINK_WAIT
+        if isinstance(n, bool) or not isinstance(n, (int, float)) or not lo <= n <= hi:
+            raise ValueError(f"file_link.wait is a number of seconds from {lo} to {hi}, not {n!r}")
+        return n
+
+    return _each(_fields(v, FILE_LINK_KEYS, "file_link", drop), {"folder_first": folder_first, "wait": wait}, drop)
 
 
 def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
-    """`person:` — `open_in`, `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164),
-    `inbox: {board_show}` (TD-220), `attach: {max}` (TD-478) and `composer` (TD-500)."""
+    """`person:` — `open_in`, `file_link: {folder_first, wait}` (TD-536), `terminal: {size, face,
+    copy_on_select}` (§5, goal 12, TD-164), `inbox: {board_show}` (TD-220), `attach: {max}` (TD-478) and
+    `composer` (TD-500)."""
 
     def terminal(v: Any) -> dict[str, Any]:
         v = _fields(v, TERMINAL_KEYS, "terminal", drop)
@@ -535,7 +560,14 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
     value = _fields(value, PERSON_KEYS, "person", drop)
     return _each(
         value,
-        {"open_in": parse_open_in, "terminal": terminal, "inbox": inbox, "attach": attach, "composer": parse_composer},
+        {
+            "open_in": parse_open_in,
+            "file_link": lambda v: parse_file_link(v, drop),
+            "terminal": terminal,
+            "inbox": inbox,
+            "attach": attach,
+            "composer": parse_composer,
+        },
         drop,
     )
 

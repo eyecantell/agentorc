@@ -467,14 +467,17 @@
   // as the Session card's button sends it, then the file form, so the file lands in the worktree's
   // window — brought forward when one holds the folder, just opened when none does. The wait covers
   // the protocol handler's turn, not the window's connection (the editor queues a file for a window
-  // still connecting), and stays inside the browser's five-second activation window: one second,
-  // fixed, no setting. One toast for the pair; nothing is remembered between presses.
+  // still connecting), and stays inside the browser's five-second activation window. Both are the
+  // person's (`person.file_link`, §5; TD-536), served on the record's `editor`: `first: false` is the
+  // file form alone, and `wait` the seconds between, one where unset. One toast for the pair; nothing
+  // is remembered between presses.
   AO.FOLDER_WAIT = 1000;
   AO.openFile = function (editor, fileUrl, open) {
     const o = open || AO.openEditor, label = (editor && editor.label) || "the editor";
-    if (!(editor && editor.url)) { o(fileUrl, label); return; }
+    if (!(editor && editor.url) || editor.first === false) { o(fileUrl, label); return; }
+    const wait = typeof editor.wait === "number" ? editor.wait * 1000 : AO.FOLDER_WAIT;
     o(editor.url, label);
-    setTimeout(() => o(fileUrl, label, true), AO.FOLDER_WAIT);
+    setTimeout(() => o(fileUrl, label, true), wait);
   };
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest("a.editor");
@@ -482,7 +485,7 @@
     ev.preventDefault();
     // a file's link carries its session's folder (the recent files, TD-535): the pair; any other
     // editor link — the Session card's button, a folder — the one launch
-    if (a.dataset.folder) AO.openFile({ url: a.dataset.folder, label: a.dataset.label }, a.href);
+    if (a.dataset.folder) AO.openFile({ url: a.dataset.folder, label: a.dataset.label, wait: a.dataset.wait ? Number(a.dataset.wait) : undefined }, a.href);
     else AO.openEditor(a.href, a.dataset.label);
   });
 
@@ -3499,7 +3502,8 @@
   // first, each drawn relative to the session's directory (else its repo) with the absolute path and
   // the edit's time on hover, **M** before one `git.files` holds (its porcelain lines, relative to the
   // worktree), and a link by the editor's file form at line 1 — the `a.editor` handler opens it on a
-  // plain click. No file form, no links: the paths are text. "" when the run has edited nothing.
+  // plain click, after the session's folder unless the person turned that off (`editor.first`, TD-536).
+  // No file form, no links: the paths are text. "" when the run has edited nothing.
   AO.recentFiles = function (v, editor) {
     const files = v.files || [];
     if (!files.length) return "";
@@ -3509,12 +3513,14 @@
     const dir = String(v.dir || "").replace(/\/+$/, "") + "/";
     const isChanged = (p) => changed.some((c) => p.endsWith("/" + c) && dir.startsWith(p.slice(0, p.length - c.length)));
     const file = editor && editor.file;
+    const folder = editor && editor.url && editor.first !== false
+      ? ` data-folder="${esc(editor.url)}"${typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : ""}` : "";
     return files.map((f) => {
       const p = String(f.path || ""), rel = under(p, v.dir) ?? under(p, v.repo) ?? p;
       const mark = v.dir && isChanged(p) ? '<span class="fmark" title="changed in the worktree">M</span> ' : "";
       const title = esc(`${p}${f.at ? ` — edited ${String(f.at).slice(0, 16).replace("T", " ")}Z` : ""}`);
       const name = file
-        ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}"${editor.url ? ` data-folder="${esc(editor.url)}"` : ""} data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`
+        ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}"${folder} data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`
         : `<span title="${title}">${esc(rel)}</span>`;
       return `<div>${mark}${name}</div>`;
     }).join("");
@@ -4092,6 +4098,9 @@
         $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
+      // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
+      // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
+      if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
       renderReports(v);
       renderInbox(v);
@@ -4627,12 +4636,16 @@
       you: (f) => {
         const mode = f.elements.open_in.value;
         const open_in = mode === "template" ? { label: f.elements.label.value.trim(), url: f.elements.url.value.trim() } : mode;
+        // a template's **file** (TD-536): sent only when written, so an empty field leaves the url's road
+        if (mode === "template" && f.elements.file && f.elements.file.value.trim()) open_in.file = f.elements.file.value.trim();
+        // **file link** (§4.5a, §5 `person.file_link`, TD-536): the switch and the wait, read by the next file link
+        const file_link = f.elements.folder_first ? { folder_first: f.elements.folder_first.checked, wait: f.elements.wait.value === "" ? null : Number(f.elements.wait.value) } : undefined;
         const terminal = { size: f.elements.size.value ? Number(f.elements.size.value) : null, face: f.elements.face.value.trim() || null, copy_on_select: f.elements.copy_on_select.checked };
         // **attachment bound** (TD-478): an empty field clears `person.attach.max`, back to its default
         const attach = { max: f.elements.attach_max ? f.elements.attach_max.value.trim() || null : null };
         // **composer** (§4.5a *Focus composer* **the bar**, TD-500): folded or open, read on the next Focus load
         const composer = f.elements.composer ? f.elements.composer.value : undefined;
-        return ["you", { open_in, terminal, attach, composer, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
+        return ["you", { open_in, file_link, terminal, attach, composer, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
       // **Telegram** (§4.5a **You**, §4.10; TD-319): the three fields whole, an empty one cleared by the route
       notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],
@@ -4675,6 +4688,8 @@
         });
         $$(".setdayswords", f).forEach((w) => { const d = (f.elements.board_days.value || "").trim() || "7"; w.textContent = d === "7" ? "due this week" : `due within ${d} days`; });
         if (f.elements.open_in && $("#settemplate")) $("#settemplate").classList.toggle("hidden", f.elements.open_in.value !== "template");
+        if (f.elements.open_in && $("#setfilelink")) $("#setfilelink").classList.toggle("hidden", f.elements.open_in.value === "none");
+        if (f.elements.folder_first) f.elements.wait.disabled = !f.elements.folder_first.checked;
         settle(f);
       });
     });
@@ -4733,7 +4748,13 @@
       });
     });
     const openin = $("#setopenin");
-    if (openin) openin.addEventListener("change", () => $("#settemplate").classList.toggle("hidden", openin.value !== "template"));
+    if (openin) openin.addEventListener("change", () => {
+      $("#settemplate").classList.toggle("hidden", openin.value !== "template");
+      const fl = $("#setfilelink"); if (fl) fl.classList.toggle("hidden", openin.value === "none");
+    });
+    // **file link**'s wait is disabled with the switch off (§4.5a *Settings page: You, file link*, TD-536)
+    const first = $("#setyou") && $("#setyou").elements.folder_first;
+    if (first) first.addEventListener("change", () => { $("#setyou").elements.wait.disabled = !first.checked; });
     // *this browser* (§4.5a): what it holds, each set by its own control; Reset clears every `ao.*` key
     $$("#setbrowser [data-key]", page).forEach((dd) => {
       const v = store.get(dd.dataset.key, null);

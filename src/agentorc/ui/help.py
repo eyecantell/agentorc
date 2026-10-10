@@ -212,8 +212,8 @@ HELP: tuple[Help, ...] = (
             "editor, at the line where the editor's link takes one; it underlines only when the file is in the "
             "session's repo, which the host checks when you hover. A plain click or a drag selects, as before; "
             "without an editor button on the Session card there are no file links. It opens the session's folder "
-            "first, so the file lands in the worktree's window; your browser may ask twice until you tell it to "
-            "always allow this site."
+            "first, so the file lands in the worktree's window, unless you turned that off under file link on the "
+            "Settings page; your browser may ask twice until you tell it to always allow this site."
         ),
     ),
     Help(
@@ -380,6 +380,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "file-link",
+        "file link",
+        "Settings page: You",
+        (
+            "Has a file link open the session's folder in your editor first, then the file after the wait you "
+            "set, so the file lands in the worktree's window. Turn the folder off if the pair misfires for you, or "
+            "lengthen the wait if the file lands in the wrong window. It runs no command; your browser may ask "
+            "twice until you tell it to always allow this site."
+        ),
+    ),
+    Help(
         "telegram",
         "tell me on Telegram",
         "Settings page: You",
@@ -495,7 +506,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "held-missed",
         ),
     ),
-    ("settings", "Settings", ("on-work", "balance", "telegram", "telegram-test")),
+    ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
 )
 
 

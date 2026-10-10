@@ -72,8 +72,22 @@ const click = (a) => {
 const recentClick = click({ href: "vscode://file/w/wt/README.md:1",
   dataset: { folder: editor.url, label: "VS Code" } });
 const buttonClick = click({ href: editor.url, dataset: { label: "VS Code" } });
+// the person's `file_link` (TD-536): a row drawn with the folder off carries none; with a wait, its
+// seconds, which the click reads
+const off = { ...editor, first: false, wait: 2 }, slow = { ...editor, first: true, wait: 3 };
+const waitClick = (() => {
+  const saved = AO.openEditor; AO.openEditor = noop;
+  timers.length = 0;
+  const a = { href: "vscode://file/w/wt/README.md:1", dataset: { folder: editor.url, label: "VS Code", wait: "3" } };
+  const ev = { target: { closest: (sel) => (sel === "a.editor" ? a : null) }, preventDefault: noop };
+  clicks.forEach((f) => { try { f(ev); } catch (e) {} });
+  const waits = timers.splice(0).map(([, ms]) => ms);
+  AO.openEditor = saved;
+  return waits;
+})();
 console.log(JSON.stringify({
-  recentClick, buttonClick,
+  recentClick, buttonClick, waitClick,
+  linkedOff: AO.recentFiles(v, off), linkedSlow: AO.recentFiles(v, slow),
   painted, emptied,
   railHtml: AO.railHtml({ state: "idle" }, true, 0, {}, editor),
   railHtmlNone: AO.railHtml({ state: "idle" }, true, 0, {}, null),
@@ -137,6 +151,16 @@ def test_a_recent_file_click_sends_the_folder_then_the_file_and_the_cards_button
 
 
 @pytest.mark.unit
+def test_a_recent_file_follows_the_persons_file_link():
+    """§5 `person.file_link` (TD-536, built by TD-537): with the folder off a row carries no folder, so a
+    click is the file alone; with a wait, the row carries its seconds and the click waits them."""
+    got = _probe()
+    assert "data-folder" not in got["linkedOff"] and 'href="vscode://file/w/wt/README.md:1"' in got["linkedOff"]
+    assert 'data-folder="vscode://file/w/wt?windowId=_blank" data-wait="3" data-label="VS Code"' in got["linkedSlow"]
+    assert got["waitClick"] == [3000]
+
+
+@pytest.mark.unit
 def test_no_file_form_draws_text_and_no_edit_draws_nothing():
     got = _probe()
     assert "<a " not in got["text"] and "src/new file.py" in got["text"]
@@ -181,6 +205,8 @@ def test_focus_paints_the_row_and_the_rail_from_each_view_with_its_editor():
     render = focus[focus.index("    function render(v) {") :]
     render = render[: render.index("\n    }\n")]
     assert '      AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));' in render
+    # the person's file_link with each view, onto the object the pane's link provider holds (TD-537)
+    assert "if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }" in render
     rail = focus[focus.index("    function renderRail(v, ready) {") :]
     rail = rail[: rail.index("\n    }\n")]
     assert "      const html = AO.railHtml(railV, railReady, inboxN, lines, s.editor);" in rail

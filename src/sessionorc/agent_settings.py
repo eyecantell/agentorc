@@ -444,13 +444,14 @@ class SettingsMixin:
 
     @staticmethod
     def _person_change(current: Any, change: Any) -> dict[str, Any]:
-        """`person:` with `change` laid over it: a key set to None cleared; `terminal`, `inbox` and `attach` merged
-        field by field, a field set to None cleared. Validated whole before it is returned."""
+        """`person:` with `change` laid over it: a key set to None cleared; `terminal`, `inbox`, `attach` and
+        `file_link` merged field by field, a field set to None cleared. Validated whole before it is returned."""
         known = settings_mod.PERSON_KEYS
         nested = {
             "terminal": settings_mod.TERMINAL_KEYS,
             "inbox": settings_mod.INBOX_KEYS,
             "attach": settings_mod.ATTACH_KEYS,
+            "file_link": settings_mod.FILE_LINK_KEYS,
         }
         if not isinstance(change, dict) or not change:
             raise RpcError(f"set_settings: person is a mapping of {', '.join(known)} (design §5)")

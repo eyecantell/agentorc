@@ -34,6 +34,7 @@ from sessionorc.models import (
 )
 from sessionorc.reports import branch_ref
 
+from . import uiconf
 from .common import _age, _instant, editor_file, editor_link, host_name
 
 # -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
@@ -230,9 +231,11 @@ def view(
     reach = "" if here else str((hl.get("reach") or {}).get("vscode") or "")
     d["editor"] = editor_link(str(s.get("dir") or ""), reach) if here or reach else None
     # …and its file form beside it, which Focus fills with a path the host resolved (§4.6 *A path in
-    # the pane is a link*, TD-501): no button, no file links
+    # the pane is a link*, TD-501): no button, no file links — and what a press sends, the person's
+    # `file_link` (§5; TD-536): `first`, the folder launch before the file, and `wait`, the seconds between
     if d["editor"]:
-        d["editor"] = {**d["editor"], "file": editor_file(reach)}
+        fl = uiconf.file_link()
+        d["editor"] = {**d["editor"], "file": editor_file(reach), "first": fl["folder_first"], "wait": fl["wait"]}
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")

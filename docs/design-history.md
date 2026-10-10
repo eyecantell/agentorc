@@ -356,6 +356,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-10 (TD-537, grinder-ao-2): *The help text* gains **file link** (Settings page: You), and *a path is a link* names it — the folder first *unless you turned that off under file link on the Settings page*.
 - 2026-10-10 (TD-539, the designer; Paul: *should we add an ao version to the screens to be able to check which version is being used … a date+timestamp to make it easy on the user*): the **build** chip is always drawn, as the live commit's local date and time, *main +n* amber when main holds merges not yet live, *promoting…* and *held* as the readings say, the pending commits' subjects on hover, the page's own and a node's build after. Was: drawn only when behind, as *live <sha> · main n commits ahead*. Built by TD-542.
 - 2026-10-10 (TD-538, the designer): the *recent files* row reads git, not the hook — the porcelain and the branch's commits since its base, the commit's sha on hover, computed and never kept, on every tool. Built by TD-541.
 - 2026-10-10 (TD-536, the designer; Paul, after testing TD-535: *we will want to have the command that fires when a file link is chosen to be configurable*): a **Settings page: You, file link** row — the *opens the folder first* switch and the **wait**; the You row's template gains **file**; the *a path is a link* row names the switch. Built by TD-537.

@@ -9266,3 +9266,35 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-532 (the design), TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (recent files, #1476), TD-528 / TD-529 (a template's folder form), TD-501 (the pane's links).
 
 **Resolved:** 2026-10-10 (PRs #1483, #1484) — built in #1483: `AO.openFile` sends the folder link, then after `AO.FOLDER_WAIT` (1000 ms) the file form quietly, from the pane's path links and the recent files; the Session card's button stays one launch; the help says a press may be two asks. `tests/test_ui_focus_paths.py` and `tests/test_ui_focus_recent_files.py` pin the pair. Paul's look `m-846739e230fc` answered *Works* (2026-10-10).
+
+## TD-536: What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask after testing TD-535)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §5 `person.open_in` (`docs/design/5-configuration.md` ~L73-95: `vscode`, a `{label, url}` template, `none`; `{path}`, `{line}`, `{remote}`; a folder form drops `:{line}`), §4.6 *A path in the pane is a link* (`docs/design/4.6-transport.md` ~L140-179: *the press is two launches*, *one second, fixed, no setting*, *No person setting*), §4.5a the Settings page's editor row; `src/agentorc/ui/uiconf.py` (`open_in`, `editor_link`, `editor_file`), `src/agentorc/ui/static/app.js` (`AO.openFile`, `AO.FOLDER_WAIT`)
+
+**Why:** Paul, 2026-10-10, testing TD-535 (#1483): it works, the worktree opens and the file within it, but *I wonder if this is too fragile and we should just require users to open the worktree (hit open) then choose a file… we can find out by using it for a while. We will want to have the command that fires when a file link is chosen to be configurable (e.g. vscode <worktree_path> && sleep 1 && vscode <file_path>) that way users can set it for their favorite ide/editor.* Today a template gives one URL, from which the page derives both launches (the folder form drops `:{line}`), and §4.6 fixes the rest: both launches on every press, one second apart, no setting. So if the pair proves fragile in use, nothing turns it off, and an editor whose file form is not the folder form plus `:{line}` cannot be reached.
+
+**Related:** TD-532 / TD-535 (the two launches, #1483; Paul's look `m-846739e230fc`), TD-524 / TD-526 (the file form's line and window), TD-528 / TD-529 (a folder form drops `{line}`), TD-525 / TD-527 (the Session card's recent files).
+
+**Resolved:** 2026-10-10 (PR #1487, #1492) — designed in #1487 (§4.6 *A path in the pane is a link*, §5 `person.file_link` and a template's `file`, §4.5a *Settings page: You, file link*) and built by TD-537.
+
+## TD-537: Build `person.file_link` and the template's `file` (TD-536): the folder-first switch and the wait on the Settings page, served to the page with `editor`; `AO.openFile` reads them
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (the designer, TD-536's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §5 `person.open_in` and `person.file_link`; §4.6 *A path in the pane is a link* (the wait, the switch, a template's `file`); §4.5a *Settings page: You, file link*, *Settings page: You* (the **file** field), *a path is a link*, *The help text*; `src/sessionorc/settings.py` (`parse_open_in` ~L494 takes an optional `file`; `PERSON_KEYS` ~L326 gains `file_link`; `parse_person` ~L504 parses `{folder_first: bool, wait: 0–4}` and refuses outside it as `terminal.size` is), `src/agentorc/ui/uiconf.py` (`OpenIn` gains `file`; `parse_open_in` reads it under the same scheme check; `editor_file` returns the template's `file` with `{remote}` filled when it is set, the `url` road otherwise; a `file_link()` reader, `{folder_first, wait}` with the defaults), `src/agentorc/ui/cards.py` ~L231 (the record's `editor` carries `first` and `wait`), `src/agentorc/ui/static/app.js` (`AO.openFile` ~L473: no folder launch when `editor.first` is false, the wait `editor.wait * 1000` in place of `AO.FOLDER_WAIT`; `AO.recentFiles`' `data-folder` dropped when `first` is off; the Settings form's rows and save ~L4677/L4735), `src/agentorc/ui/app.py` ~L2781 (`set_settings`: `file_link` through, `file` on the template), `src/agentorc/ui/templates/settings.html` ~L176-190 (the rows), `src/agentorc/ui/help.py` (the new paragraph, and *a path is a link*'s), `docs/mockups/gen.py` (TD-536's row), `tests/test_ui_open_in.py`, `tests/test_ui_settings.py`, `tests/test_ui_focus_paths.py`, `tests/test_ui_focus_recent_files.py`, `tests/test_help.py`
+
+**Why:** TD-536: Paul, after testing TD-535's pair, wants it configurable per editor and switchable off should it prove fragile; today nothing turns it off and an editor whose file form differs from its folder form is unreachable.
+
+**Related:** TD-536 (the design), TD-532 / TD-535 (the pair, #1483), TD-526 (the one launch), TD-528 / TD-529 (a folder form drops `{line}`), TD-095 / TD-146 (`person.open_in`), TD-148 (the Settings page's You).
+
+**Resolved:** 2026-10-10 (PR #1492) — `person.file_link: {folder_first, wait}` parsed in `sessionorc/settings.py` and read by `uiconf.file_link()`; a template's `file` served by `editor_file`; the record's `editor` carries `first` and `wait`, which `AO.openFile` and the recent files obey; the Settings page's You draws and saves the switch, the wait and **file**; the help gains *file link*. `tests/test_ui_open_in.py`, `test_ui_settings.py`, `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` pin it; the UI check on a scratch home held every case (PR body).
