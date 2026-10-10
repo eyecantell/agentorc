@@ -66,7 +66,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
-| TD-510 | `agentorc.watch.main` — the watch's only real entry — is never run by a test, nor are `tell`'s success and OSError branches or a non-dict `watch.json` | Medium | Open |
 | TD-511 | `cards.pill_title`'s *waiting* and *seat on call* branches and `ending.clock`'s day prefix are pinned by no test — the pill hover §4.5a words in order | Medium | Open |
 
 ---
@@ -1041,31 +1040,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** that test passes, and `ao doctor hooks` on kmaster, once live, prints no *does not resolve* line for the `+cadence` layers.
 
 **Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
-
-## TD-510: `agentorc.watch.main` is never run by a test: the switch and host wiring, `tell`'s two branches and a non-dict `watch.json` are unseen
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_watch.py`, `src/agentorc/watch.py` (`main`, `tell`, `_load`), `src/agentorc/service.py` (`watch_reading`)
-
-**Why:** The test-audit of #1407 (TD-497). `tests/test_watch.py` drives `step`, `run_once` and `manager_started` with fakes, but `main` — the one function the system timer runs, at 3 a.m., with nobody to read a traceback — is never called. Probes, each one line, `pytest -q tests/test_watch.py tests/test_service.py tests/test_cli_doctor.py` — **47 passed** every time:
-- `main`'s `secrets=tg["secrets"] if tg else None` → `secrets=None`: the watch would never tell anyone, the whole point of TD-497.
-- `main`'s `host=hosts.local_host().name` → `host="x"`.
-- `tell`'s success `log(f"told: {line}")` removed, and its `except (OSError, subprocess.SubprocessError)` narrowed to another class: only the nonzero-exit branch is tested (`test_a_failed_send_is_logged_and_not_retried`).
-- `_load`'s `return doc if isinstance(doc, dict) else {}` → `return doc`: only `{not json` is tested, not a valid JSON list.
-- `service.watch_reading`'s `except (OSError, subprocess.SubprocessError): return {"loaded": False}` (the no-systemd host, which the docstring promises) — every test patches `subprocess.run` to succeed.
-
-(`main` does run clean under a scratch `AGENTORC_HOME`: probed by hand, it wrote `watch.json` with `silent_since` and told nothing, as the switch is off there.)
-
-**Fix:** One test that runs `watch.main()` with `AGENTORC_HOME` a temp dir, `manager_started`/`ask` patched, `settings.telegram` returning `{"secrets": "a/b"}` and `tell` patched, asserting the line sent and the host name; one each for `tell`'s success log and `OSError`, a list-valued `watch.json`, and `watch_reading` with `subprocess.run` raising `FileNotFoundError`. Confirm each with its probe.
-
-**Done when** each probe in the Why fails a test.
-
-**Related:** TD-497 (#1407).
 
 ## TD-511: `pill_title`'s waiting and seat-on-call branches and `ending.clock`'s day prefix are pinned by no test
 

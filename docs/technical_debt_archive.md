@@ -8334,3 +8334,30 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Why:** "what happened overnight" is answered today by reading a manager's log on a launch branch and several transcripts; the records already know.
 
 **Related:** TD-053 (the wind-down's board line), TD-079 (outcomes), TD-069 (the Inbox), TD-087 (usage readings).
+
+## TD-510: `agentorc.watch.main` is never run by a test: the switch and host wiring, `tell`'s two branches and a non-dict `watch.json` are unseen
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_watch.py`, `src/agentorc/watch.py` (`main`, `tell`, `_load`), `src/agentorc/service.py` (`watch_reading`)
+
+**Why:** The test-audit of #1407 (TD-497). `tests/test_watch.py` drives `step`, `run_once` and `manager_started` with fakes, but `main` — the one function the system timer runs, at 3 a.m., with nobody to read a traceback — is never called. Probes, each one line, `pytest -q tests/test_watch.py tests/test_service.py tests/test_cli_doctor.py` — **47 passed** every time:
+- `main`'s `secrets=tg["secrets"] if tg else None` → `secrets=None`: the watch would never tell anyone, the whole point of TD-497.
+- `main`'s `host=hosts.local_host().name` → `host="x"`.
+- `tell`'s success `log(f"told: {line}")` removed, and its `except (OSError, subprocess.SubprocessError)` narrowed to another class: only the nonzero-exit branch is tested (`test_a_failed_send_is_logged_and_not_retried`).
+- `_load`'s `return doc if isinstance(doc, dict) else {}` → `return doc`: only `{not json` is tested, not a valid JSON list.
+- `service.watch_reading`'s `except (OSError, subprocess.SubprocessError): return {"loaded": False}` (the no-systemd host, which the docstring promises) — every test patches `subprocess.run` to succeed.
+
+(`main` does run clean under a scratch `AGENTORC_HOME`: probed by hand, it wrote `watch.json` with `silent_since` and told nothing, as the switch is off there.)
+
+**Fix:** One test that runs `watch.main()` with `AGENTORC_HOME` a temp dir, `manager_started`/`ask` patched, `settings.telegram` returning `{"secrets": "a/b"}` and `tell` patched, asserting the line sent and the host name; one each for `tell`'s success log and `OSError`, a list-valued `watch.json`, and `watch_reading` with `subprocess.run` raising `FileNotFoundError`. Confirm each with its probe.
+
+**Done when** each probe in the Why fails a test.
+
+**Related:** TD-497 (#1407).
+
+**Resolved:** 2026-10-09 (PR #1419) — four tests: `tests/test_watch.py::test_main_wires_the_switch_the_host_and_the_home` (`main` with `AGENTORC_HOME` a temp dir, the child caught: one send, the switch's secrets and the host's name), `::test_a_sent_line_is_logged_and_a_child_that_cannot_run_is_a_log_line` (`told:`, `FileNotFoundError` and `TimeoutExpired`), `::test_a_state_file_that_is_not_a_mapping_starts_afresh`, and `tests/test_service.py::test_the_watch_reads_as_not_loaded_on_a_host_without_systemd`. Each of the Why's six probes now fails a test (the table is on the PR).
