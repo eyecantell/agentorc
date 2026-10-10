@@ -1,3 +1,7 @@
+> **Retired 2026-10-09, never launched.** It predates the checkout on kmaster, the container-node
+> decision (design §10, §4.4a) and the manager / techlead / member shape. guardians' team is now
+> stood up from its own repo: `guardians-devenv/docs/briefs/team-setup.md` (its TD-028).
+
 # Brief: the `guardians` lead (design §4.8, TD-036 step 5)
 
 **Not yet launchable — see "What has to be true first".** This brief exists so that the facts

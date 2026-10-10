@@ -126,7 +126,8 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       bind-mounted in; occupancy across the home and its container is derived from the
       `container:` entry; a runtime host has `ao host forget`. Rejected: bind-mounting the home's
       whole `~/.agentorc` (its `agent.sock` makes an unqualified caller a person at the home).
-      Built: TD-057 step 3c. Brief: `docs/briefs/guardians-orchestrator.md`.
+      Built: TD-057 step 3c. Brief: guardians-devenv's `docs/briefs/team-setup.md` (2026-10-09; the
+      first, `docs/briefs/archive/guardians-orchestrator.md`, was retired unlaunched).
 - [x] **What may a manager do with the repo's numbers?** (raised 2026-09-25, Paul: *if I want to
       make sure the team is balanced, I can make sure the PR count is not growing too much — the
       grinders outpacing the techlead; this may lead to automatic checks by the manager*). The
