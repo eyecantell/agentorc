@@ -76,7 +76,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
-| TD-508 | `test_a_kill_says_who_pressed_it`'s *a second kill keeps the first one's words* assertion cannot fail: the same person within one second writes the same dict | Medium | Open |
+| TD-508 | `test_a_kill_says_who_pressed_it`'s *a second kill keeps the first one's words* assertion all but cannot fail: the same person within one second writes the same dict | Medium | Open |
 | TD-509 | TD-490's `ended`/`tick` has unseen branches: a hook's end then a dead pane keeps the tool's words, a close keeps `ended`, close and forget-host write `tick`, the status-lag refresh, a failed `last_tick` write | Medium | Open |
 | TD-510 | `agentorc.watch.main` — the watch's only real entry — is never run by a test, nor are `tell`'s success and OSError branches or a non-dict `watch.json` | Medium | Open |
 
@@ -1218,7 +1218,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
 
-## TD-508: `test_a_kill_says_who_pressed_it`'s *a second kill keeps the first one's words* assertion cannot fail
+## TD-508: `test_a_kill_says_who_pressed_it`'s *a second kill keeps the first one's words* assertion all but cannot fail
 
 **Priority:** Medium
 **Type:** debt
@@ -1248,9 +1248,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Why:** The test-audit of #1401. Each probe below is one line changed in the worktree, `pytest -q tests/test_exit_cause.py tests/test_agent_paths.py tests/test_balance.py` — **55 passed** every time:
 - `_observe`'s `if s.state != "exited" or s.ended is None:` → `if True:`. Design §4.2's `SessionEnd` row and the code comment say *the tool's own end, when its hook landed first, keeps its words*; this is the ordinary clean exit (the hook, then the pane dies), and `test_the_tools_own_end_keeps_its_reason` never runs a tick over the dead pane, so `how: tool` turning into `how: pane` goes unseen.
-- `set_state`'s `if state not in ("exited", "closed"):` → `("exited",)`: closing an exited record would drop its `ended`; no test closes one.
+- `set_state`'s `if state not in ("exited", "closed"):` → `("exited",)`: closing an exited record would drop its `ended`; no test closes an exited record and checks `ended` (`test_containers.py`'s forget-host test closes one and asserts neither `ended` nor `confidence`).
 - `rpc_close`'s and `rpc_forget_host`'s `confidence="tick"` → `"scraped"`: §4.2 lists *a close* among the `tick` readings, and `ao status` / the card mark `~` a `scraped` state alone, so a closed record would show the guess mark; `test_only_a_scraped_state_is_marked_a_guess` feeds hand-made records and never a closed one.
-- `_observe`'s `elif s.ended.get("how") == "pane": s.ended["code"] = ...` → `pass`: the refresh for *tmux's status lags its dead flag*; `test_a_dead_pane_ends_with_its_status_and_is_observed` waits for `exit_code == 3` and so passes whether or not the first observation had it (its own comment says the lag is runner-dependent), which leaves the branch to chance.
+- `_observe`'s `elif s.ended.get("how") == "pane": s.ended["code"] = ...` → `pass`: the refresh for *tmux's status lags its dead flag*; `test_a_dead_pane_ends_with_its_status_and_is_observed` asserts `ended["code"] == exit_code` after waiting for `exit_code == 3`, so it catches the probe only on a runner where tmux's status lagged at first sight; here the status was present and it passed (its own comment says the lag is runner-dependent), which leaves the branch to chance.
 - `_note_tick`'s `except OSError` → another exception class: the docstring says *a failed write is a weaker ending, never a failed tick*; no test makes the write fail.
 
 **Fix:** In `tests/test_exit_cause.py`: drive `_observe` with a `PaneInfo(dead=True, dead_status=None)` and then `3` on a record whose `ended` is `how: tool` (kept) and on one whose `ended` is `how: pane` (code refreshed); close an exited record and assert `ended` kept and `confidence == "tick"`; `forget_host` a node's record likewise; patch `HostStore.save` to raise `OSError` and assert `tick()` completes. Confirm each with its probe.
