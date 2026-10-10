@@ -257,6 +257,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-09 (TD-491, the designer; Paul's review of the Focus composer, the collapsed bar picked over a side panel): screen 2's composer is **folded to one bar by default**, opened over the terminal's foot; `Esc` folds it. Built by TD-500.
 - 2026-10-09 (TD-490, the designer): row 5 (b) gains **an exit, and how** — `ending.exit_words` from `ended`: the code, the tool's reason, *killed by <who>*, *pane gone · found <time>*, *… by a host agent down since <time>*, *· after wrap-up*. Built by TD-498.
 - 2026-10-09 (TD-485, the designer): the Focus identity line's marks gain *restarted · <why>*. Built by TD-487.
 - 2026-10-09 (TD-474, the designer): the Focus identity line's marks gain the terminal mark (§4.6 *Reconnect contract*). Built by TD-480.
@@ -347,6 +348,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-491, the designer): the **bar** row — the fold, the overlay, the draft on the bar, `person.composer`; `c` in the keys row; the You card's composer pick; the mockup's composer redrawn as the bar (`FocusReady.dc.html` draws the bar, `Focus.dc.html`'s unattended session none, shot `docs/mockups/reviews/2026-10-09-td491-focus-composer-bar.png`). Built by TD-500.
 - 2026-10-09 (TD-490, the designer): the **state pill hover** row — the pill's title on each state, the ending's words on `exited` and `closed`, *guessed* only on a `scraped` state. Built by TD-498.
 - 2026-10-09 (TD-485, the designer; filed by grinder-ao-2 from TD-467 slice 2, which built `ao status -v`'s `restarts:` line and found no card surface for a restart): the **restarted** chip — the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every entry in the window on hover with the count toward the ceiling, a new badge in the card's row 4 beside the report line in a short form and the full words on the Focus header beside *brief changed*, never in the slot; `start` and `fill` are not restarts. Built by TD-487.
 - 2026-10-09 (TD-474, the designer): the **terminal mark** row — three marks, their graces and hovers. Built by TD-480.
@@ -1049,6 +1051,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-09 (TD-491, the designer): `person.composer` — folded | open. Built by TD-500.
 - 2026-10-09 (TD-489, the designer): `notify:`'s comment says the watch reads it too. Built by TD-497.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §5 cut to what each file holds — the build record left for this record: `settings.yml` one file since 2026-09-25 (TD-100; the four keys, their readers and `set_settings`/`settings` built by TD-146 slice 1, which also retired `ui.yml`; the stop time slice 2; the replica TD-147; the page TD-148 on 2026-09-27; `usage:` the fifth key since TD-233 slice 4, `notify:` the sixth designed with TD-092 and read since TD-319 slice 1; amounts read by the gate since TD-151 slice 3 and taken by the writers since slice 5; `max_age` TD-230/TD-233; `on_work` TD-214/TD-457; `flow` read since TD-309 slice 4; `balance` TD-177 built by TD-239; `pull` TD-222; `copy_on_select` TD-164; `board_show` TD-207 built by TD-220; the hosts parser TD-004; the restart-pending line TD-149; the scratch home's registry TD-298; `{path}` percent-encoded TD-011; Cursor's refusal TD-095; `held:` read since TD-309 slice 1; the aggregate TD-210 built by TD-229 slice 5; `promote:` TD-120 step 2 designed 2026-09-24, read by the home since TD-132 slice 1, carried by this repo since slice 4, `auto` in `settings.yml` since 2026-09-25, the rollback TD-212; TD-149's accepted-ahead keys and `AGENTORC_TICK`; TD-026 and TD-100 on the `unattended:` block; TD-128 on the amounts, TD-307 on `flow:` and `held:`, and *the CLI is TD-146's rest*); 2,788 → 2,582 words.
 - 2026-10-09 (TD-473, the designer): `person.attach.max` — the most a Focus attachment may be, `256M` by default, `1M` to `4G` — joins `person:`; a setting the person turns, so `settings.yml` and the You card, never a constant. Built by TD-478.
