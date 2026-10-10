@@ -277,6 +277,7 @@ def state_rows(
             "state_class": v.get("state_class") or "",
             "state_label": v.get("state_label") or "",
             "scraped": bool(v.get("scraped")),
+            "pill_title": v.get("pill_title") or "",  # §4.5a **state pill hover**: the card's one text (TD-490)
             "suspended_note": v.get("suspended_note") or "",  # §4.8a: the mark rides with the record
             "host": v.get("host") or "",
             "text": text,

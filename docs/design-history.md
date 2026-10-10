@@ -258,6 +258,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-09 (TD-498 slice 2, grinder-ao-2, building TD-490): row 5 (b)'s kill words gain *killed itself* for a session's own kill and *killed by the tick · stop time* for the home's — `rpc_kill` writes both `by`s, and the design named neither.
 - 2026-10-09 (TD-491, the designer; Paul's review of the Focus composer, the collapsed bar picked over a side panel): screen 2's composer is **folded to one bar by default**, opened over the terminal's foot; `Esc` folds it. Built by TD-500.
 - 2026-10-09 (TD-490, the designer): row 5 (b) gains **an exit, and how** — `ending.exit_words` from `ended`: the code, the tool's reason, *killed by <who>*, *pane gone · found <time>*, *… by a host agent down since <time>*, *· after wrap-up*. Built by TD-498.
 - 2026-10-09 (TD-485, the designer): the Focus identity line's marks gain *restarted · <why>*. Built by TD-487.
@@ -349,6 +350,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-09 (TD-498 slice 2, grinder-ao-2, building TD-490): the **state pill hover** row gains *observed by the host agent, not reported by the tool* for a `tick` state that is not an ending (`stalled?`), which §4.2 makes the tick's own and which *reported by the tool* misdescribed.
 - 2026-10-09 (TD-491, the designer): the **bar** row — the fold, the overlay, the draft on the bar, `person.composer`; `c` in the keys row; the You card's composer pick; the mockup's composer redrawn as the bar (`FocusReady.dc.html` draws the bar, `Focus.dc.html`'s unattended session none, shot `docs/mockups/reviews/2026-10-09-td491-focus-composer-bar.png`). Built by TD-500.
 - 2026-10-09 (TD-490, the designer): the **state pill hover** row — the pill's title on each state, the ending's words on `exited` and `closed`, *guessed* only on a `scraped` state. Built by TD-498.
 - 2026-10-09 (TD-485, the designer; filed by grinder-ao-2 from TD-467 slice 2, which built `ao status -v`'s `restarts:` line and found no card surface for a restart): the **restarted** chip — the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words, every entry in the window on hover with the count toward the ceiling, a new badge in the card's row 4 beside the report line in a short form and the full words on the Focus header beside *brief changed*, never in the slot; `start` and `fill` are not restarts. Built by TD-487.

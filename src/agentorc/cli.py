@@ -19,7 +19,7 @@ from typing import Any
 
 from agentorc import doctor, orgcheck, repoconfig, service, teamrun, teams
 from agentorc import org as orgmod
-from agentorc.ending import closer_words, restart_words, waiting_words
+from agentorc.ending import closer_words, exit_words, restart_words, waiting_words
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc import ledger as ledger_mod
@@ -292,6 +292,10 @@ def cmd_status(args: argparse.Namespace) -> int:
             if s["state"] == "closed":  # who closed it, in the card's words (§4.5 row 5 (b), TD-265)
                 when = f" {_age(s['closed_at'])} ago" if s.get("closed_at") else ""
                 print(f"{'':<{w}}      {closer_words(s, id_names)}{when}")
+            elif s["state"] == "exited":  # how it ended, in the card's words (§4.5 row 5 (b), TD-490)
+                ended = s.get("ended") if isinstance(s.get("ended"), dict) else {}
+                when = f" {_age(ended['at'])} ago" if isinstance(ended.get("at"), str) and ended["at"] else ""
+                print(f"{'':<{w}}      {exit_words(s, id_names)}{when}")
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
             if s.get("team"):
