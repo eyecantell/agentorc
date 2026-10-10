@@ -3202,6 +3202,35 @@
     (open || window.open)(uri, "_blank", "noopener");
     return true;
   };
+  // **a cut row is one line** (§4.6, TD-494): a program that breaks its own lines at the width prints
+  // rows with no wrap mark, so the addon would read a URL wider than the pane as a cut URL and rows
+  // that are no link.
+  // The addon reads the screen through this view, where a row reads as wrapped when the row above
+  // is full to its last column and it begins with a URL character that starts no `scheme://` of
+  // its own; the addon's regex still decides what a link is, and its range spans the rows.
+  AO.cutRows = function (term) {
+    const scheme = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//, urlChar = /^[^\s"'!*(){}|\\^<>`]/;
+    const cut = (buf, y, line) => {
+      const prev = y > 0 && buf.getLine(y - 1);
+      if (!prev || !prev.length) return false;
+      const last = prev.getCell(prev.length - 1), tail = last ? last.getChars() : "";
+      const head = line.translateToString(true);
+      return tail !== "" && !/\s/.test(tail) && urlChar.test(head) && !scheme.test(head);
+    };
+    const view = (buf) => ({
+      getNullCell: () => buf.getNullCell(),
+      getLine: (y) => {
+        const line = buf.getLine(y);
+        if (!line || line.isWrapped || !cut(buf, y, line)) return line;
+        return { isWrapped: true, length: line.length, getCell: (x, c) => line.getCell(x, c),
+          translateToString: (t, a, b) => line.translateToString(t, a, b) };
+      },
+    });
+    return {
+      registerLinkProvider: (p) => term.registerLinkProvider(p),
+      buffer: { get active() { return view(term.buffer.active); } },
+    };
+  };
   AO.focus = function (s, popped) {
     const id = s.id;
     document.title = AO.focusTitle(s);
@@ -3237,7 +3266,8 @@
     }
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
-    term.loadAddon(new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri)));  // on a read-only Focus too
+    const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));  // on a read-only Focus too
+    term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
     term.open($("#term")); fit.fit();
     AO.termRenderer(term);
     AO.termFont(term, fit);
