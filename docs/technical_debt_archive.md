@@ -8032,3 +8032,28 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** every slice above is merged and the live Org, read after its promote, shows the mockup's after-shot on that day's data.
 
 **Resolved:** 2026-10-09 (PR #1333, #1342, #1348, #1354, #1358, #1389, #1399; the live check, grinder-ao-1) — the live Org page at e708109, read by a headless GET (Chromium, 1600×1000 dark and 1400×1000 light), against `docs/mockups/reviews/2026-10-08-org-declutter-after.png`: *+ New ▾* at the top right and the filter's words; the rollup in one row (*Agents (10)* with its *i*, the state pills, *Needs you*); ao-grind's header on one row (flow, mail, *109 answered for you*, *1 PR waiting · oldest 5m*, *5 ready to close*, Wind down, Stop now, the fold, its *i*); the repo facet's two bars with the seven kinds' legend (*pickable · design · for you · live check · blocked · evaluation · other*); the waiting pill on designer-ao-1 and grinder-ao-2; each grinder's own lane count (*21/2*); techlead-ao-1 named *Tech Lead*. It matches the after-shot on the day's data. One thing on today's data the shot did not have: the priority bar's *4 High* segment is too narrow for its words and draws them clipped (*l High*) — TD-506.
+
+## TD-502: `tests/test_kill_guard.py` pins no `--`, no `sudo` inside a search substitution, no wrapper but `sudo`/`timeout`/`nice` and no xargs option value: four of the guard's branches go back unseen
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/adapters/claude_code/guard.py` (`kill_targets`, `KILL_OF_A_SEARCH`, `WRAPPERS`, `WRAPPER_VALUES`), `tests/test_kill_guard.py` (`REFUSED`, `ALLOWED`)
+
+**Why:** The test-audit of #1395 (TD-496), mutation by mutation in a worktree, each followed by `pytest -q tests/test_kill_guard.py` — **52 passed** every time:
+- `kill_targets`' `elif rest[0] == "--": return rest[1:]` changed to `return []`: `kill -- -1` is then passed by the guard (no target is read), and no test has a `--`.
+- `KILL_OF_A_SEARCH`'s `(?:sudo\s+)?` removed: `kill $(sudo pgrep x)` is passed; no case in `REFUSED` has a `sudo` inside the substitution.
+- `WRAPPERS` cut to `{"sudo", "timeout", "nice"}`: `env pkill x`, `nohup killall x`, `exec pkill x`, `command pkill x`, `setsid`, `time`, `xargs` stop being seen through; `REFUSED` has only sudo, timeout, nice.
+- `WRAPPER_VALUES["xargs"]` emptied: `xargs -I {} pkill x` reads `{}` as the command word and passes; the xargs and env value-options have no case either.
+The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as a command word*, and the docstring of `command_word` says wrappers are skipped; the tests pin three of the eleven.
+
+**Fix:** One `REFUSED` row per branch: `kill -- -1`, `kill $(sudo pgrep x)`, `env pkill x`, `nohup killall x`, `xargs -I {} pkill x`, `env -u X pkill x`; re-run each mutation above and see it fail.
+
+**Done when** each mutation in the Why fails `tests/test_kill_guard.py`.
+
+**Related:** TD-496 (#1395), TD-489 (the guard's design).
+
+**Resolved:** 2026-10-09, the PR on branch `td502-kill-guard-rows`: twelve `REFUSED` rows — `kill -- -1`, `kill $(sudo pgrep x)`, each of `WRAPPERS`' eight beyond sudo/timeout/nice (`env`, `nohup`, `exec`, `command`, `builtin`, `setsid`, `time`, `xargs`), and the value options `env -u X` and `xargs -I {}`. Each mutation in the Why, re-run: `--` → `[]` 1 failed, the substitution's `sudo` removed 1 failed, `WRAPPERS` cut to three 10 failed, `xargs`' values emptied 1 failed, `env`'s emptied 1 failed.

@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | In progress |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-502 | `tests/test_kill_guard.py` pins no `--`, no `sudo` inside a search substitution, no wrapper but `sudo`/`timeout`/`nice` and no xargs option value: four of the guard's branches go back unseen | Medium | Open |
 | TD-503 | No test reaches the pane cgroup through the create path: `_start` can drop its `self._pane_cgroup(sid)` call and the suite stays green | Medium | Open |
 | TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
@@ -1178,29 +1177,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Focus of a session that printed `src/agentorc/cli.py:364` underlines it on hover and Ctrl+click opens VS Code at that file and line; `build/review` in the same pane's prose, and a path outside the checkout, never underline; `open_in: none` registers no provider and the hover asks nothing (the network tab is empty); a read-only Focus and a popped-out window link as the interactive one does; a node's record is asked through `read`; `pdm run test` covers the RPC's bounds and the provider's runs.
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
-
-## TD-502: `tests/test_kill_guard.py` pins no `--`, no `sudo` inside a search substitution, no wrapper but `sudo`/`timeout`/`nice` and no xargs option value: four of the guard's branches go back unseen
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/adapters/claude_code/guard.py` (`kill_targets`, `KILL_OF_A_SEARCH`, `WRAPPERS`, `WRAPPER_VALUES`), `tests/test_kill_guard.py` (`REFUSED`, `ALLOWED`)
-
-**Why:** The test-audit of #1395 (TD-496), mutation by mutation in a worktree, each followed by `pytest -q tests/test_kill_guard.py` — **52 passed** every time:
-- `kill_targets`' `elif rest[0] == "--": return rest[1:]` changed to `return []`: `kill -- -1` is then passed by the guard (no target is read), and no test has a `--`.
-- `KILL_OF_A_SEARCH`'s `(?:sudo\s+)?` removed: `kill $(sudo pgrep x)` is passed; no case in `REFUSED` has a `sudo` inside the substitution.
-- `WRAPPERS` cut to `{"sudo", "timeout", "nice"}`: `env pkill x`, `nohup killall x`, `exec pkill x`, `command pkill x`, `setsid`, `time`, `xargs` stop being seen through; `REFUSED` has only sudo, timeout, nice.
-- `WRAPPER_VALUES["xargs"]` emptied: `xargs -I {} pkill x` reads `{}` as the command word and passes; the xargs and env value-options have no case either.
-The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as a command word*, and the docstring of `command_word` says wrappers are skipped; the tests pin three of the eleven.
-
-**Fix:** One `REFUSED` row per branch: `kill -- -1`, `kill $(sudo pgrep x)`, `env pkill x`, `nohup killall x`, `xargs -I {} pkill x`, `env -u X pkill x`; re-run each mutation above and see it fail.
-
-**Done when** each mutation in the Why fails `tests/test_kill_guard.py`.
-
-**Related:** TD-496 (#1395), TD-489 (the guard's design).
 
 ## TD-503: No test reaches the pane cgroup through the create path: `_start` can drop its `self._pane_cgroup(sid)` call and the suite stays green
 
