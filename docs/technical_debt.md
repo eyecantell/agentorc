@@ -50,7 +50,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
-| TD-486 | PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned: three mutations of them still pass | Low | Open |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
@@ -761,22 +760,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
 
 **Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
-
-## TD-486: PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1, the audit of PRs #1362–#1373)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`), `tests/test_cli.py` `test_status_v_says_a_records_restarts_and_the_caches_in_its_words`
-
-**Why:** `restart_words`' docstring says *Never raises: a malformed field is left out*, and `restarts_line` filters non-dict entries and a non-list `restarts`. The one test feeds only well-formed entries (floats, ints, a string `error`). With the PR's worktree, each of these edits leaves `pytest tests/test_cli.py -k restarts_and_the_caches` at `1 passed`: dropping ` and not isinstance(idle, bool) and math.isfinite(idle)`; dropping ` and not isinstance(tokens, bool)`; replacing the `isinstance(r, dict)`/`isinstance(restarts, list)` filter with `list(restarts or [])`. No other test names `restart_words` or `restarts_line` (`grep -rn "restart_words\|restarts_line" tests/`). A record from a node older than the field, or a `restarts` of `None`, a string, or an entry with `idle: NaN`/`true`, would crash `ao status -v` and nothing would say so.
-
-**Fix:** a unit test over `restart_words` and `restarts_line` with `idle` as `True`, `nan`, `inf` and `"5"`, `context` as `True` and `"191k"`, an entry that is not a dict, `restarts` as `None` or a string — each returns words (or "") and does not raise.
-
-**Related:** TD-467 (the build), PR #1371.
 
 ## TD-487: Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover
 

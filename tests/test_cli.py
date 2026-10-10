@@ -2322,6 +2322,22 @@ def test_status_v_says_a_records_restarts_and_the_caches_in_its_words(monkeypatc
     assert "closed by the tick · cache lapsed 5m ago" in out
 
 
+def test_a_malformed_restarts_field_reads_as_words_and_never_raises():
+    """`restart_words` leaves a malformed field out and `restarts_line` skips what is not an entry
+    (TD-486): a record from a node older than the field, or a hand-repaired one, never crashes
+    `ao status -v`."""
+    from agentorc.ending import restart_words
+
+    for idle in (True, float("nan"), float("inf"), "5", None):
+        assert restart_words({"why": "cache", "idle": idle}) == "cache lapsed", idle
+    for tokens in (True, "191k", 191.5):
+        assert restart_words({"why": "cache", "context": tokens}) == "cache lapsed", tokens
+    assert restart_words({"why": "cache", "idle": 5.4, "context": True}) == "cache lapsed · idle 5h"
+    for restarts in (None, "cache", 3, {"why": "cache"}, [], ["cache", 7, None]):
+        assert cli.restarts_line(restarts) == "", restarts
+    assert cli.restarts_line(["x", {"why": "brief changed"}, None]) == "brief changed"
+
+
 def test_status_v_says_what_a_session_waits_on_on_its_declarations_line(monkeypatch, capsys):
     """§4.5a **waiting** mark (TD-274): `ao status -v` prints the wait on the declaration's line, or on
     a line of its own where the session declared nothing, from the home's `host` reading."""

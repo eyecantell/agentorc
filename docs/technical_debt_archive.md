@@ -8443,3 +8443,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-428 (slice 5), TD-418 (the design).
 
 **Resolved:** 2026-10-09 (PR #1424) — `render_heads` carries each member's lane count on its group as `lanes` (`{id: span or ""}`, the `lanecount.html` macro the card also calls), so every `session`, `gone` and `groups` delta brings every sibling's count, and `syncGroups` patches each pill; `tests/test_ui_team_summary.py::test_each_member_card_draws_its_own_lane_count_in_its_pill` reads g1's *13/2* from the groups payload after g2's claim. Design §4.5a *card: compact* says so.
+
+## TD-486: PR #1371's test leaves `restart_words`' and `restarts_line`' malformed-record guards unpinned
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, the audit of PRs #1362–#1373)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ending.py` (`restart_words`), `src/agentorc/cli.py` (`restarts_line`), `tests/test_cli.py` `test_status_v_says_a_records_restarts_and_the_caches_in_its_words`
+
+**Why:** `restart_words`' docstring says *Never raises: a malformed field is left out*, and `restarts_line` filters non-dict entries and a non-list `restarts`. The one test feeds only well-formed entries (floats, ints, a string `error`). With the PR's worktree, each of these edits leaves `pytest tests/test_cli.py -k restarts_and_the_caches` at `1 passed`: dropping ` and not isinstance(idle, bool) and math.isfinite(idle)`; dropping ` and not isinstance(tokens, bool)`; replacing the `isinstance(r, dict)`/`isinstance(restarts, list)` filter with `list(restarts or [])`. No other test names `restart_words` or `restarts_line` (`grep -rn "restart_words\|restarts_line" tests/`). A record from a node older than the field, or a `restarts` of `None`, a string, or an entry with `idle: NaN`/`true`, would crash `ao status -v` and nothing would say so.
+
+**Fix:** a unit test over `restart_words` and `restarts_line` with `idle` as `True`, `nan`, `inf` and `"5"`, `context` as `True` and `"191k"`, an entry that is not a dict, `restarts` as `None` or a string — each returns words (or "") and does not raise.
+
+**Related:** TD-467 (the build), PR #1371.
+
+**Resolved:** 2026-10-09 (PR #1425) — `tests/test_cli.py::test_a_malformed_restarts_field_reads_as_words_and_never_raises`: `idle` as `True`/`nan`/`inf`/`"5"`, `context` as `True`/`"191k"`, and `restarts` as `None`, a string, an int, a dict or a list of non-entries each read as words (or `""`) without raising; each of the Why's mutations now fails it.
