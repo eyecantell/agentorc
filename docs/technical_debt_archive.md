@@ -8400,3 +8400,26 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** PR #1354, TD-428.
 
 **Resolved:** 2026-10-09 (PR #1422) — `tests/test_ui_org.py::test_an_idle_session_that_waits_on_someone_reads_waiting` reads a claim on `TD-1` (no open branch names it) with `review_pr=1302` as *waiting · review #1302*; the Why's mutation (`review_pr` dropped from `review_wait`) now fails it (1 failed, 86 passed).
+
+## TD-511: `pill_title`'s waiting and seat-on-call branches and `ending.clock`'s day prefix are pinned by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_exit_words.py`, `src/agentorc/ui/cards.py` (`pill_title`), `src/agentorc/ending.py` (`clock`)
+
+**Why:** The test-audit of #1415 (TD-498 slice 2). §4.5a **state pill hover** (`docs/design/4.5a-controls.md:153`) words an order of seven texts; `test_the_pill_hover_takes_the_first_that_applies` pins the host note, the ending, *guessed*, *reported* and *observed*, but two of the seven moved from `card.html` into `pill_title` in this PR with no test of their own, and none existed before it either (`git grep "idle in every payload" 551475e0^ -- tests` is empty). Each probe below, run against `tests/test_ui*.py tests/test_cli*.py tests/test_exit_*.py` — **810 passed** every time:
+- `pill_title`'s `if d.get("state_class") == "waiting": return …` branch deleted: a waiting pill falls through to *reported by the tool*, and nothing fails.
+- `if d.get("seat"): return "a seat on call: read from its record, not from a screen"` deleted: a seat's pill reads *reported by the tool*.
+- `ending.clock`'s `("" if at.date() == today else at.strftime("%a "))` → `""`: the day is never said, so *killed by you · 12:31* on a record from Tuesday reads as today. Every case in the file is an instant of the same day as `NOW`. (The *bad* kind on a nonzero code was probed too and **is** caught.)
+
+**Fix:** In `test_the_pill_hover_takes_the_first_that_applies`, add a `state_class: waiting` view with a `wait_reason`, a `seat: True` view, and a seat that is also exited (the order the section words: seat before the ending); and one `clock`/`ending_hover` case on an instant two days before `now`, asserting the weekday prefix. Confirm each against its probe.
+
+**Done when** each probe in the Why fails a test.
+
+**Related:** TD-490, TD-498 (#1415).
+
+**Resolved:** 2026-10-09 (PR #1423) — `tests/test_exit_words.py::test_the_pill_hover_takes_the_first_that_applies` reads `pill_title` on a waiting view, a seat, a seat also exited (the seat text before the ending) and a host note over a seat; `::test_an_ending_before_today_says_its_day` reads the weekday on an instant two days back, in `clock` and `ending_hover`. Each of the Why's three probes now fails a test (1 failed, 810 passed).
