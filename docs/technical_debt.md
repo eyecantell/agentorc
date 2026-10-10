@@ -884,24 +884,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
 
-## TD-504: `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/cli.py` (`cmd_service`), `tests/test_service.py`
-
-**Why:** The test-audit of #1396 (TD-495 slice 2). `test_ao_service_install_prints_the_root_line_only_when_staged` covers the root line and the non-root refusal of `--system`. Two branches of `cmd_service` no test reaches (each probe: `pytest -q tests/test_service.py tests/test_cli.py` — **94 passed**): (1) the `--system` success `emit` (`wrote {target}; agentorc-tmux enabled and started` and `{"written": [target]}`) — its print replaced with `print("x")`; (2) `except OSError` around `service.stage_tmux_unit()` ("the units are installed and running: a stage that failed is said, not raised") — changed to `except ZeroDivisionError`, so an unwritable home would make `ao service install` crash after it restarted the units, as the review round on #1396 ("failures refuse, never crash") meant to prevent.
-
-**Fix:** Patch `stage_tmux_unit` to raise `OSError` and assert exit 0 and the stderr line; patch `install_system` to return a path and assert `--json` `written` and the text.
-
-**Done when** both probes in the Why fail `tests/test_service.py`.
-
-**Related:** TD-495 (#1396).
-
 ## TD-505: `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch
 
 **Priority:** Low
