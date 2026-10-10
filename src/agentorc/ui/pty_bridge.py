@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 from collections.abc import Awaitable, Callable
 
@@ -110,6 +111,56 @@ def scroll_argv(
 
 
 SCROLL_MAX = 500  # lines in one wheel message: a frame's notches are a handful, so this only bounds a bad client
+
+
+CLIENTS_EVERY = 5.0  # seconds between the bridge's readings of tmux's clients and window (design §4.6)
+
+
+def clients_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
+    """The reading behind the terminal mark *resized by another client* (design §4.6 *Attach behaviour
+    with another client present*, TD-480): how many clients the session has attached, the window's
+    size, and how many lines tmux's status bar takes from it."""
+    argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
+    fmt = "#{session_attached} #{window_width} #{window_height} #{status}"
+    return argv + ["display-message", "-p", "-t", f"={session_id}:", fmt]
+
+
+def clients_frame(out: str) -> dict | None:
+    """`clients_argv`'s output as the page's frame, `{"clients": n, "window": [cols, rows]}`, the rows
+    counted as a client's grid counts them — the window's height and the status bar's lines (tmux's
+    `status` option: `on` one, `off` none, a number that many). None for anything else."""
+    parts = out.split()
+    if len(parts) != 4 or not all(p.isdigit() for p in parts[:3]):
+        return None
+    n, w, h = (int(p) for p in parts[:3])
+    st = parts[3]
+    bar = 1 if st == "on" else 0 if st == "off" else int(st) if st.isdigit() else 0
+    return {"clients": n, "window": [w, h + bar]}
+
+
+async def watch_clients(
+    read: Callable[[], Awaitable[str | None]],
+    send_text: Callable[[str], Awaitable[object]],
+    *,
+    every: float = CLIENTS_EVERY,
+) -> None:
+    """While a terminal is attached, read tmux's clients and window every `every` seconds and send the
+    page a text frame when the reading changes from the last one sent (the first always): the attach's
+    own word, as `read_only` is, never pane output. A failed read sends nothing. Runs until cancelled,
+    or until a send fails."""
+    last = None
+    while True:
+        out = None
+        with contextlib.suppress(Exception):
+            out = await read()
+        frame = clients_frame(out) if out else None
+        if frame is not None and frame != last:
+            try:
+                await send_text(json.dumps(frame))
+            except Exception:  # noqa: BLE001 — the socket went away: the pump's end cancels this anyway
+                return
+            last = frame
+        await asyncio.sleep(every)
 
 
 async def pump(

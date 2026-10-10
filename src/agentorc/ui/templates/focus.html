@@ -71,6 +71,10 @@
          pressable, hidden until true and kept current from the delta as the two above are #}
       <span class="badge brief{% if not s.brief_unsent %} hidden{% endif %}" id="fbrief"
             title="{{ (s.brief_unsent or {}).full }}">{{ (s.brief_unsent or {}).text or 'brief not sent' }}</span>
+      {# design §4.5a **terminal mark** (§4.6 *Reconnect contract*, TD-480): what the terminal is doing,
+         one of *reconnecting…*, *resized by another client*, *no output for Ns*; display only, drawn
+         by the page (`AO.termMark`) and hidden until one holds #}
+      <span class="badge termmark hidden" id="ftermmark"></span>
     </div>
     {# **The acts line** (design §4.5 *The Focus screen's anatomy*, TD-156): the next act first,
        outlined, by state — Close session when the checklist passes, Take over on an unattended

@@ -43,6 +43,20 @@ def wait_state(client, sid, state, timeout=6.0):
     raise AssertionError(f"{sid} never reached {state}: {s['state']}")
 
 
+def pane_bytes(ws, words=None):
+    """The next pane frame of a `/term/` socket. The attach's own words — text frames, the bridge's
+    `{clients, window}` reading among them (design §4.6, TD-480) — are not pane output: collected
+    into `words` when given, and passed over."""
+    while True:
+        msg = ws.receive()
+        if msg.get("type") == "websocket.close":
+            raise WebSocketDisconnect(msg.get("code", 1000), msg.get("reason"))
+        if msg.get("bytes") is not None:
+            return msg["bytes"]
+        if words is not None:
+            words.append(json.loads(msg["text"]))
+
+
 def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/")
     assert r.status_code == 200 and "Org" in r.text and "No sessions" in r.text
@@ -163,7 +177,7 @@ def test_terminal_bridge(client, subprocess_agent, tmp_path):
         buf = b""
         deadline = time.time() + 8
         while time.time() < deadline and b"BRIDGE-42" not in buf:
-            buf += ws.receive_bytes()
+            buf += pane_bytes(ws)
         assert b"BRIDGE-42" in buf
     # the pane is still alive after the viewer disconnects (attach detached, session kept)
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
@@ -225,7 +239,7 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
         buf = b""
         deadline = time.time() + 8
         while time.time() < deadline and b"SCROLL-DONE" not in buf:
-            buf += ws.receive_bytes()
+            buf += pane_bytes(ws)
         assert b"SCROLL-DONE" in buf
         # read once, this raced the attach (TD-033): the pane leaves whatever mode it started in
         assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
@@ -244,7 +258,7 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
         buf = b""
         deadline = time.time() + 8
         while time.time() < deadline and b"STILL-2" not in buf:
-            buf += ws.receive_bytes()
+            buf += pane_bytes(ws)
         assert b"STILL-2" in buf
     client.post(f"/api/sessions/{sid}/kill")
 
@@ -259,7 +273,7 @@ def test_term_tolerates_bad_size_params(client, tmp_path):
         buf = b""
         deadline = time.time() + 8
         while time.time() < deadline and b"SIZE-OK" not in buf:
-            buf += ws.receive_bytes()
+            buf += pane_bytes(ws)
         assert b"SIZE-OK" in buf
     client.post(f"/api/sessions/{sid}/kill")
 
@@ -613,7 +627,7 @@ def test_a_dead_attach_is_final(client, subprocess_agent, tmp_path):
     assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["pane"] is True
     with pytest.raises(WebSocketDisconnect) as e, client.websocket_connect(f"/term/{sid}") as ws:
         while True:
-            ws.receive_bytes()  # tmux's own error, then the close
+            pane_bytes(ws)  # tmux's own error, then the close
     assert e.value.code == 4404
 
 
@@ -660,11 +674,12 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
     assert ">Switch to unattended</button>" in page  # no controller and no team: nobody to hand it to
     with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
         ws.send_text("echo TOOK-$((40+4))\r")
-        buf = b""
+        buf, words = b"", []
         deadline = time.time() + 8
         while time.time() < deadline and b"TOOK-44" not in buf:
-            buf += ws.receive_bytes()  # bytes from the first frame on: no read-only word
+            buf += pane_bytes(ws, words)
         assert b"TOOK-44" in buf
+        assert not [w for w in words if "read_only" in w]  # no read-only word: it takes keys
     client.post(f"/api/sessions/{sid}/kill")
 
 

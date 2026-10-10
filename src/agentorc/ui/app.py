@@ -312,7 +312,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     team_repo,  # noqa: F401
     team_summary,  # noqa: F401
 )
-from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
+from .pty_bridge import PtySession, attach_argv, clients_argv, pump, scroll_argv, watch_clients
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     ENTRY_PREFIX,
     ENTRY_TRIES,
@@ -3540,9 +3540,30 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # Reap in the background: waiting here would hold the key pump behind a slow tmux.
             reapers.add(asyncio.ensure_future(proc.wait()))
 
+        async def read_clients() -> str | None:
+            # tmux's clients and window for the terminal mark (design §4.6, TD-480), through the same
+            # prefix and socket the scroll command takes; a slow or failed read is no reading
+            argv = [*[a for a in inside if a != "-it"], *clients_argv(sid, socket_name=sock)]
+            pipe, devnull = asyncio.subprocess.PIPE, asyncio.subprocess.DEVNULL
+            proc = await asyncio.create_subprocess_exec(*argv, stdout=pipe, stderr=devnull)
+            try:
+                out, _ = await asyncio.wait_for(proc.communicate(), timeout=3)
+            except TimeoutError:
+                return None
+            finally:
+                # timed out, or cancelled when the pump ended: a hung read (a stuck container's `docker
+                # exec`) is killed and reaped in the background, never left running
+                if proc.returncode is None:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.kill()
+                    reapers.add(asyncio.ensure_future(proc.wait()))
+            return out.decode(errors="replace") if proc.returncode == 0 else None
+
+        watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))
         try:
             await pump(pty, send, recv, scroll, read_only=read_only)
         finally:
+            watcher.cancel()
             for f in reapers:
                 f.cancel()
             # `pump` has already closed the pty, so the child is reaped and its status is final:
