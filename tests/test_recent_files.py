@@ -104,8 +104,9 @@ def test_a_merged_branch_lists_nothing_and_a_tree_with_no_origin_lists_its_own(t
     # no origin: the tree alone, committed work not listed
     (repo / "x.txt").write_text("x")
     assert [os.path.basename(f["path"]) for f in changed_files(repo, None, RECENT_FILES)] == ["x.txt"]
+    # no merge base with the base it names (unborn, unrelated, gone) reads as no origin: the tree alone
+    assert [os.path.basename(f["path"]) for f in changed_files(repo, "origin/no-such", RECENT_FILES)] == ["x.txt"]
     # a read that cannot be made is None, so the record keeps its list
-    assert changed_files(repo, "origin/no-such", RECENT_FILES) is None
     assert changed_files(tmp_path / "not-a-repo", None, RECENT_FILES) is None
 
 

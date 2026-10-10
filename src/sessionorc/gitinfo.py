@@ -158,10 +158,10 @@ def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeo
     """The paths the work in `directory` has changed against its base, `{path, at, sha}` newest first, a
     path once, the newest `limit` (design §4.2 *The record's `files`*, TD-538): `git diff --name-only`
     from `merge-base HEAD <base_ref>` and the untracked paths — the tree alone where `base_ref` is None
-    (no origin) — each path absolute. One the porcelain holds is the file's own: its modification time
-    and no `sha` (a deleted one the newest commit's time, else the read's); any other is the newest of
-    the branch's commits that touched it, from one `git log --name-only`. None when a read fails, so the
-    record keeps what it had. Computed on each read and never kept; nothing is fetched."""
+    (no origin) or shares no merge base with `HEAD` — each path absolute. One the porcelain holds is the
+    file's own: its modification time and no `sha` (a deleted one the newest commit's time, else the
+    read's); any other is the newest of the branch's commits that touched it, from one `git log
+    --name-only`. None when a read fails, so the record keeps what it had. Computed on each read and never kept; nothing is fetched."""
     top = toplevel(directory, timeout=timeout)
     if not top:
         return None
@@ -177,15 +177,13 @@ def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeo
         if len(entry) < 4:
             continue
         dirty.append(entry[3:])
-        if entry[0] in "RC":
-            i += 1  # a rename's or copy's source follows its path: the source is no longer in the tree
+        if "R" in entry[:2] or "C" in entry[:2]:
+            i += 1  # a rename's or copy's source follows its path, on either side: no longer in the tree
     paths = dict.fromkeys(dirty)
     commits: dict[str, tuple[str, int]] = {}  # path → the newest commit since the base that touched it
-    if base_ref:
-        base = _git(top, "merge-base", "HEAD", base_ref, timeout=timeout)
-        if base is None:
-            return None
-        base = base.strip()
+    # no merge base (an unborn HEAD, unrelated histories) reads as no origin: the tree alone
+    base = (_git(top, "merge-base", "HEAD", base_ref, timeout=timeout) or "").strip() if base_ref else ""
+    if base:
         diff = _git(top, "diff", "--name-only", "-z", base, timeout=timeout)
         log_out = _git(top, "log", "--name-only", "-z", "--format=%x01%H %ct", f"{base}..HEAD", timeout=timeout)
         if diff is None or log_out is None:
@@ -194,8 +192,7 @@ def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeo
         for chunk in log_out.split("\x01")[1:]:  # `<sha> <time>\0\n<path>\0…`, newest first as git gives them
             head, _, names = chunk.partition("\0")
             sha, _, ct = head.partition(" ")
-            for name in names.split("\0"):
-                name = name.lstrip("\n")
+            for name in names.removeprefix("\n").split("\0"):
                 if name and name not in commits and ct.isdigit():
                     commits[name] = (sha, int(ct))
     now = datetime.now(UTC).timestamp()

@@ -3796,7 +3796,7 @@ def _recent_files(directory: str) -> list[dict[str, Any]] | None:
     """A record's recent files (§4.2 *The record's `files`*, TD-538): what the work in `directory` changed
     against `merge-base HEAD origin/<default>` by the cadence's default-branch rule — the tree alone with
     no origin — or None when a read failed. Blocking: a thread's."""
-    return changed_files(directory, ledger_mod.default_ref(directory), RECENT_FILES)
+    return changed_files(directory, ledger_mod.default_ref(directory, timeout=5.0), RECENT_FILES)
 
 
 def _span(seconds: float) -> str:
