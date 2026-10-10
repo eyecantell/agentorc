@@ -2,7 +2,8 @@
 TD-493, built by TD-501): the page is served the editor button's file form beside the button
 (`editor.file`), a link provider of its own asks the `paths` read once per row through
 `POST /api/sessions/<id>/paths`, and only what the host resolved underlines and opens, on Ctrl or Cmd,
-the line riding on the `vscode://file` form alone. The page's functions run as themselves under node."""
+the line riding after the path on every `vscode` form (TD-526). The page's functions run as themselves
+under node."""
 
 from __future__ import annotations
 
@@ -36,11 +37,15 @@ def person():
 @pytest.mark.unit
 def test_the_file_form_is_the_buttons_template_with_path_unfilled(person):
     person("")
-    assert uiconf.editor_file(local=True, remote="km") == "vscode://file{path}?windowId=_blank"
-    assert uiconf.editor_file(local=False, remote="km") == "vscode://vscode-remote/ssh-remote+km{path}?windowId=_blank"
-    # a container's record: the reach link's own prefix, the file in its folder's place
+    # no windowId=_blank on a file form: a file lands in the window used last (TD-526)
+    assert uiconf.editor_file(local=True, remote="km") == "vscode://file{path}"
+    assert uiconf.editor_file(local=False, remote="km") == "vscode://vscode-remote/ssh-remote+km{path}"
+    # a container's record: the reach link's own prefix, the file in its folder's place, its query dropped
     got = uiconf.editor_file(local=False, remote="km", reach=REACH)
-    assert got == REACH.replace("/workspaces/r?", "{path}?")
+    assert got == REACH.removesuffix("/workspaces/r?windowId=_blank") + "{path}"
+    # the button's folder forms keep `_blank`: a folder into a used window replaces what it showed
+    assert uiconf.editor_link("/r", local=True, remote="km")["url"] == "vscode://file/r?windowId=_blank"
+    assert uiconf.editor_link("/r", local=False, remote="km")["url"].endswith("km/r?windowId=_blank")
     assert uiconf.editor_file(local=False, remote="km", reach="vscode://vscode-remote/x") is None
     person("open_in: {label: Zed, url: 'zed://ssh/{remote}{path}'}")
     assert uiconf.editor_file(local=False, remote="km") == "zed://ssh/km{path}"
@@ -61,7 +66,7 @@ def test_focus_is_served_editor_file_only_beside_its_editor_button(tmp_path, mon
     rec = {"id": "ao-x-1", "name": "w", "kind": "agent", "dir": str(tmp_path), "state": "idle"}
     person("")
     v = view(rec)
-    assert v["editor"]["file"] == "vscode://file{path}?windowId=_blank" and v["editor"]["url"].startswith("vscode://")
+    assert v["editor"]["file"] == "vscode://file{path}" and v["editor"]["url"].startswith("vscode://")
     person("open_in: none")
     assert view(rec)["editor"] is None
     # a record on another host the button cannot reach: no button, so no file form
@@ -124,7 +129,8 @@ const press = (event, file, resolved, line, col) => {
   const r = AO.pathLink(event, file, resolved, line, col, (...a) => opened.push(a));
   return { r, opened };
 };
-const FILE = "vscode://file{path}?windowId=_blank", SSH = "vscode://vscode-remote/ssh-remote+km{path}?windowId=_blank";
+const FILE = "vscode://file{path}", SSH = "vscode://vscode-remote/ssh-remote+km{path}";
+const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
 (async () => {
   const rows = ["see src/agentorc/cli.py:364 and build/review.", "nothing here at all",
     "Edit(scripts/x.py) then https://github.com/eyecantell/agentorc/pull/1"];
@@ -178,6 +184,14 @@ const FILE = "vscode://file{path}?windowId=_blank", SSH = "vscode://vscode-remot
     file: press({ ctrlKey: true }, FILE, "/r/my dir/a#b.py", 12, 3),
     fileNoLine: press({ metaKey: true }, FILE, "/r/a.py", null, null),
     ssh: press({ ctrlKey: true }, SSH, "/r/a.py", 12, null),
+    sshNoLine: press({ ctrlKey: true }, SSH, "/r/a.py", null, null),
+    box: press({ ctrlKey: true }, BOX, "/w/a.py", 7, 2),
+    boxNoLine: press({ ctrlKey: true }, BOX, "/w/a.py", null, null),
+    tmpl: press({ ctrlKey: true }, "zed://ssh/km{path}:{line}", "/r/a.py", 12, 3),
+    tmplNoLine: press({ ctrlKey: true }, "zed://ssh/km{path}:{line}", "/r/a.py", null, null),
+    tmplTwice: press({ ctrlKey: true }, "x://o?f={path}&l={line}&g={line}", "/r/a.py", 9, null),
+    tmplBare: press({ ctrlKey: true }, "zed://ssh/km{path}", "/r/a.py", 12, null),
+    tmplQuery: press({ ctrlKey: true }, "vscode://file{path}?windowId=_blank", "/r/a.py", 12, null),
     plain: press({}, FILE, "/r/a.py", 1, null),
     none: press({ ctrlKey: true }, FILE, null, 1, null),
   }));
@@ -234,15 +248,25 @@ def test_a_row_is_asked_once_and_only_what_the_host_resolved_is_a_link():
 
 
 @pytest.mark.unit
-def test_only_ctrl_or_cmd_opens_and_the_line_rides_on_the_vscode_file_form_alone():
+def test_only_ctrl_or_cmd_opens_and_the_line_rides_on_every_vscode_form():
     got = _probe()
     assert got["plainClick"] is False and got["ctrlClick"] is True
-    assert got["opened"] == [["vscode://file/r/src/agentorc/cli.py:364?windowId=_blank", "the editor"]]
-    # percent-encoded, `/` kept (§5, TD-011); the line and column after the path, before the query
-    assert got["file"]["opened"] == [["vscode://file/r/my%20dir/a%23b.py:12:3?windowId=_blank", "the editor"]]
-    assert got["fileNoLine"]["opened"] == [["vscode://file/r/a.py?windowId=_blank", "the editor"]]
-    # the ssh-remote form opens the file, no line
-    assert got["ssh"]["opened"] == [["vscode://vscode-remote/ssh-remote+km/r/a.py?windowId=_blank", "the editor"]]
+    assert got["opened"] == [["vscode://file/r/src/agentorc/cli.py:364", "the editor"]]
+    # percent-encoded, `/` kept (§5, TD-011); the line and column after the path
+    assert got["file"]["opened"] == [["vscode://file/r/my%20dir/a%23b.py:12:3", "the editor"]]
+    # no line printed: `:1`, so a remote path opens as a file and not a folder (TD-524, TD-526)
+    assert got["fileNoLine"]["opened"] == [["vscode://file/r/a.py:1", "the editor"]]
+    assert got["ssh"]["opened"] == [["vscode://vscode-remote/ssh-remote+km/r/a.py:12", "the editor"]]
+    assert got["sshNoLine"]["opened"] == [["vscode://vscode-remote/ssh-remote+km/r/a.py:1", "the editor"]]
+    assert got["box"]["opened"] == [["vscode://vscode-remote/attached-container+7b7d/w/a.py:7:2", "the editor"]]
+    assert got["boxNoLine"]["opened"] == [["vscode://vscode-remote/attached-container+7b7d/w/a.py:1", "the editor"]]
+    # a template's {line} takes the line, `1` where none was printed; one without it is filled as it
+    # stands, and one of the person's own with a query is a template, not a `vscode` form
+    assert got["tmpl"]["opened"] == [["zed://ssh/km/r/a.py:12", "the editor"]]
+    assert got["tmplNoLine"]["opened"] == [["zed://ssh/km/r/a.py:1", "the editor"]]
+    assert got["tmplTwice"]["opened"] == [["x://o?f=/r/a.py&l=9&g=9", "the editor"]]
+    assert got["tmplBare"]["opened"] == [["zed://ssh/km/r/a.py", "the editor"]]
+    assert got["tmplQuery"]["opened"] == [["vscode://file/r/a.py?windowId=_blank", "the editor"]]
     assert got["plain"] == {"r": False, "opened": []} and got["none"] == {"r": False, "opened": []}
 
 

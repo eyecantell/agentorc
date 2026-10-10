@@ -45,8 +45,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-524 | A file link in the Focus pane opens VS Code but no file when the UI reaches the host over SSH: the remote form carries no `:line`, so VS Code opens the file's path as a folder | Medium | Designed 2026-10-10 — build TD-526 |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
-| TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Open |
+| TD-526 | Build the file link's line on every `vscode` form (TD-524): `:line` or `:1` after the path, no `windowId=_blank` on the file form, `{line}` in a template | Medium | Built (#1467); waits for Paul's look |
 | TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open |
+| TD-528 | A template `person.open_in` with `{line}` draws the folder button with `{line}` unfilled, and the Settings page's url note names only `{path}` and `{remote}` | Low | Open |
 
 ---
 
@@ -675,7 +676,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (the designer, TD-524's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built by PR #1467 (the UI check held on a scratch home: the remote link carries `:line`, `:1` where none, no `windowId`); waits for Paul's look in VS Code over SSH — *Works* archives it
+**Blocked by:** decision (paul)
 **Location:** design §4.6 *A path in the pane is a link* (the line, the window), §4.5a **a path is a link**, §5 `person.open_in` (the file form, `{line}`); `src/agentorc/ui/uiconf.py` (`editor_file`: the three `vscode` forms without `?windowId=_blank`, `vscode_link` unchanged), `src/agentorc/ui/static/app.js` (`AO.pathLink`: the `at` suffix on every `vscode://` form, `:1` when no line was printed, `{line}` filled in a template), `tests/test_ui_focus_paths.py`
 
 **Why:** TD-524: Paul's Ctrl+click from a UI reached over SSH opened VS Code, which named the file and asked for a folder — the remote form carried no `:line`, and VS Code's handler opens a `vscode-remote` path as a file only when it ends in `:digits` (`getWindowOpenableFromProtocolUrl`, read in the source 2026-10-10). Every file link from a UI not on the host was broken.
@@ -715,3 +717,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the Session card lists a run's edits as links with their marks, the editor button sits on its summary line and on the rail and nowhere else on Focus, the help says so, and the tests pin the hook, the record and the page.
 
 **Related:** TD-525 (the design), TD-524 / TD-526 (the file form's line and window), TD-501 (the pane's links), TD-408 (the rail), TD-156 (the Session card).
+
+## TD-528: A template `person.open_in` with `{line}` draws the folder button with `{line}` unfilled, and the Settings page's url note names only `{path}` and `{remote}`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-2, found by the independent review of TD-526's #1467)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §5 `person.open_in` (`{line}`: *the file form only*), §4.5a **Settings page** rows for `open_in`; `src/agentorc/ui/uiconf.py` (`editor_link`, which fills `{path}` and `{remote}`), `src/agentorc/ui/templates/settings.html` (the template url's note)
+
+**Why:** TD-524's round gave a template `{line}` beside `{path}` and `{remote}`, filled on the file form (built by TD-526, #1467). The folder form — the Session card's and the card's editor button, *edit yml*, Settings' **Open file** — fills only `{path}` and `{remote}`, so a template such as `zed://ssh/{remote}{path}:{line}`, which the file links invite, draws a folder button whose link ends `:{line}` literally. The design says `{line}` is the file form's only and is silent on what the folder form does with it; the Settings page's note under the url names `{path}` and `{remote}` alone, so a person never learns `{line}` exists.
+
+**Fix:** a design call first: what the folder form does with `{line}` (drop it with what is around it, fill `1`, or refuse such a template for the button), and the Settings note's words. Then the build: `editor_link` as decided, a test with a `{line}` template, the note.

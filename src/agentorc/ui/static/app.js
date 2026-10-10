@@ -3386,14 +3386,18 @@
     return out;
   };
   // …and the press, `AO.paneLink`'s shape: no modifier, nothing; else the editor's file form filled
-  // with the host's resolved path, percent-encoded with `/` kept (§5, TD-011), the printed line riding
-  // after it only on the `vscode` default's `vscode://file` form, and handed to the protocol handler
-  // as the header's editor button is.
+  // with the host's resolved path, percent-encoded with `/` kept (§5, TD-011), and handed to the
+  // protocol handler as the header's editor button is. On every `vscode` form — a `vscode://` URL that
+  // ends at `{path}`: local, ssh-remote, container — the line rides after the path, `:line[:col]` as
+  // printed and `:1` where none was, since VS Code opens a remote path as a file only when it ends in
+  // `:digits` (TD-524, TD-526); a template's `{line}` takes the line (`1` where none was) and a
+  // template without it is filled as it stands.
   AO.pathLink = function (event, file, resolved, line, col, open) {
     if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
     const path = String(resolved).split("/").map(encodeURIComponent).join("/");
-    const at = file.startsWith("vscode://file{path}") && line ? `:${line}${col ? `:${col}` : ""}` : "";
-    (open || AO.openEditor)(file.replace("{path}", path + at), "the editor");
+    const vscode = file.startsWith("vscode://") && file.endsWith("{path}");
+    const at = vscode ? `:${line || 1}${line && col ? `:${col}` : ""}` : "";
+    (open || AO.openEditor)(file.replace("{path}", path + at).replaceAll("{line}", String(line || 1)), "the editor");
     return true;
   };
   // The provider the page registers beside the web-links addon when the header has an editor button:
