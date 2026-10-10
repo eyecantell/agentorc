@@ -44,7 +44,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-532 | A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward | Medium | Designed 2026-10-10 — build TD-535 |
-| TD-535 | Build a file link's two launches (TD-532): the folder link then, a second after, the file form, from the pane's links and the recent files alike; one toast; the help says a press may be two asks | Medium | Open |
+| TD-535 | Build a file link's two launches (TD-532): the folder link then, a second after, the file form, from the pane's links and the recent files alike; one toast; the help says a press may be two asks | Medium | Built — live check of #1483 |
 
 ---
 
@@ -651,8 +651,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** feature
 **Added:** 2026-10-10 (the designer, TD-532's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1483
+**Status:** Built in #1483 (grinder-ao-2, 2026-10-10): `AO.openFile` sends the folder link, then after `AO.FOLDER_WAIT` (1000 ms) the file form, quietly; the pane's links and the recent files take it, the Session card's button stays one launch; the help says a press may be two asks. The scratch home read the pair in order on all three roads (#1483's UI check). **What to read once #1483 is live:** only Paul's VS Code shows it — with no window holding the worktree, a Ctrl+click on a path opens the worktree's window and the file in it at its line; with the window open it comes forward and the file lands there, no second window; a recent file the same. That is the look sent to Paul after the merge.
 **Location:** design §4.6 *A path in the pane is a link* (*The press is two launches*); §4.5a **a path is a link**, **recent files**, the Session card's **VS Code** button, *The help text*'s *a path is a link* bullet; §5 `person.open_in` (the `vscode` file form); `src/agentorc/ui/static/app.js` (`AO.openEditor` ~L461 and the `a.editor` click handler under it, `AO.pathLink` ~L3476, `AO.recentFiles` ~L3486 — the record's `editor` is `{label, url, file}` from `src/agentorc/ui/cards.py` ~L231, `url` the folder link); `src/agentorc/ui/help.py` (the bullet); `tests/test_ui_focus_paths.py`, `tests/test_ui_focus_recent_files.py`, `tests/test_help.py`, `tests/test_design_doc.py`
 
 **Why:** TD-532: a file link with no VS Code window holding the worktree lands in whatever window was used last, and Paul opens the worktree by hand each time; VS Code brings a window holding the folder forward and opens no second one, so the page can always send the folder first.

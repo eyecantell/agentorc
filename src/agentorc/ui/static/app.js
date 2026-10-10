@@ -458,16 +458,32 @@
   // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
   // the protocol handler without navigating this tab away (a plain click replaced the Org with a
   // blank page when the handler declined — first-use finding).
-  AO.openEditor = function (url, label) {
+  AO.openEditor = function (url, label, quiet) {
     const f = document.createElement("iframe"); f.style.display = "none"; f.src = url;
     document.body.appendChild(f); setTimeout(() => f.remove(), 3000);
-    AO.toast(`opening in ${label || "the editor"}…`, true);
+    if (!quiet) AO.toast(`opening in ${label || "the editor"}…`, true);
+  };
+  // A file link is two launches (§4.6 *The press is two launches*, TD-532): the session's folder link
+  // as the Session card's button sends it, then the file form, so the file lands in the worktree's
+  // window — brought forward when one holds the folder, just opened when none does. The wait covers
+  // the protocol handler's turn, not the window's connection (the editor queues a file for a window
+  // still connecting), and stays inside the browser's five-second activation window: one second,
+  // fixed, no setting. One toast for the pair; nothing is remembered between presses.
+  AO.FOLDER_WAIT = 1000;
+  AO.openFile = function (editor, fileUrl, open) {
+    const o = open || AO.openEditor, label = (editor && editor.label) || "the editor";
+    if (!(editor && editor.url)) { o(fileUrl, label); return; }
+    o(editor.url, label);
+    setTimeout(() => o(fileUrl, label, true), AO.FOLDER_WAIT);
   };
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest("a.editor");
     if (!a) return;
     ev.preventDefault();
-    AO.openEditor(a.href, a.dataset.label);
+    // a file's link carries its session's folder (the recent files, TD-535): the pair; any other
+    // editor link — the Session card's button, a folder — the one launch
+    if (a.dataset.folder) AO.openFile({ url: a.dataset.folder, label: a.dataset.label }, a.href);
+    else AO.openEditor(a.href, a.dataset.label);
   });
 
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
@@ -3462,7 +3478,7 @@
   };
   // …and the press, `AO.paneLink`'s shape: no modifier, nothing; else the editor's file form filled
   // with the host's resolved path, percent-encoded with `/` kept (§5, TD-011), and handed to the
-  // protocol handler as the Session card's editor button is. On every `vscode` form — a `vscode://` URL that
+  // protocol handler after the session's folder (`AO.openFile`, TD-535). On every `vscode` form — a `vscode://` URL that
   // ends at `{path}`: local, ssh-remote, container — the line rides after the path, `:line[:col]` as
   // printed and `:1` where none was, since VS Code opens a remote path as a file only when it ends in
   // `:digits` (TD-524, TD-526); a template's `{line}` takes the line (`1` where none was) and a
@@ -3473,9 +3489,10 @@
     const at = vscode ? `:${line || 1}${line && col ? `:${col}` : ""}` : "";
     return file.replace("{path}", path + at).replaceAll("{line}", String(line || 1));
   };
-  AO.pathLink = function (event, file, resolved, line, col, open) {
+  AO.pathLink = function (event, editor, resolved, line, col, open) {
+    const file = editor && editor.file;
     if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
-    (open || AO.openEditor)(AO.fileUrl(file, resolved, line, col), "the editor");
+    AO.openFile(editor, AO.fileUrl(file, resolved, line, col), open);
     return true;
   };
   // The Session card's **recent files** (§4.5 item 4, §4.5a, TD-525): the record's `files`, newest
@@ -3497,7 +3514,7 @@
       const mark = v.dir && isChanged(p) ? '<span class="fmark" title="changed in the worktree">M</span> ' : "";
       const title = esc(`${p}${f.at ? ` — edited ${String(f.at).slice(0, 16).replace("T", " ")}Z` : ""}`);
       const name = file
-        ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}" data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`
+        ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}"${editor.url ? ` data-folder="${esc(editor.url)}"` : ""} data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`
         : `<span title="${title}">${esc(rel)}</span>`;
       return `<div>${mark}${name}</div>`;
     }).join("");
@@ -3513,7 +3530,7 @@
   // a row with candidates asks the `paths` route once — the answer kept by the row's text until
   // `clear` (a re-attach) — and the runs the host resolved are links; a failed ask is no link and is
   // remembered nowhere, so the next hover asks again.
-  AO.pathProvider = function (term, id, file, fetchPaths) {
+  AO.pathProvider = function (term, id, editor, fetchPaths) {
     const known = new Map();
     let era = 0;  // an answer that lands after a `clear` belongs to the attach before it
     const ask = fetchPaths || ((runs) => fetch(`/api/sessions/${encodeURIComponent(id)}/paths`, {
@@ -3540,7 +3557,7 @@
           range: { start: { x: col(r.start) + 1, y }, end: { x: col(r.end - 1) + 1, y } },
           text: r.run,
           decorations: { underline: true, pointerCursor: true },
-          activate: (event) => AO.pathLink(event, file, paths[r.path], r.line, r.col),
+          activate: (event) => AO.pathLink(event, editor, paths[r.path], r.line, r.col),
         }));
         if (known.has(text)) { const l = links(known.get(text)); callback(l.length ? l : undefined); return; }
         const asked = era;
@@ -3619,7 +3636,7 @@
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
     // **a path is a link** (TD-501): only where the Session card draws its editor button
-    const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor.file) : null;
+    const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor) : null;
     if (pathLinks) term.registerLinkProvider(pathLinks);
     term.open($("#term")); fit.fit();
     AO.termRenderer(term);
