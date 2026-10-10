@@ -129,6 +129,12 @@ def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
     assert pill_title({"seat": True, "confidence": "hook"}) == seat
     assert pill_title({"seat": True, "state": "exited"}, "killed by you · 12:31") == seat
     assert pill_title({"host_note": "restarting the node", "seat": True}) == "restarting the node"
+    # TD-515: two inputs at once — a host note outranks a waiting reason, and a waiting reason a seat
+    # and the ending
+    reason = pill_title(waiting)
+    assert pill_title({**waiting, "host_note": "restarting the node"}) == "restarting the node"
+    assert pill_title({**waiting, "seat": True}) == reason
+    assert pill_title({**waiting, "state": "exited"}, "killed by you · 12:31") == reason
 
 
 @pytest.mark.unit

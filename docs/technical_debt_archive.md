@@ -8661,3 +8661,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-482 (#1422), TD-428.
 
 **Resolved:** 2026-10-10 (PR #1444) — `tests/test_ui_team_summary.py::test_a_claims_pr_the_tick_set_is_its_review_row_and_its_compact_lines_pr`: a claim carrying only the tick's `review_pr` 1302, no open PR on its branch, gives a *review* row with `pr == 1302` and the compact line `Grinder · TD-1 → #1302`; each probe in the Why now fails it.
+
+## TD-515: `pill_title`'s order — a *waiting* pill's reason before a seat and the ending, a host note before all — is asserted in no case that holds two of its inputs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/cards.py` (`pill_title`), `tests/test_exit_words.py` (`test_the_pill_hover_takes_the_first_that_applies`)
+
+**Why:** The test-audit of #1423 (TD-511). The test's docstring says §4.5a's order is *an unreachable host's reason, a waiting pill's reason, a seat on call, then the ending*, and its comment says the waiting reason and the seat are read *before the ending*. The cases it adds each hold one input (`{state_class: waiting, ...}` alone; `seat` alone), except `seat` with an ending and `host_note` with `seat`. Probes, `pytest -q tests/test_exit_words.py tests/test_ui_org.py`: the `waiting` branch moved below the `seat` and `ending` branches — **57 passed**; the `host_note` branch moved below the `waiting` branch — **9 passed**. So the order of a waiting pill against a seat, an ending and a host note is stated and asserted nowhere.
+
+**Fix:** Add cases holding two inputs: `{host_note, state_class: waiting}` gives the host note; `{state_class: waiting, seat: True}` and `{state_class: waiting}` with an ending give the waiting reason (or, if the design says a seat wins, the test says so and §4.5a is read first). **Done when** both probes fail a test.
+
+**Related:** TD-511 (#1423), TD-490.
+
+**Resolved:** 2026-10-10 (PR #1445) — `tests/test_exit_words.py::test_the_pill_hover_takes_the_first_that_applies` holds two inputs at once: a host note with a waiting reason gives the note, and a waiting reason with a seat, or with an ending on an exited record, gives the reason; both probes in the Why now fail it.
