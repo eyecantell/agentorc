@@ -351,6 +351,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-10 (TD-523, grinder-ao-2; Paul, answering TD-479's look, asked why Ctrl+V on the terminal drew a white *Paste* button to press): **Copy / Paste** — the keys paste from the browser's own paste event, caught before xterm.js pastes it, in place of the script read TD-520 (#1449) had moved them to; the menu's Paste and right-click keep the script read, having no event.
 - 2026-10-10 (TD-501, grinder-ao-2): *The help text* gains **a path is a link** (Focus pane), the Help page's Focus paragraph, in TD-501's words.
 - 2026-10-10 (TD-506, grinder-ao-2; found by grinder-ao-1 in TD-428's live check, where *4 High* of 64 read *l High*): **team card: Repo facet** — a priority segment too narrow for its words draws its count alone, and one too narrow for the count nothing inside; its hover keeps both. Every `.bar` segment wraps what does not fit to a second line it clips, so the kind and phase bars drop a count that does not fit too.
 - 2026-10-09 (TD-498 slice 2, grinder-ao-2, building TD-490): the **state pill hover** row gains *observed by the host agent, not reported by the tool* for a `tick` state that is not an ending (`stalled?`), which §4.2 makes the tick's own and which *reported by the tool* misdescribed.

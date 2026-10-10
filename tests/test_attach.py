@@ -651,13 +651,21 @@ def test_a_screenshot_pasted_on_the_terminal_takes_the_attach_road(tmp_path):
 @pytest.mark.unit
 def test_the_terminals_paste_reads_nothing_on_a_read_only_focus():
     """§4.5a *Copy / Paste*: Paste is inert on a read-only Focus — the toast comes before the clipboard
-    is read — and every paste, text or file, goes through `AO.clipPaste` to the terminal."""
+    is read — and the menu's paste, text or file, goes through `AO.clipPaste` to the terminal; the
+    keys' paste event takes the same text and file roads."""
     js = (UI / "static" / "app.js").read_text()
     body = js[js.index("const pasteClip = () => {") :]
     body = body[: body.index("\n    };\n")]
     ro = body.index('if (readOnly) { AO.toast("watching: paste is off — Take over to type"); return; }')
     assert ro < body.index("AO.clipPaste(navigator.clipboard") and "readText" not in body
-    assert "attachFiles([f], (path) => { if (live()) term.paste(path); })" in body
+    assert "text: pasteText, file: pasteFile" in body
+    assert (
+        "const pasteFile = (f) => attachFiles && attachFiles([f], (path) => { if (live()) term.paste(path); });" in js
+    )
+    wired = (
+        'AO.wireTermPaste($("#term"), { readOnly: () => readOnly, text: pasteText, file: pasteFile, toast: AO.toast });'
+    )
+    assert wired in js
     assert "attachFiles = AO.wireAttach({" in js
 
 
@@ -667,9 +675,8 @@ KEY_PROBE = (
 const press = (o) => {
   const e = Object.assign({ type: "keydown", key: "v", ctrlKey: false, shiftKey: false, altKey: false,
     cancelled: false, preventDefault() { this.cancelled = true; } }, o);
-  let pasted = 0;
-  const took = AO.pasteKey(e, () => { pasted += 1; });
-  return { took, pasted, cancelled: e.cancelled };
+  const took = AO.pasteKey(e);
+  return { took, cancelled: e.cancelled };
 };
 console.log(JSON.stringify({
   ctrl_v: press({ ctrlKey: true }),
@@ -688,20 +695,79 @@ console.log(JSON.stringify({
 
 
 @pytest.mark.unit
-def test_one_paste_key_pastes_once(tmp_path):
-    """§4.5a *Copy / Paste* (TD-520), under node: Ctrl+V, Ctrl+Shift+V and Shift+Insert on the terminal
-    call the paste road once and cancel the keydown, so the browser raises no `paste` event of its own
-    on xterm's textarea — which xterm.js pastes itself, and the text went in twice. Every other key,
-    and the key's later events, are left to xterm.js and the browser."""
+def test_the_paste_keys_leave_the_paste_to_the_browser(tmp_path):
+    """§4.5a *Copy / Paste* (TD-520, TD-523), under node: Ctrl+V, Ctrl+Shift+V and Shift+Insert on the
+    terminal are kept from xterm.js and never cancel their keydown, so the browser raises its own
+    `paste` event — read where it lands, with no *Paste* button — and nothing reads the clipboard by
+    script for them. Every other key, and the key's later events, are left to xterm.js and the browser."""
     got = _node(tmp_path, KEY_PROBE)
-    once = {"took": True, "pasted": 1, "cancelled": True}
-    left = {"took": False, "pasted": 0, "cancelled": False}
+    took = {"took": True, "cancelled": False}
+    left = {"took": False, "cancelled": False}
     for chord in ("ctrl_v", "ctrl_V", "ctrl_shift_v", "shift_insert"):
-        assert got[chord] == once, chord
+        assert got[chord] == took, chord
     for other in ("keyup", "keypress", "ctrl_alt_v", "plain_v", "ctrl_c", "insert"):
         assert got[other] == left, other
     js = (UI / "static" / "app.js").read_text()
     handler = js[js.index("term.attachCustomKeyEventHandler((e) => {") :]
     handler = handler[: handler.index("\n    });\n")]
-    assert "if (AO.pasteKey(e, pasteClip)) return false;" in handler
-    assert handler.count("pasteClip") == 1  # the one road: no chord calls it beside AO.pasteKey
+    assert "if (AO.pasteKey(e)) return false;" in handler
+    assert "pasteClip" not in handler  # no chord reads the clipboard by script
+
+
+EVENT_PROBE = (
+    PRELUDE
+    + """
+let reads = 0;
+const count = async (v) => { reads += 1; return v; };
+globalThis.navigator = { clipboard: { read: () => count([]), readText: () => count("") } };
+const file = (name, type) => ({ name, type });
+const data = (parts, files) => ({ types: Object.keys(parts).concat(files && files.length ? ["Files"] : []),
+  getData: (t) => parts[t] || "", files: files || [] });
+function fire(cd, ro) {
+  const got = { text: [], file: [], toast: [] };
+  const on = {};
+  const el = { addEventListener: (k, f, capture) => { on[k] = { f, capture }; } };
+  AO.wireTermPaste(el, { readOnly: () => !!ro, text: (t) => got.text.push(t), file: (f) => got.file.push(f.name),
+    toast: (m) => got.toast.push(m) });
+  const e = { clipboardData: cd, cancelled: false, stopped: false,
+    preventDefault() { this.cancelled = true; }, stopPropagation() { this.stopped = true; } };
+  on.paste.f(e);
+  return { ...got, capture: on.paste.capture, cancelled: e.cancelled, stopped: e.stopped };
+}
+console.log(JSON.stringify({
+  text: fire(data({ "text/plain": "hello", "text/html": "<b>hello</b>" })),
+  shot: fire(data({}, [file("image.png", "image/png")])),
+  text_and_shot: fire(data({ "text/plain": "hi" }, [file("image.png", "image/png")])),
+  png_first: fire(data({}, [file("a.pdf", "application/pdf"), file("b.png", "image/png")])),
+  blank_text_shot: fire(data({ "text/plain": "" }, [file("image.png", "image/png")])),
+  html_only: fire(data({ "text/html": "<i>x</i>" })),
+  none: fire(null),
+  read_only: fire(data({ "text/plain": "hello" }), true),
+  reads,
+}));
+"""
+)
+
+
+@pytest.mark.unit
+def test_a_paste_event_on_the_terminal_pastes_once_from_its_own_data(tmp_path):
+    """§4.5a *Copy / Paste* (TD-523), under node: the terminal's paste event is caught in the capture
+    phase and cancelled, so xterm.js's textarea never pastes it a second time (TD-520); its text is
+    pasted once, a file and no text (`image/png` first) takes the attach road once, a read-only Focus
+    toasts and pastes nothing — and the clipboard is never read by script."""
+    got = _node(tmp_path, EVENT_PROBE)
+    caught = {"capture": True, "cancelled": True, "stopped": True}
+    assert got["text"] == {"text": ["hello"], "file": [], "toast": [], **caught}
+    assert got["shot"] == {"text": [], "file": ["image.png"], "toast": [], **caught}
+    assert got["text_and_shot"]["text"] == ["hi"] and got["text_and_shot"]["file"] == []
+    assert got["png_first"]["file"] == ["b.png"]
+    assert got["blank_text_shot"]["file"] == ["image.png"]  # an empty text is no text
+    assert got["html_only"] == {"text": [], "file": [], "toast": [], **caught}
+    assert got["none"] == {"text": [], "file": [], "toast": [], **caught}
+    assert got["read_only"] == {
+        "text": [],
+        "file": [],
+        "toast": ["watching: paste is off — Take over to type"],
+        **caught,
+    }
+    assert got["reads"] == 0
