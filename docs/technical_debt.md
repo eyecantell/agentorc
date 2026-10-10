@@ -50,6 +50,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-542 | Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list | Medium | Open |
 | TD-540 | No test holds `AO.openEditor`'s `quiet` argument: the second launch of a file link's pair can toast again and the suite stays green (test audit of #1483) | Low | Open |
 | TD-541 | Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped | Medium | Open |
+| TD-543 | The Session card lists no links: a PR, CI run or doc URL a session printed is found again only by scrolling the pane; read recent URLs from the transcript, off the keystroke path | Medium | Open |
 
 ---
 
@@ -772,3 +773,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** every page's top bar names the live build by its commit's local date and time, says *main +n* when merges are not yet live with their subjects on hover, says *promoting…* and *held* when the readings do, shows the page's own build when it differs, and the tests pin it.
 
 **Related:** TD-539 (the design), TD-062 (the promoted install), TD-120 / TD-132 (Promote; slice 5 built the first chip), TD-226 (rollback and its hold), TD-233 (the usage chip beside it).
+
+## TD-543: The Session card lists no links: a PR, CI run or doc URL a session printed is found again only by scrolling the pane; read recent URLs from the transcript, off the keystroke path
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 item 4 (the **Session** card, beside *recent files*), §4.6 *A URL in the pane is a link* (http/https only, Ctrl+click), §4.3 (the adapter contract: the transcript read); `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path` ~L587, `read_transcript` ~L676), `src/sessionorc/agent.py` (`rpc_transcript` ~L2237), `src/agentorc/ui/static/app.js` (`AO.paneLink`, the web-links addon, `AO.pathProvider`)
+
+**Why:** Paul, 2026-10-10: *we currently check the terminal input/output in order to add browser and file links where they are applicable … do we leverage that and add the recent urls and files from the terminal to our list?* The pane's detection cannot be reused for a list. The web-links addon and `AO.pathProvider` run only when the mouse hovers over a row, and only on that row (TD-422, TD-501), so they never see the output whole. Scanning every row painted would put work on the path keystrokes and output take. The files half is TD-538 / TD-541 (from git). The links half has no source: a PR link, a CI run, a doc a session printed is gone once it scrolls away. The transcript already holds every message and tool result whole, on the host, and `ao transcript` reads it.
+
+**Fix:** a design round settles a **recent links** row on the Session card: (1) the source, the session's transcript read on the record's host, the http/https URLs in the assistant's text and tool results, newest first, de-duplicated, a cap like the files' twenty; computed on read or kept, and never by scanning the pane; (2) what each draws (the URL shortened, a PR as *#n* with its title if cheap, the time on hover) and how it opens (the pane's rule: http/https only, a new tab); (3) which URLs count: the session's own output, or the person's prompts too, and whether to drop noise (localhost, the UI's own pages); (4) a tool with no readable transcript shows no row, and this is named in TD-112's conformance suite as a transcript read every adapter declares or lacks; (5) cost: when the read runs (the card unfolded, on a tick, at a stop) so a long transcript is not reparsed per request. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-538 / TD-541 (recent files from git), TD-525 / TD-527 (the card), TD-422 (URL links in the pane), TD-501 (path links), TD-112 (adapter neutrality).
