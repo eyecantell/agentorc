@@ -70,7 +70,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-492 | TD-464's archived `**Resolved:**` names #1325 for §4.5a's slice and #1343 for §6's; those are TD-063/TD-078's and TD-462's PRs (the slices are #1345 and #1350) | Low | Open |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
-| TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Open |
+| TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | In progress |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
@@ -1112,9 +1112,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Priority:** High
 **Type:** feature
 **Added:** 2026-10-09 (the designer, TD-489's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Owner:** anchor
+**Kind:** live-check #1407
+**Status:** Built in #1407: `agentorc-watch` (`src/agentorc/watch.py`), the watch's service and timer in `service.py` staged by `ao service install` and installed by `--system`, `ao service status`'s timer line, `ao doctor`'s agent line. The run knows it started the manager from systemd's monotonic stamps (the manager's `ActiveEnterTimestampMonotonic` at or after the watch service's `InactiveExitTimestampMonotonic`), since `ExecStartPre` has run before `ExecStart` can read anything; `ExecStartPre=-+` so a manager that will not start is still told as silence. **The live check** waits for Paul's root press (the TD-495 line on `docs/user_attention.md`, extended to the watch): then `ao service status` names `agentorc-watch.timer: active`, `ao doctor agent` carries *watch: agentorc-watch.timer, last run HH:MM*, and `~/.agentorc/watch.json` holds a `last_run` no older than five minutes — reads; the eleven-minute stop of `agentorc-agent` and its two Telegram lines are Paul's, in that line.
 **Location:** design §4.10 *When the home itself is down: the watch*, §4.1 (the press), §4.4a *When the home is lost*, §4.7 **agent**, §5 `notify:`; a new `src/agentorc/watch.py` (the `agentorc-watch` console script, `pyproject.toml`), `src/agentorc/service.py` (the two unit texts, `install`'s file under `~/.agentorc/systemd/`, `--system`, `status`), `src/sessionorc/notify.py` (the child, reused), the `doctor` RPC's agent reading, `src/sessionorc/agent_common.py` (`WATCH_EVERY`, `WATCH_SILENCE`)
 
 **Why:** TD-489: nothing outside `user@1000` noticed the host agent gone for 4h20m, and nothing started the user manager again; the design now says the watch does both.
