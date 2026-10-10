@@ -71,7 +71,8 @@ notify:                                       # §4.10 *Told on Telegram when no
   Settings page too, once built — says *migrate: ui.yml is no longer read*. The UI reads
   `person:` through that read, at most every five seconds, before it serves a request, and keeps the
   last answer when a read fails. What `person.open_in` takes is what `ui.yml` took, the editor button of the card, the
-  Focus header, *edit yml* and the Settings page's **Open file**:
+  Focus header, *edit yml*, the Settings page's **Open file** and the Focus pane's file link (§4.6 *A path
+  in the pane is a link*: the same template with the file's path, served to the page as `editor.file`):
   - **`vscode`** — the default, and what a missing file means:
     `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on
     the machine the person sits at, `vscode://file{path}?windowId=_blank`.
