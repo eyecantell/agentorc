@@ -62,6 +62,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-513 | The client half of TD-484's lane-count patch is pinned by no test: deleting the `syncGroups` block leaves every UI test green | Medium | Open |
+| TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
 
 ---
 
@@ -967,3 +968,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Add a source-reading test beside the file's others that the `app.js` `syncGroups` reads `g.lanes` and removes a stale `.lanecount` / inserts the new one in the pill (or a driven-DOM check where the suite has one), and a case in `render_heads`' test for a group with no summary giving `lanes == {}`. **Done when** both probes in the Why fail a test.
 
 **Related:** TD-484 (#1424), TD-428.
+
+## TD-514: Two `review_pr` reads in `ui/org.py` — the TDs-in-motion row's PR and the compact line's `→ #N` — are pinned by no test in the suite
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/org.py` (`motion_rows`: `pr = p.get("pr") or p.get("review_pr")`; `compact_line`: `pr = claims[0].get("pr") or claims[0].get("review_pr")`)
+
+**Why:** The test-audit of #1422 (TD-482). TD-482 pinned the `review_pr` source in `cards.py`'s `review_wait` only. `org.py` reads the tick's `review_pr` twice more, and the docstring of `motion_rows` names it as a source (*its own `pr`, the tick's `review_pr`, or else an open PR whose head branch names the reference*). Probe: both `or p.get("review_pr")` / `or claims[0].get("review_pr")` removed, then the whole `pytest -q tests` — every test passed (all dots, no F), as did `tests/test_ui_org.py tests/test_ui_team_summary.py tests/test_ui_work_row.py tests/test_ui.py` alone (156 passed). A claim whose PR the tick set but whose branch no open PR names draws no `review` row PR and no `→ #N`, unseen.
+
+**Fix:** Add one case each: a member with a `claimed` entry `{ref: 'TD-1', review_pr: 1302}` on a repo whose open PRs name no `td001` branch gives a `motion_rows` row with `pr == 1302` and a compact line ending `TD-1 → #1302`. **Done when** each probe fails a test.
+
+**Related:** TD-482 (#1422), TD-428.
