@@ -153,7 +153,9 @@ class TickMixin:
             live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
             # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
             live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
-            await asyncio.to_thread(self._prune_runs, snapshot_at, live)
+            # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
+            live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
+            await asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids)
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
@@ -2914,11 +2916,14 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
             log.exception("the nightly backup of the store failed")
 
-    def _prune_runs(self, now: datetime, live: set[str]) -> None:
+    def _prune_runs(self, now: datetime, live: set[str], live_ids: set[str] | None = None) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
         of forgotten sessions are the common case — Forget keeps the file until this sweep. `0`
-        keeps everything. An attachment's `.part` nothing has written to for an hour goes whatever
+        keeps everything. A session's attachments (`attachments/<session>/`, §4.4 *An attachment's
+        life*, TD-469) go by the same bound unless its id is in `live_ids` — any record of it neither
+        exited nor closed; a forgotten one has none — each folder removed once empty; `None` sweeps no
+        attachment. An attachment's `.part` nothing has written to for an hour goes whatever
         the bound (§4.4 *Attachment drop*, TD-478): a browser closed mid-upload leaves nothing.
         Runs in a thread: touches files, never `self.sessions`."""
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
@@ -2951,6 +2956,24 @@ class TickMixin:
                     log.info("pruned promote log %s (older than %d days)", f, keep)
             except OSError:
                 continue
+        if live_ids is None:
+            return
+        for folder in paths.attachments_dir().glob("*"):
+            if folder.name in live_ids or folder.is_symlink() or not folder.is_dir():
+                continue
+            try:
+                files = [f for f in folder.iterdir() if f.is_file() and not f.is_symlink()]
+            except OSError:  # gone meanwhile
+                continue
+            for f in files:
+                try:
+                    if f.stat().st_mtime < cutoff:
+                        f.unlink()
+                        log.info("pruned attachment %s (older than %d days)", f, keep)
+                except OSError as e:
+                    log.warning("could not prune attachment %s: %s", f, e)
+            with contextlib.suppress(OSError):  # not empty: a younger file keeps it
+                folder.rmdir()
 
     async def _refresh_git(self, now: datetime) -> None:
         due = [
