@@ -44,12 +44,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448; the look sent to Paul (m-37f220f9e955) |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
-| TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
-| TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
+| TD-521 | Focus below 720px scrolls sideways: the main column is as wide as the terminal's content (1444px at a 600px viewport) | Low | Open |
 
 ---
 
@@ -647,23 +646,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-488, TD-092 and TD-319 (Telegram), TD-111 (`ao doctor`).
 
-## TD-491: The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (ao-paul, Paul's review of the Focus composer; shape 2 and 3 of the mockups chosen over the side panel)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1394): §4.5a *Focus composer* **the bar** — folded by default to *✎ Compose a prompt… · Attach · Send* with the terminal taking the height down to it (no bar on an unattended Focus; the terminal takes that too); opened over the terminal's foot by a click, `c`, a paste or a drop, never by a resize; Send and `Esc` fold it, the draft kept and named on the bar; `person.composer: folded | open` on the You card (§5); the narrow mode unchanged; §4.5 screen 2 and *Keyboard focus*; the keys row; the mockup's composer redrawn as the bar, shot `docs/mockups/reviews/2026-10-09-td491-focus-composer-bar.png`, beside Paul's chosen shots of 2026-10-09. The build is TD-500, and this entry archives with it.
-**Blocked by:** TD-500
-**Location:** `src/agentorc/ui/templates/focus.html` (`#composer`), `static/app.css` (`.termbox` 60vh, `.composer`), `static/app.js` (composer, `fit`); design §4.5 (Focus anatomy), §4.5a (*Focus composer* rows); mockups `docs/mockups/reviews/2026-10-09-focus-composer-{current,collapsed,collapsed-open,sidebar,sidebar-folded}.png`, their source `docs/mockups/reviews/focus-composer-src/`
-
-**Why:** the composer is useful (Attach, Send's confirmation, Steer, the prompt chips, typing while the terminal reconnects, the phone layout), but it holds about 130px under a terminal fixed at 60vh even when unused. The side panel was weighed and not taken: it is about 300px wide, the hint wraps to seven lines, and with Inbox open it is off the screen.
-
-**Fix:** design first, starting from the chosen mockups: the composer folds to one bar (*✎ Compose a prompt… · Attach · Send*) and the terminal takes the height down to it. A click on the bar, `c`, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal (a resize makes Claude Code repaint, one of TD-474's causes). It folds again on Send, or on Esc when empty, and a draft survives a fold. A Settings → You choice decides whether it starts folded or always open. The terminal also takes the height an unattended Focus leaves empty under it today. This is the anchor of a wider Focus-screen round: other changes Paul names join this entry before its design. **Done when** the design says the fold, the overlay and the setting, the build lands, and the shapes are drawn again from the built page.
-
-**Related:** TD-472 (paste on the terminal), TD-474 (the struggling-terminal mark, which takes the header room), TD-003 (the phone).
-
 ## TD-493: A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page
 
 **Priority:** Low
@@ -696,22 +678,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §4.10 says. (1) `service.py`: `agentorc-watch.service` — `[Service] Type=oneshot, User=<the person>, ExecStartPre=+/usr/bin/systemctl start user@<uid>.service, ExecStart=<venv>/agentorc-watch` — and `agentorc-watch.timer` — `OnBootSec=2min, OnUnitActiveSec=5min, [Install] WantedBy=timers.target` — written beside the tmux unit when absent or differing, installed by the same `--system`, named by `status`. (2) `watch.py`: one never-gated read of the home's socket with a ten-second bound; `~/.agentorc/watch.json` holding `silent_since`, `manager_started_at`, `told` (which of the three lines went for this outage); the three lines in §4.10's words, sent as `notify.argv(secrets)`'s Doppler child with the line on its stdin, `secrets` from `notify.telegram` read from `settings.yml`, nothing sent with `on: false`; a failed send logged to `~/.agentorc/watch.log`, not retried; the manager's start is the unit's `ExecStartPre`, and the run reads `systemctl is-active user@<uid>.service` before and after to know it happened. (3) The doctor's **agent** reading adds the timer's presence and `LastTriggerUSec`, the two lines in §4.7's words. (4) TD-495's board line for Paul extends to the watch: after the press, `systemctl --user stop agentorc-agent` for eleven minutes brings the *has not answered* line and `start` the *answers again* line. **Done when** a fake socket (silent / answering), a fake `systemctl` and a fake clock drive `watch.json` through stopped-manager → started → told, and silence → told at 10 min → recovery → told, exactly one message each and none under `on: false`; the unit texts are pinned; `install` writes the watch files beside the tmux unit and `--system` installs both; the doctor's two lines read from fixtures; the board line is extended.
 
 **Related:** TD-489 (the design), TD-488 / TD-495 (the press), TD-319 (the Telegram child), TD-111 / TD-465 (the doctor).
-
-## TD-500: Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-491's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Focus composer* **the bar**, the **keys** row, the **You** row; §4.5 screen 2 and *Keyboard focus*; §5 `person.composer`; `src/agentorc/ui/templates/focus.html` (`#composer` ~L148; the bar beside it), `static/app.css` (`.termbox` 60vh ~L514, `.composer` ~L515, the popped and narrow rules ~L478, ~L526), `static/app.js` (~L3329 the composer's keys, ~L3334 the draft, ~L3357 `wireAttach`'s targets, ~L3380 the disabled reasons; `fit` of the terminal), `src/sessionorc/settings.py` (`person.composer`, bounded to `folded` | `open`), the Settings page's You card, `src/agentorc/ui/static/app.js`'s key table (`c`); mockups `docs/mockups/reviews/2026-10-09-focus-composer-*.png`
-
-**Why:** TD-491: the composer holds about 130px under a terminal fixed at 60vh even when unused; Paul picked the folded bar over a side panel.
-
-**Fix:** as §4.5a says. (1) `focus.html`: a `#composerbar` under the terminal (the text, Attach, Send/Steer), drawn when the composer is folded; `#composer` becomes the overlay (`position: absolute` over `.termbox`'s foot, the terminal's width, a six-line textarea, the hint, the chips) when open; neither on an `unattended` session. (2) `app.css`: `.termbox` fills from the header's bottom to the bar (or the page's foot) with the 360px floor; the popped and narrow rules keep their own heights; the narrow mode keeps the open composer under the terminal. (3) `app.js`: open on the bar's click, `c` (the key table), a paste or a drop whose target was the terminal or the bar (`wireAttach`'s targets gain the bar); fold on Send and on `Esc`, the draft kept in `localStorage` as today and the bar reading *✎ draft · <first words>* while one exists; the terminal is never `fit` on open or fold; the disabled reasons move to the bar's text while folded. (4) `person.composer` in `settings.py` (`folded` | `open`, refused otherwise) and the You card's pick; `open` draws the composer under the terminal as before. (5) The shots re-taken from the built page on a scratch home (`scripts/look_home.py`), folded, open with a draft, and unattended, as `docs/mockups/reviews/<date>-td499-*.png`, and the look sent to Paul (§4.9b). **Done when** a rendered Focus has the bar and no composer on an interactive session, neither on an unattended one, the overlay on a click with the terminal's size unchanged before and after (a test over the DOM's heights), `Esc` folding with the draft named on the bar, `person.composer: open` drawing the old shape, `person.composer: sideways` refused in words, and the three shots are in the PR.
-
-**Related:** TD-491 (the design), TD-472 / TD-479 (paste on the terminal), TD-474 / TD-480 (the terminal mark), TD-003 (the phone), TD-161 / TD-170 (the prompt chips).
 
 ## TD-501: Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph
 
@@ -753,3 +719,18 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
+## TD-521: Focus below 720px scrolls sideways: the main column is as wide as the terminal's content (1444px at a 600px viewport)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-2, met building TD-500)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.css` (`.page.focus { align-items: flex-start }` ~L468; the narrow rules' `.page.focus { flex-direction: column }` ~L540), `.focus .main`; design §4.5 *Phone layout*
+
+**Why:** on a scratch home (`scripts/look_home.py`) at a 600×900 viewport, `origin/main` at `35b4aaca` draws Focus's `.main` 1444px wide — the header, the acts line, the terminal and the composer all of it — and the page scrolls sideways; the panel stacks under it. In the narrow mode `.page.focus` is a column, and its `align-items: flex-start` keeps `.main` at its content's width instead of the page's, so the terminal's grid, once fit, holds it wide.
+
+**Fix:** in the narrow mode `.focus .main` takes the page's width (`align-self: stretch`, or `align-items: stretch` on the column) and the terminal fits to it; a check on a scratch home at 600px wide that `.main`'s width is the page's and `document.body.scrollWidth` the viewport's. **Done when** Focus at 600px wide has no sideways scroll and its terminal's columns fit the width.
+
+**Related:** TD-003 (the phone layout), TD-500 (where it was met).

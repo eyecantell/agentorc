@@ -153,22 +153,27 @@
   // `ctl.cancelled()`, true once the ✕ was pressed for this file; an upload that answers no path was
   // cancelled and inserts nothing (TD-478). Answers `attach(files, put)`, the promise of the queue:
   // with `put`, the terminal's paste of a file (TD-479), each path goes to `put` and not to the caret,
-  // and the composer need not be open.
-  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel }) {
-    const label = button.lastChild, word = label.textContent;
+  // and the composer need not be open. The folded composer (§4.5a **the bar**, TD-500): `unfold()` opens
+  // it before a path goes to its caret, and `mirror`, the bar's own Attach and ✕, says the upload there too.
+  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel, unfold, mirror }) {
+    const buttons = [button, ...(mirror ? [mirror.button] : [])];
+    const cancels = [cancel, ...(mirror ? [mirror.cancel] : [])].filter(Boolean);
+    const labels = buttons.map((b) => b.lastChild), word = labels[0].textContent;
+    const say = (t) => labels.forEach((l) => { l.textContent = t; });
     const shut = () => composer.classList.contains("hidden");
     let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
     let stopNow = () => {};
-    if (cancel) cancel.addEventListener("click", () => { stopNow(); cancel.classList.add("hidden"); });
+    const cancelOff = (off) => cancels.forEach((c) => c.classList.toggle("hidden", off));
+    for (const c of cancels) c.addEventListener("click", () => { stopNow(); cancelOff(true); });
     async function each(list, put) {
-      button.disabled = true;
+      buttons.forEach((b) => { b.disabled = true; });
       for (const f of list) {
-        label.textContent = `Attaching ${f.name}…`;
+        say(`Attaching ${f.name}…`);
         let stopped = false;
         stopNow = () => { stopped = true; };
         const ctl = {
           // the ✕ goes once only the last piece is left: that one links the file into place, past cancelling
-          progress: (pct, last) => { label.textContent = `Attaching ${f.name} · ${pct}%`; if (cancel) cancel.classList.toggle("hidden", stopped || !!last); },
+          progress: (pct, last) => { say(`Attaching ${f.name} · ${pct}%`); cancelOff(stopped || !!last); },
           cancelled: () => stopped,
         };
         try {
@@ -176,18 +181,19 @@
           if (path) put ? put(path) : AO.insertAtCaret(compose, path);
         } catch (e) { fail(`Attach failed: ${e.message}`); }
         stopNow = () => {};
-        if (cancel) cancel.classList.add("hidden");
+        cancelOff(true);
       }
-      label.textContent = word; button.disabled = false;
+      say(word); buttons.forEach((b) => { b.disabled = false; });
       if (!put) { compose.dispatchEvent(new Event("input")); compose.focus(); }
     }
     function attach(files, put) {
       const list = Array.from(files || []);
       if (!list.length || (!put && shut())) return attaching;
+      if (!put && unfold) unfold();
       attaching = attaching.then(() => each(list, put)).catch((e) => fail(`Attach failed: ${e.message}`));
       return attaching;
     }
-    button.addEventListener("click", () => input.click());
+    buttons.forEach((b) => b.addEventListener("click", () => input.click()));
     input.addEventListener("change", () => { attach(input.files).finally(() => { input.value = ""; }); });
     for (const el of targets) {
       el.addEventListener("dragover", (e) => { if (!shut() && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
@@ -199,6 +205,45 @@
       e.preventDefault(); attach(cd.files);
     });
     return attach;
+  };
+
+  // §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): what the folded bar reads — the reason
+  // nothing can be sent where there is one, else the draft's first words, else the invitation.
+  AO.barText = function (draft, reason) {
+    if (reason) return reason;
+    const words = (draft || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "✎ Compose a prompt… (c · or paste / drop a file)";
+    const first = words.slice(0, 8).join(" ");
+    return `✎ draft · ${first.length > 60 ? first.slice(0, 59) + "…" : first}${words.length > 8 && first.length <= 60 ? "…" : ""}`;
+  };
+  // The folded Focus's terminal height: from its top to the bar (and the page's foot under it), never
+  // under the 360px floor. `top` is the terminal's top in the document, `below` what stands under it.
+  AO.termFill = (viewport, top, below) => Math.max(360, Math.floor(viewport - top - below));
+  // The bar's wiring, its elements handed in so it runs under node (TD-500). Opening unfolds the overlay
+  // and focuses the box; folding hides it, keeps the draft, redraws the bar and gives the terminal the
+  // focus. Neither touches the terminal's box: a resize would make the tool repaint (TD-474).
+  AO.wireComposerBar = function ({ bar, text, send, composer, compose, sendBtn, hint, term }) {
+    const folded = () => composer.classList.contains("folded");
+    const redraw = () => {
+      const off = !!compose.disabled;
+      text.textContent = AO.barText(compose.value, off ? hint.textContent || "nothing can be sent now" : "");
+      text.classList.toggle("draft", !off && !!compose.value.trim());
+      text.classList.toggle("off", off);
+      send.disabled = off;
+      send.textContent = sendBtn.textContent;
+    };
+    const open = () => { composer.classList.remove("folded"); bar.classList.add("under"); compose.focus(); };
+    const fold = () => { composer.classList.add("folded"); bar.classList.remove("under"); redraw(); term.focus(); };
+    text.addEventListener("click", open);
+    send.addEventListener("click", () => { if (compose.value.trim()) sendBtn.click(); else open(); });
+    // a paste on the bar: text into the box, opened; a file takes the Attach road, which opens it
+    bar.addEventListener("paste", (e) => {
+      const cd = e.clipboardData;
+      if (!cd || ![...cd.types].includes("text/plain")) return;
+      e.preventDefault(); open(); AO.insertAtCaret(compose, cd.getData("text/plain")); compose.dispatchEvent(new Event("input"));
+    });
+    compose.addEventListener("input", redraw);
+    return { open, fold, folded, redraw };
   };
 
   // The terminal's **Paste** (§4.5a *Copy / Paste*, TD-472): the clipboard as `clip.read()` gives it.
@@ -2626,6 +2671,8 @@
       } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }
       try { localStorage.setItem(AO.draftKey(got.id), got.text); } catch (_) { /* no storage: Focus opens with an empty composer */ }
+      // …and Focus opens it, filled and focused, once: a draft the person folded stays on the bar (TD-500)
+      try { sessionStorage.setItem("ao.draft.open", got.id); } catch (_) { /* no storage: it waits on the bar */ }
       location.href = `/focus/${encodeURIComponent(got.id)}`;
     };
     say(""); plan();
@@ -3533,15 +3580,50 @@
     term.focus();
 
     const compose = $("#compose");
-    compose.addEventListener("keydown", (e) => { if (e.key === "Escape") { term.focus(); } if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#send").click(); });
-    // a draft the Add entry form left for this session (§4.5a **Open a session**, TD-219): filled,
-    // focused and not sent, kept as the person edits it and dropped once it is sent
+    // design §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): folded, the composer opens over
+    // the terminal's foot and folds back on Esc and on Send; `open` (person.composer) has no bar
+    const cbar = $("#composerbar") ? AO.wireComposerBar({
+      bar: $("#composerbar"), text: $("#cbtext"), send: $("#cbsend"), composer: $("#composer"), compose,
+      sendBtn: $("#send"), hint: $("#composehint"), term,
+    }) : null;
+    compose.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { if (cbar) cbar.fold(); else term.focus(); }
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#send").click();
+    });
+    // The terminal filled to the bar (§4.5a **the bar**): the header's bottom to the bar's top, the 360px
+    // floor kept; the popped-out window and the narrow mode keep their own heights. Measured again
+    // whenever what stands above it or the bar changes size, never on an open or a fold.
+    const wrap = $("#termwrap");
+    const fill = () => {
+      if (!wrap || !wrap.classList.contains("cfold")) return;
+      const bar = $("#composerbar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + 10 : 0;
+      wrap.style.setProperty("--cbarh", `${barH}px`);  // the open composer takes the bar's place
+      if (document.body.classList.contains("popped") || matchMedia("(max-width: 720px)").matches) { wrap.style.removeProperty("--termh"); return; }
+      wrap.style.setProperty("--termh", `${AO.termFill(window.innerHeight, $("#term").getBoundingClientRect().top + window.scrollY, barH + 16)}px`);
+    };
+    if (wrap && wrap.classList.contains("cfold")) {
+      const ro = new ResizeObserver(fill);
+      for (let el = wrap.previousElementSibling; el; el = el.previousElementSibling) ro.observe(el);
+      if ($("#composerbar")) ro.observe($("#composerbar"));
+      window.addEventListener("resize", fill);
+      fill();
+    }
+    // a draft (§4.5a **Open a session**, TD-219; **the bar**, TD-500): kept in this browser as the person
+    // writes it and dropped once it is sent. The Add entry form's is opened on load, filled, focused and
+    // not sent; one the person folded waits on the bar, named there
     const draft = (() => { try { return localStorage.getItem(AO.draftKey(id)); } catch (_) { return null; } })();
-    if (draft !== null && !compose.value) { compose.value = draft; compose.focus(); }
-    compose.addEventListener("input", () => { try { if (localStorage.getItem(AO.draftKey(id)) !== null) localStorage.setItem(AO.draftKey(id), compose.value); } catch (_) { /* no storage */ } });
+    const handed = (() => { try { const v = sessionStorage.getItem("ao.draft.open") === id; if (v) sessionStorage.removeItem("ao.draft.open"); return v; } catch (_) { return false; } })();
+    if (draft !== null && !compose.value) {
+      compose.value = draft;
+      if (!cbar || handed) { if (cbar) cbar.open(); compose.focus(); } else cbar.redraw();
+    }
+    compose.addEventListener("input", () => { try { if (compose.value) localStorage.setItem(AO.draftKey(id), compose.value); else localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } });
     $("#send").addEventListener("click", async () => {
       const text = compose.value; if (!text.trim()) return;
-      try { await act(id, "send", { text }); compose.value = ""; try { localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } term.focus(); } catch (e) { banner(`Send failed: ${e.message}`); }
+      try {
+        await act(id, "send", { text }); compose.value = ""; try { localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ }
+        if (cbar) cbar.fold(); else term.focus();
+      } catch (e) { banner(`Send failed: ${e.message}`); }
     });
     // design §4.5a *Focus composer* **prompt chips** (§4.8 *A role has saved prompts*, TD-170): a
     // press is **Send** with the chip's text — the same `send`, its confirmation and its refusals —
@@ -3561,8 +3643,10 @@
     // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*). A screenshot
     // pasted on the terminal takes it too, its path pasted there (`pasteClip` above, TD-479).
     attachFiles = AO.wireAttach({
-      button: $("#attach"), input: $("#attachfile"), composer: $("#composer"), compose, targets: [$("#term"), compose],
+      button: $("#attach"), input: $("#attachfile"), composer: $("#composer"), compose,
+      targets: [$("#term"), compose, ...($("#composerbar") ? [$("#composerbar")] : [])],
       fail: banner, cancel: $("#attachcancel"),
+      unfold: cbar ? cbar.open : null, mirror: cbar ? { button: $("#cbattach"), cancel: $("#cbcancel") } : null,
       upload: (f, ctl) => AO.uploadPieces(f, {
         name: AO.attachName(f, new Date()), piece: Number($("#attach").dataset.piece) || 2 * 1024 * 1024,
         progress: ctl.progress, cancelled: ctl.cancelled,
@@ -3663,6 +3747,10 @@
       const mm = $("#fmodemenu"); if (mm) mm.hidden = !!v.unattended;
       const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
       const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", !!v.unattended);
+      // the bar goes with the composer on an unattended session, and says why nothing can be sent (TD-500)
+      const cb = $("#composerbar");
+      if (cb) { const was = cb.classList.contains("hidden"); cb.classList.toggle("hidden", !!v.unattended); if (was !== !!v.unattended) fill(); }
+      if (cbar) cbar.redraw();
       const tp = $("#tpaste");
       if (tp) tp.title = "paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click)" + (v.unattended ? " — not while you are watching: Take over first" : "");
       // §4.8a (TD-077 a2): the **suspended** mark rides the pushed delta like the state does. It
@@ -4021,6 +4109,8 @@
     { keys: ["?"], page: "all", control: "this list (? or Esc closes it)", help: true },
     // the side panel put away and brought back (§4.5 *The panel put away*, TD-412): whichever is drawn
     { keys: ["s"], page: "focus", control: "put the side panel away / bring it back", sel: ".side:not(.rail) #sideaway, .side.rail #sideback" },
+    // the composer's bar (§4.5a *Focus composer* **the bar**, TD-500): opens it, where a bar is drawn
+    { keys: ["c"], page: "focus", control: "open the composer", sel: "#composerbar:not(.hidden) #cbtext" },
     { keys: ["j", "ArrowDown"], page: "org", control: "ring the next card", move: 1 },
     { keys: ["k", "ArrowUp"], page: "org", control: "ring the previous card", move: -1 },
     { keys: ["g"], page: "org", control: "then a team's initial, or a group's number 1–9: jump to that team", g: true },
@@ -4316,7 +4406,9 @@
         const terminal = { size: f.elements.size.value ? Number(f.elements.size.value) : null, face: f.elements.face.value.trim() || null, copy_on_select: f.elements.copy_on_select.checked };
         // **attachment bound** (TD-478): an empty field clears `person.attach.max`, back to its default
         const attach = { max: f.elements.attach_max ? f.elements.attach_max.value.trim() || null : null };
-        return ["you", { open_in, terminal, attach, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
+        // **composer** (§4.5a *Focus composer* **the bar**, TD-500): folded or open, read on the next Focus load
+        const composer = f.elements.composer ? f.elements.composer.value : undefined;
+        return ["you", { open_in, terminal, attach, composer, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
       // **Telegram** (§4.5a **You**, §4.10; TD-319): the three fields whole, an empty one cleared by the route
       notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],

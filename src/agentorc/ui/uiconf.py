@@ -122,6 +122,12 @@ def copy_on_select() -> bool:
     return got if isinstance(got, bool) else True
 
 
+def composer() -> str:
+    """The person's `composer` as last read (design §4.5a *Focus composer* **the bar**, §5 `person:`,
+    TD-500): `folded`, the bar under the terminal, unless they picked `open`."""
+    return "open" if _read["person"].get("composer") == "open" else "folded"
+
+
 def terminal() -> dict[str, Any]:
     """The person's terminal face and size as last read (design goal 12, §5 `person.terminal`, the
     Settings page; TD-148): `{size, face}`, each None where they set none — the pane's own default

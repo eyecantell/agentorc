@@ -322,7 +322,8 @@ BOARD_SHOW_DAYS = (1, 365)  # `<n>d`, what falls due within n days
 ATTACH_KEYS = ("max",)
 ATTACH_MAX_DEFAULT = "256M"  # §4.4 *Attachment drop*: the most a Focus attachment may be when nothing is set
 ATTACH_MAX = (1 << 20, 4 << 30)  # `1M` to `4G`: the bound is for the disk the sweep frees, not for the tool
-PERSON_KEYS = ("open_in", "terminal", "inbox", "attach")
+COMPOSER = ("folded", "open")  # §4.5a *Focus composer* **the bar** (TD-491): the first is the default
+PERSON_KEYS = ("open_in", "terminal", "inbox", "attach", "composer")
 
 
 def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
@@ -502,7 +503,7 @@ def parse_open_in(v: Any) -> str | dict[str, str]:
 
 def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
     """`person:` — `open_in`, `terminal: {size, face, copy_on_select}` (§5, goal 12, TD-164),
-    `inbox: {board_show}` (TD-220) and `attach: {max}` (TD-478)."""
+    `inbox: {board_show}` (TD-220), `attach: {max}` (TD-478) and `composer` (TD-500)."""
 
     def terminal(v: Any) -> dict[str, Any]:
         v = _fields(v, TERMINAL_KEYS, "terminal", drop)
@@ -532,7 +533,19 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
         return _each(_fields(v, ATTACH_KEYS, "attach", drop), {"max": parse_attach_max}, drop)
 
     value = _fields(value, PERSON_KEYS, "person", drop)
-    return _each(value, {"open_in": parse_open_in, "terminal": terminal, "inbox": inbox, "attach": attach}, drop)
+    return _each(
+        value,
+        {"open_in": parse_open_in, "terminal": terminal, "inbox": inbox, "attach": attach, "composer": parse_composer},
+        drop,
+    )
+
+
+def parse_composer(v: Any) -> str:
+    """`person.composer` (§5, §4.5a *Focus composer* **the bar**, TD-500): `folded`, Focus's composer one
+    bar under the terminal, or `open`, drawn open under it as before the bar."""
+    if v in COMPOSER:
+        return v
+    raise ValueError(f"composer is {' or '.join(COMPOSER)}, not {v!r}")
 
 
 def parse_attach_max(v: Any) -> str:

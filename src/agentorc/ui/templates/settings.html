@@ -201,6 +201,14 @@
       <label class="setrow"><span class="setlabel">attachment bound</span>
         <input class="input setin" name="attach_max" value="{{ you.attach_max }}" placeholder="{{ you.attach_default }}" autocomplete="off" spellcheck="false">
         <span class="note">the most a Focus attachment may be · <span class="mono">&lt;n&gt;M</span> or <span class="mono">&lt;n&gt;G</span>, 1M to 4G · {{ you.attach_default }} by default</span></label>
+      {#- **composer** (§4.5a *Focus composer* **the bar**, §5 `person.composer`; TD-500): folded to one bar
+          under the terminal, the default, or always open under it as before -#}
+      <label class="setrow"><span class="setlabel">composer</span>
+        <select class="input setin" name="composer">
+          <option value="folded"{% if you.composer == "folded" %} selected{% endif %}>folded</option>
+          <option value="open"{% if you.composer == "open" %} selected{% endif %}>always open</option>
+        </select>
+        <span class="note">Focus's prompt box: one bar under the terminal until you open it, or always open under it · read on the next Focus load</span></label>
       {#- **board items shown** (§4.5a *Settings page*, §4.5 screen 6 *The board's horizon*; TD-220 slice 4):
           a pick of four, the two numbers beside their choice, written to `person.inbox.board_show` -#}
       {% set info_board = "which board items the Inbox shows before they are due; they are listed under \"Not due yet\" and are not counted; what this hides is under \"not shown\"" %}

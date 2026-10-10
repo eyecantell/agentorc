@@ -477,7 +477,7 @@ details.more .menu .menutoggle { display: flex; align-items: center; gap: 6px; p
 .focus .railbtn:hover { background: var(--hover); } .focus #sideback { border-color: transparent; background: transparent; color: var(--muted); }
 .focus .railbtn.g-needs { background: var(--needs-bg); color: var(--needs-fg); border-color: var(--needs); font-weight: 600; }
 /* a popped-out Focus (§4.5 *Pop out*, TD-046): no top bar, so the terminal takes the room it left */
-body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(100vh - 150px); }
+body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .termwrap.cfold .termbox { height: calc(100vh - 150px); }
 /* design §4.5a **Focus header** (TD-085). The row had no wrap, and 2026-09-19 and -20 put three
    more things in it — the tool's title, the **out of work** chip and the **doing** line, beside
    the path, the state, the mode toggle, the stop badge, team, role, grants, controllers and, on a
@@ -515,6 +515,17 @@ details.side > summary .h2::before { content: "▾ "; color: var(--muted); font-
 details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
 .composer { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+/* §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): folded, the composer is one bar under the
+   terminal and opens as an overlay over the terminal's foot — the terminal's width, never past its top,
+   never resizing it — and the terminal is filled to the bar by `AO.termFill` (`--termh`), 360px its floor */
+.termwrap { position: relative; } .termwrap.cfold .termbox { height: var(--termh, 60vh); }
+/* open, it takes the bar's place (`--cbarh`, the bar and the gap above it) and grows up over the terminal's foot */
+.composer.overlay { position: absolute; left: 0; right: 0; bottom: calc(-1 * var(--cbarh, 0px)); max-height: calc(100% + var(--cbarh, 0px)); overflow: auto; z-index: 5; box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
+.composerbar.under { visibility: hidden; }
+.composer.overlay.folded { display: none; } .composer.overlay textarea { height: auto; }
+.composerbar { padding: 6px 10px; align-items: center; }
+.composerbar .cbtext { min-width: 0; text-align: left; padding: 6px 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-body); cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composerbar .cbtext:hover { color: var(--fg); } .composerbar .cbtext.draft { color: var(--fg); } .composerbar .cbtext.off { cursor: default; }
 .composer textarea { width: 100%; height: 72px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); line-height: var(--lh); font-family: inherit; resize: vertical; }
 .termro { margin: 0 0 4px; }
 .inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
@@ -527,6 +538,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   /* the Focus composer's prompt chips (§4.5a, TD-170): one wrapping row above the text box */
   .composer { display: flex; flex-direction: column; gap: 6px; } .composer > .row { display: contents; }
   .composer .promptchips { order: -1; } .composer .promptchips .chip { min-height: 44px; }
+  /* the narrow mode keeps its composer open under the terminal, at the terminal's own height (TD-500) */
+  .composerbar, .cfoldhint { display: none !important; } .termwrap.cfold .termbox { height: 50vh; }
+  .composer.overlay, .composer.overlay.folded { position: static; display: flex; box-shadow: none; max-height: none; }
   .railchips { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
   .railchips .filterschip { position: sticky; left: 0; z-index: 1; background: var(--card); }
   .railchips .chipteams { display: flex; gap: 6px; }

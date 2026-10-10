@@ -8846,3 +8846,37 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Fix:** a design round: a §4.5a row for the note and §4.5 row 5's words, then a build entry.
 
 **Related:** TD-467 (the CLI half), TD-459 (the design), TD-217 (rule 7's restart), TD-103 (*restarts exhausted*).
+
+## TD-491: The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, Paul's review of the Focus composer; shape 2 and 3 of the mockups chosen over the side panel)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Resolved:** 2026-10-10 (PR #1455) — archived with its build TD-500: the bar is §4.5a *Focus composer* **the bar** as designed in PR #1394, built and its shapes drawn again from the built page (`docs/mockups/reviews/2026-10-10-td500-composer-*.png`). Was: Designed 2026-10-09 (the designer, PR #1394): §4.5a *Focus composer* **the bar** — folded by default to *✎ Compose a prompt… · Attach · Send* with the terminal taking the height down to it (no bar on an unattended Focus; the terminal takes that too); opened over the terminal's foot by a click, `c`, a paste or a drop, never by a resize; Send and `Esc` fold it, the draft kept and named on the bar; `person.composer: folded | open` on the You card (§5); the narrow mode unchanged; §4.5 screen 2 and *Keyboard focus*; the keys row; the mockup's composer redrawn as the bar, shot `docs/mockups/reviews/2026-10-09-td491-focus-composer-bar.png`, beside Paul's chosen shots of 2026-10-09. The build is TD-500, and this entry archives with it.
+**Location:** `src/agentorc/ui/templates/focus.html` (`#composer`), `static/app.css` (`.termbox` 60vh, `.composer`), `static/app.js` (composer, `fit`); design §4.5 (Focus anatomy), §4.5a (*Focus composer* rows); mockups `docs/mockups/reviews/2026-10-09-focus-composer-{current,collapsed,collapsed-open,sidebar,sidebar-folded}.png`, their source `docs/mockups/reviews/focus-composer-src/`
+
+**Why:** the composer is useful (Attach, Send's confirmation, Steer, the prompt chips, typing while the terminal reconnects, the phone layout), but it holds about 130px under a terminal fixed at 60vh even when unused. The side panel was weighed and not taken: it is about 300px wide, the hint wraps to seven lines, and with Inbox open it is off the screen.
+
+**Fix:** design first, starting from the chosen mockups: the composer folds to one bar (*✎ Compose a prompt… · Attach · Send*) and the terminal takes the height down to it. A click on the bar, `c`, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal (a resize makes Claude Code repaint, one of TD-474's causes). It folds again on Send, or on Esc when empty, and a draft survives a fold. A Settings → You choice decides whether it starts folded or always open. The terminal also takes the height an unattended Focus leaves empty under it today. This is the anchor of a wider Focus-screen round: other changes Paul names join this entry before its design. **Done when** the design says the fold, the overlay and the setting, the build lands, and the shapes are drawn again from the built page.
+
+**Related:** TD-472 (paste on the terminal), TD-474 (the struggling-terminal mark, which takes the header room), TD-003 (the phone).
+
+## TD-500: Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-491's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Resolved:** 2026-10-10 (PR #1455) — `person.composer` (`folded` | `open`, `settings.parse_composer`) on the Settings page's You card; Focus draws `#composerbar` under the terminal and `#composer` as the overlay over its foot, in the bar's place (`.composer.overlay`, `--cbarh`), opened by the bar's text, `c`, a paste on the bar or a file dropped on it or the terminal, folded by Esc and Send with the draft on the bar (`AO.wireComposerBar`, `AO.barText`); the terminal filled to the bar (`AO.termFill`, `--termh`). On a scratch home `#term` read 691px folded, open and folded again; the shots are `docs/mockups/reviews/2026-10-10-td500-composer-*.png`. Tests: `tests/test_ui_composer_bar.py`, `tests/test_ui_settings.py`.
+**Location:** design §4.5a *Focus composer* **the bar**, the **keys** row, the **You** row; §4.5 screen 2 and *Keyboard focus*; §5 `person.composer`; `src/agentorc/ui/templates/focus.html` (`#composer` ~L148; the bar beside it), `static/app.css` (`.termbox` 60vh ~L514, `.composer` ~L515, the popped and narrow rules ~L478, ~L526), `static/app.js` (~L3329 the composer's keys, ~L3334 the draft, ~L3357 `wireAttach`'s targets, ~L3380 the disabled reasons; `fit` of the terminal), `src/sessionorc/settings.py` (`person.composer`, bounded to `folded` | `open`), the Settings page's You card, `src/agentorc/ui/static/app.js`'s key table (`c`); mockups `docs/mockups/reviews/2026-10-09-focus-composer-*.png`
+
+**Why:** TD-491: the composer holds about 130px under a terminal fixed at 60vh even when unused; Paul picked the folded bar over a side panel.
+
+**Fix:** as §4.5a says. (1) `focus.html`: a `#composerbar` under the terminal (the text, Attach, Send/Steer), drawn when the composer is folded; `#composer` becomes the overlay (`position: absolute` over `.termbox`'s foot, the terminal's width, a six-line textarea, the hint, the chips) when open; neither on an `unattended` session. (2) `app.css`: `.termbox` fills from the header's bottom to the bar (or the page's foot) with the 360px floor; the popped and narrow rules keep their own heights; the narrow mode keeps the open composer under the terminal. (3) `app.js`: open on the bar's click, `c` (the key table), a paste or a drop whose target was the terminal or the bar (`wireAttach`'s targets gain the bar); fold on Send and on `Esc`, the draft kept in `localStorage` as today and the bar reading *✎ draft · <first words>* while one exists; the terminal is never `fit` on open or fold; the disabled reasons move to the bar's text while folded. (4) `person.composer` in `settings.py` (`folded` | `open`, refused otherwise) and the You card's pick; `open` draws the composer under the terminal as before. (5) The shots re-taken from the built page on a scratch home (`scripts/look_home.py`), folded, open with a draft, and unattended, as `docs/mockups/reviews/<date>-td499-*.png`, and the look sent to Paul (§4.9b). **Done when** a rendered Focus has the bar and no composer on an interactive session, neither on an unattended one, the overlay on a click with the terminal's size unchanged before and after (a test over the DOM's heights), `Esc` folding with the draft named on the bar, `person.composer: open` drawing the old shape, `person.composer: sideways` refused in words, and the three shots are in the PR.
+
+**Related:** TD-491 (the design), TD-472 / TD-479 (paste on the terminal), TD-474 / TD-480 (the terminal mark), TD-003 (the phone), TD-161 / TD-170 (the prompt chips).

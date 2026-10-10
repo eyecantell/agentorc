@@ -654,7 +654,8 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
     assert rec.get("pause_prompt"), "the gate's texts ride the toggle (TD-100)"
     page = client.get(f"/focus/{sid}").text
     assert 'id="fmodeact"' in page and ">Take over</button>" in page and 'data-unattended="1"' in page
-    assert re.search(r'class="card composer hidden" id="composer"', page)  # the composer types: closed
+    assert re.search(r'class="card composer[^"]* hidden" id="composer"', page)  # the composer types: closed
+    assert re.search(r'class="card composerbar[^"]* hidden" id="composerbar"', page)  # and its bar (TD-500)
     with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
         assert json.loads(ws.receive_text()) == {"read_only": True}
         ws.send_text("echo TYPED-$((40+2))\r")
