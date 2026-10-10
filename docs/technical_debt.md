@@ -42,7 +42,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
-| TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448; the look sent to Paul (m-37f220f9e955) |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
@@ -615,23 +614,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first: a paste on the terminal that carries a file and no text takes the composer's road — `attach`, named `paste-<date>-<time>.<ext>` — and the returned path goes into the terminal as a bracketed paste, so it lands in the tool's own input (not sent; Enter stays the person's). Inert where Paste already is (a read-only Focus); a paste that carries text stays the text's; the same bounds as the composer (desktop, a session on this host, `ATTACH_BYTES_MAX`); a refusal toasts, never silence. **Done when** §4.5a's two rows say it, the build lands, and a screenshot pasted on the terminal of an interactive Claude Code session puts its path in the prompt.
 
 **Related:** TD-002 (the attach), TD-096 (read-only Focus), TD-469 (the attachment's life).
-
-## TD-474: The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (ao-paul, Paul: the terminal sometimes freezes or gets jittery — is it the connection, and should the page say so?)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer) — §4.6 *Reconnect contract* says the terminal mark: *reconnecting…* after the banner's three-second grace, *resized by another client* from the bridge's `{clients, window}` frame (tmux's `#{session_attached}` and window size, read every five seconds; *Attach behaviour with another client present*), *no output for Ns* on a `working` session after thirty seconds, one at a time, each event logged to the browser console; §4.5's identity line and §4.5a's **terminal mark** row say where it is drawn and what the hovers say. Built by TD-480. Was: Open.
-**Blocked by:** TD-480
-**Location:** design §4.6 *Reconnect contract* and *Attach behaviour with another client present*, §4.5 *Browser mechanics* (the host agent's down banner, TD-372); `src/agentorc/ui/static/app.js` (the terminal socket's reconnect, ~L3263: the only sign today is a grey `[agentorc] terminal … — retrying in Ns` line written into the terminal)
-
-**Why:** a frozen or jittery Focus terminal has three likely causes the person cannot tell apart: (1) another client on the same tmux session — tmux's `window-size latest` makes a second tab or a VS Code attach resize the pane each time either is used, and Claude Code repaints in full (§4.6 accepts this and names `window-size manual` as the fallback); (2) the terminal socket dropped and is reconnecting with backoff — a node's session crosses one more hop than a local one; (3) the socket is open and no pane output arrives. The Org's down banner covers the host agent's event socket only; the terminal's own socket has no mark on the page, and (3) has none anywhere.
-
-**Fix:** design first: a quiet mark in the Focus header beside the state pill, drawn after a grace as TD-372's banner is (no flicker on a navigation or a promote's restart): *reconnecting…* while the terminal socket is down, *no output for Ns* while it is open, the session reads `working` and no byte has come — never on an idle session, where silence is the normal case — and *resized by another client* when the pane's size changes under a Focus that did not ask for it (the count of attached clients is tmux's `#{session_attached}`). Hover says what each means and what to do. Record each kind of event with its time in the browser's console, so the next freeze names its cause. **Done when** the design says the marks and their graces, the build lands, and each of the three is drawn on a scratch home by forcing it (kill the socket, a silent `working` pane, a second `tmux attach` resizing).
-
-**Related:** TD-372 (the down banner's grace), TD-029 (the reconnect contract), TD-022 (scrollback through tmux).
 
 ## TD-479: Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal
 
