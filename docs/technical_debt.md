@@ -38,11 +38,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
 | TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
-| TD-458 | A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour | Low | Designed 2026-10-09 — TD-470 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
-| TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
@@ -547,26 +545,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Fix:** design, in §6, (1) **restart the one member**: when a finished member's lane gains work while its team runs on, the tick replays that member's record (rule 8's replay, `why: work`, under the team's `on_work` — `start` replays it, `ask` asks with a row naming the member, `off` does nothing), so the member that owns the lane comes back alone and is told what arrived; the sentence quoted above goes; weigh it against *a restart is not a start* (§6 — a replay under the person's standing word, as rule 8's is); (2) **seats do not hold a wind-down**: whether rule 8's *wound down* should read over members only, a live seat not counting — or whether (1) makes that unnecessary; (3) the `on_work: start` default in §5, its Settings picker's *(default)* label (`settings.html`), and the code defaults (`agent_tick.py`, `agent_notify.py`, `settings.py`'s `ON_WORK`, `ui/settings_page.py`); (4) the race: whether the finished pass should first read the lane against `origin/main` (or wait a settle after the checkout's pull) before closing a member as finished. Then a build entry. **Done when** the design says what happens to a finished member's lane gaining work while a seat runs, and the build entry is open.
 
-## TD-458: A metered profile gets Claude Code's five-minute prompt cache: pin the main conversation's lifetime to one hour
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1341): §4.2a *A metered profile's prompt cache lives an hour* — the claude-code adapter's launch of a session on a `metered` profile carries `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` beside `CLAUDE_CONFIG_DIR`, the subagent key left to the tool, a subscription's launch setting nothing; the one way off is the key in the host agent's own environment, whose value the adapter passes into every launch for either billing (`new-session -e`), no `profiles.yml` field; the doorbell's `CACHE_LIFETIME` is the same hour for both billings because of it. The build is TD-470. Was: Open — decided by Paul 2026-10-08 (option 2 of the ADR); the design line in §4.2a first, then its build.
-**Blocked by:** TD-470
-**Location:** design §4.2a (`billing: metered`, the profile's layer); `src/agentorc/profiles.py`; the claude-code adapter's launch environment
-
-**Why:**
-- Claude Code gives a subscription's main conversation the one-hour cache lifetime, but on an API key, a cloud provider or usage credits every request gets five minutes ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
-- On 2026-10-01–08, 813 requests (4%) came 5–60 minutes after the one before. Each was a cache hit. At five minutes each would have written its whole context again, about 60% more than the week cost in total.
-- A metered profile (TD-151, built) is exactly the one that would lose this. No team runs on one yet, so the cost is still to come.
-
-**Fix:** design §4.2a: a profile whose `billing` is `metered` launches its claude-code sessions with `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` (the subagents' `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL` left at its default), unless the profile's own environment sets one. Say whether the person can turn it off and where. Then build it in the adapter's launch environment, with a test that a metered profile's launch carries the key and a subscription's does not. **Done when** a metered profile's session starts with the one-hour lifetime and §4.2a says so.
-
-**Related:** TD-378 (archived; the research), TD-151 (metered profiles), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
-
 ## TD-460: Read back the one-week trial of a 200k context bound on ao-grind's grinders
 
 **Priority:** Medium
@@ -623,22 +601,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §6 rule 8 says, in slices: (1) the reading — `_work_mark` also watches a crew member that is `closed` or `exited` with `out_of_work` while its team is not wound down (not one a person killed or closed; not one sat out), its `lane_seen` kept as rule 6 keeps it, the same mark and settle, `members` naming it; the mark removed when every named member is live again, when no id is new, or under `off`; (2) the start — `_work_start` reads at the start whether the team is wound down: whole as today, else only the named members, each replayed alone with `why: work`, its `ids`, `start`, `of` = the members replayed, under the five bounds (usage read for the member's profile, one such start counting in `work_started`), a named member at its ceiling, suspended, sat out or without a launch record left and a mark naming only such members held as `nothing`; (3) `work_start {team}`, a person's own RPC in `HOME_EDITS`, the same replay under the same bounds, refused in the row's words when one holds; the row (`inbox.py`) reads *`<team>` · `<member>` finished <t> · its lane gained …* for a running team and its **Start** calls `work_start` instead of the team's start; (4) the default: `start` when absent in `agent_tick.py`, `agent_notify.py`, `settings_page.py`, `ON_WORK`'s comment, the picker's *(default)* on *start the team*; (5) the help text: §4.5a's **when work appears** paragraph loses *It does nothing while the team is live* and says a finished member of a running team is started alone, and **Start** (Inbox row: team start) says it starts the named members when the team is running — word for word in `help.py` and §4.5a's list together (`tests/test_help.py`); (6) tests: a finished member closed while a seat runs, the mark, the one-member replay under `start`, the row under `ask`, `work_start` refused by a bound, the default with no key. **Done when** a crew member closed after declaring, its team running on, is replayed alone within `WORK_SETTLE` of its lane gaining an entry under `on_work: start` (and the default), the row names it under `ask` and its Start replays it, and the help text and tests agree.
 
 **Related:** TD-457 (the design), TD-214 / TD-227 (rule 8), TD-240 / TD-241 (rule 9), TD-407 (no hold for an untold entry), TD-271 (a question's end is work: unchanged).
-
-## TD-470: Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-458's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.2a *A metered profile's prompt cache lives an hour*; `src/agentorc/adapters/claude_code/__init__.py` (`launch`, the `env` dict beside `CLAUDE_CONFIG_DIR`, ~L504–L510), `src/agentorc/profiles.py` (`Profile.metered`)
-
-**Why:** TD-458: on an API key Claude Code caches for five minutes, and 4% of a week's requests fell in the 5–60-minute gap that an hour's cache turns from a re-write into a hit; no team runs metered yet, so the cost is still to come.
-
-**Fix:** in `launch`: when `CLAUDE_CODE_PROMPT_CACHE_TTL` is in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"]` is that value for either billing (the tmux session does not inherit the host agent's environment: `new-session -e` carries each key, `tmux.py` L133); else when `prof.metered`, `"1h"`; else nothing; nothing for the subagent key. Tests: a metered profile's launch carries `1h`, a subscription's carries nothing, either with the key in the environment (monkeypatched) carries that value. **Done when** a metered profile's session starts with the key and the tests pass.
-
-**Related:** TD-458 (the design), TD-151 (metered profiles), TD-459 / TD-467 (the doorbell's `CACHE_LIFETIME`), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
 
 ## TD-472: An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road
 
