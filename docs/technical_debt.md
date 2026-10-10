@@ -77,6 +77,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-495 | Build the tmux server's system unit (TD-488): `agentorc-tmux.service` under `Delegate=yes`, `ao service install --system`, the pane cgroup the host agent makes, §4.8a's clause for it, the doctor's and `service status`' line, the person's one-time install | High | Open |
 | TD-496 | Build the process rule and the kill guard (TD-489): the line in `ao --skill` and every template brief, the claude-code adapter's `PreToolUse` deny by shape with its reason | High | Open |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Open |
+| TD-499 | PR #1379's wiring test leaves two `view(..., waits=…)` call sites of `app.py` unpinned: the Org page's cards and `/api/sessions` read *idle* where the group head reads *waiting* | Medium | Open |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | Open |
 
 ---
@@ -1238,3 +1239,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** as §4.2, §4.5 and §4.5a say. (1) `Confidence` gains `tick`; every `set_state` the tick, a kill, a close or a link makes passes it; `cards.py`'s `scraped` is `confidence == "scraped"`; `cli.py`'s `~` likewise. (2) `ended: {how, at, code?, reason?, by?, found?, down_since?}` on the record: the hook's `SessionEnd` (`how: tool`, the payload's `reason`, `code` when the payload carries one), the dead pane (`how: pane`, `code: dead_status`), the gone pane (`how: gone`, `found: now`, and `down_since` when this is the agent's first tick after its start and `host.json`'s `last_tick` is older than `CREATE_GRACE`), `rpc_kill` (`how: kill`, `by` as `closer_of` derives it from the caller); `last_tick` written to `host.json` on each tick. (3) `ending.exit_words(s, names)` in §4.5's words, *· after wrap-up* when `wrapup_at` precedes `ended.at`; `cards.py` draws it into the slot's ending and into the pill's `title` with the time; the card's and the Inbox row's `title` follow §4.5a's order; the Focus end overlay's first line is the same words; `ao status -v` prints the line beside the closer's. **Done when** fixtures pin each `ended` shape's words, the hover for each state in §4.5a's order, a gone pane on the first tick after a start carrying `down_since` from a `host.json` fixture, a kill by a person and by a session, `~` absent on a `tick` state, and a rendered card, Inbox row and Focus header for an exited record of each cause on a scratch home.
 
 **Related:** TD-490 (the design), TD-488 (the outage), TD-485 / TD-487 (the restarted chip), TD-265 (the closer), TD-023 (`pane` after a kill).
+
+## TD-499: PR #1379's wiring test leaves two `view(..., waits=…)` call sites of `app.py` unpinned: the Org page's cards and `/api/sessions`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs: PR #1379)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (the `org` handler's `vs = sorted((view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) ...` and `api_sessions`' `[view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]`); `tests/test_ui_waiting_wiring.py`
+
+**Why:** TD-481's docstring says *every surface that builds its own views must hand `view` the repo reading and the person-inbox waits … or that surface reads idle while the Org card reads waiting*, and PR #1379 pins three surfaces (`heads`, `person_states`, the Repo page). Two more call sites pass `waits=waits` and nothing pins them. Probes on `origin/main` (`tests/test_ui_waiting_wiring.py tests/test_ui_org.py` at 51 passed; the 801 tests matching `-k "ui or app or card or inbox or repo or api"`): deleting `, waits=waits` from the `org` handler's `view(...)` call, then from `api_sessions`' (one at a time), each left 801 passed. The same probe on `heads`' call (`app.py` 838) and the Repo page's (1198) each fails one test of the module, as that PR says. So the Org page itself, the surface the docstring names as the reference, and the JSON the page's script reads, could go back to *idle* for a session that waits on the person's ask and no test would notice.
+
+**Fix:** Extend `tests/test_ui_waiting_wiring.py`'s stub: `GET /` (the Org page) renders g3's card with `pill s-waiting` and not `s-idle`, and `GET /api/sessions` returns `pill_word == "waiting"` for g1 and g3. Re-run the two deletions and see each fail.
+
+**Related:** PR #1379, TD-481, TD-428, TD-274.
