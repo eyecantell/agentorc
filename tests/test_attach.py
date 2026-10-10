@@ -659,3 +659,49 @@ def test_the_terminals_paste_reads_nothing_on_a_read_only_focus():
     assert ro < body.index("AO.clipPaste(navigator.clipboard") and "readText" not in body
     assert "attachFiles([f], (path) => { if (live()) term.paste(path); })" in body
     assert "attachFiles = AO.wireAttach({" in js
+
+
+KEY_PROBE = (
+    PRELUDE
+    + """
+const press = (o) => {
+  const e = Object.assign({ type: "keydown", key: "v", ctrlKey: false, shiftKey: false, altKey: false,
+    cancelled: false, preventDefault() { this.cancelled = true; } }, o);
+  let pasted = 0;
+  const took = AO.pasteKey(e, () => { pasted += 1; });
+  return { took, pasted, cancelled: e.cancelled };
+};
+console.log(JSON.stringify({
+  ctrl_v: press({ ctrlKey: true }),
+  ctrl_V: press({ ctrlKey: true, key: "V" }),
+  ctrl_shift_v: press({ ctrlKey: true, shiftKey: true, key: "V" }),
+  shift_insert: press({ shiftKey: true, key: "Insert" }),
+  keyup: press({ type: "keyup", ctrlKey: true }),
+  keypress: press({ type: "keypress", ctrlKey: true }),
+  ctrl_alt_v: press({ ctrlKey: true, altKey: true }),
+  plain_v: press({}),
+  ctrl_c: press({ ctrlKey: true, key: "c" }),
+  insert: press({ key: "Insert" }),
+}));
+"""
+)
+
+
+@pytest.mark.unit
+def test_one_paste_key_pastes_once(tmp_path):
+    """§4.5a *Copy / Paste* (TD-520), under node: Ctrl+V, Ctrl+Shift+V and Shift+Insert on the terminal
+    call the paste road once and cancel the keydown, so the browser raises no `paste` event of its own
+    on xterm's textarea — which xterm.js pastes itself, and the text went in twice. Every other key,
+    and the key's later events, are left to xterm.js and the browser."""
+    got = _node(tmp_path, KEY_PROBE)
+    once = {"took": True, "pasted": 1, "cancelled": True}
+    left = {"took": False, "pasted": 0, "cancelled": False}
+    for chord in ("ctrl_v", "ctrl_V", "ctrl_shift_v", "shift_insert"):
+        assert got[chord] == once, chord
+    for other in ("keyup", "keypress", "ctrl_alt_v", "plain_v", "ctrl_c", "insert"):
+        assert got[other] == left, other
+    js = (UI / "static" / "app.js").read_text()
+    handler = js[js.index("term.attachCustomKeyEventHandler((e) => {") :]
+    handler = handler[: handler.index("\n    });\n")]
+    assert "if (AO.pasteKey(e, pasteClip)) return false;" in handler
+    assert handler.count("pasteClip") == 1  # the one road: no chord calls it beside AO.pasteKey
