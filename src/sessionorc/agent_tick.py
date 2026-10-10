@@ -132,6 +132,7 @@ class TickMixin:
         await self._id_recheck_detached()
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
+        self._note_tick(snapshot_at)
         self._note_attention(snapshot_at)
         try:
             self._notify_pass(snapshot_at)
@@ -289,13 +290,13 @@ class TickMixin:
                     # §4.2). Nobody is coming to answer it either — that is what unattended means —
                     # so it is stopped now rather than asked something it cannot hear.
                     log.info("%s reached its run_until on a pending %s; stopping it", s.id, s.pending.kind)
-                    await self.rpc_kill(s.id)
+                    await self.rpc_kill(s.id, killer={"by": "tick", "why": "stop time"})
                     continue
                 if not s.wrapup_prompt:
                     # Nothing to say, so say nothing and stop it: a stop time with no wrap-up text is
                     # still a stop time, and silently running past it is the failure this fixes.
                     log.info("%s reached its run_until with no wrap-up prompt; stopping it", s.id)
-                    await self.rpc_kill(s.id)
+                    await self.rpc_kill(s.id, killer={"by": "tick", "why": "stop time"})
                     continue
                 log.info("%s reached its run_until (%s); asking it to wrap up", s.id, s.run_until)
                 try:
@@ -309,7 +310,7 @@ class TickMixin:
             settled = s.state in SETTLED
             if settled or now - _parse(s.wrapup_sent_at) >= agent_common.WRAPUP_GRACE:
                 log.info("%s stopped after its wrap-up (%s)", s.id, "settled" if settled else "grace ran out")
-                await self.rpc_kill(s.id)
+                await self.rpc_kill(s.id, killer={"by": "tick", "why": "stop time"})
 
     async def _enforce_usage_gate(self, now: datetime) -> None:
         """Pause the unattended sessions of a profile whose usage crossed a line, and resume them
@@ -3452,7 +3453,9 @@ class TickMixin:
             if pane is None:
                 # A session created after the pane snapshot was taken is not judged by it.
                 if _parse(s.created) + agent_common.CREATE_GRACE < snapshot_at and (s.state != "exited" or s.pane):
-                    s.set_state("exited", confidence="scraped")
+                    if s.state != "exited" or s.ended is None:
+                        s.ended = self._gone_ending(now)
+                    s.set_state("exited", confidence="tick")
                     s.pane = False  # gone for good: killed, or the tmux server restarted (TD-023)
                     self.store.save(s)
                 continue
@@ -3472,6 +3475,29 @@ class TickMixin:
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
                 self._observe(s, pane, tails.get(name, []), now)
+
+    def _gone_ending(self, now: datetime) -> dict[str, Any]:
+        """The record's `ended` for a tmux session the tick found gone (§4.2, §4.5 row 5 (b), TD-490):
+        when it was found, and — on the agent's first tick after a start, the previous run's last
+        tick in `host.json` older than the create grace — since when nobody was looking."""
+        found = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        ended: dict[str, Any] = {"how": "gone", "at": found, "found": found}
+        prev = self._prev_last_tick
+        if not self._ticked and isinstance(prev, str):
+            with contextlib.suppress(ValueError):
+                if now - _parse(prev) > agent_common.CREATE_GRACE:
+                    ended["down_since"] = prev
+        return ended
+
+    def _note_tick(self, at: datetime) -> None:
+        """`last_tick` in `host.json`, written each tick: the next run's measure of how long nobody
+        was looking (§4.5 row 5 (b), TD-490). A failed write is a weaker ending, never a failed tick."""
+        self._ticked = True
+        self._host_rec["last_tick"] = at.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.warning("could not write last_tick to %s", self.host_store.path)
 
     def _is_removed_pane(self, name: str, pane: PaneInfo) -> bool:
         """Is this the pane a recent `remove` killed (as a stale snapshot would still list it)? A
@@ -3497,8 +3523,13 @@ class TickMixin:
                 s.last_output = mtime.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         if pane.dead:
             s.exit_code = pane.dead_status
+            if s.state != "exited" or s.ended is None:
+                # the tool's own end, when its hook landed first, keeps its words (§4.2, TD-490)
+                s.ended = {"how": "pane", "at": now_iso(), "code": pane.dead_status}
+            elif s.ended.get("how") == "pane" and s.ended.get("code") is None:
+                s.ended["code"] = pane.dead_status  # tmux's status lags its dead flag
             if s.state != "exited":
-                s.set_state("exited", confidence="scraped")
+                s.set_state("exited", confidence="tick")
         elif adapter.state_source == "scraped":
             st = adapter.classify(pane, tail)
             if st and st != s.state:
@@ -3521,7 +3552,7 @@ class TickMixin:
         elif s.state == "working" and s.last_output and now - _parse(s.last_output) > STALL_AFTER:
             # Hook-fed adapters: the liveness cross-check applies to `working` alone — a
             # `needs-you` or `idle` session is silent by design.
-            s.set_state("stalled?", confidence="scraped")
+            s.set_state("stalled?", confidence="tick")
         self.store.save(s)
 
     def _hook_fresh(self, sid: str, now: datetime) -> bool:
@@ -3605,6 +3636,13 @@ class TickMixin:
                     # An event that is not a turn's start woke a session its Stop left idle: the
                     # capture TD-201 asks for, since the one that did it once is not yet named.
                     log.info("%s: %s turned a hook-confirmed idle session working", sid, event["event"])
+                if state == "exited" and s.state != "exited":
+                    # the tool's own end (§4.2 the `SessionEnd` row, TD-490): its `reason`, and its
+                    # code when the event carries one
+                    s.ended = {"how": "tool", "at": now_iso()}
+                    for k in ("reason", "code"):
+                        if event.get(k) not in (None, ""):
+                            s.ended[k] = event[k]
                 s.set_state(state, confidence="hook", pending=pending)
                 self._hook_state.pop(sid, None)  # a hook's word: no screen's verdict to go back from
         self.store.save(s)

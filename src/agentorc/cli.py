@@ -231,7 +231,7 @@ def _node_status_line() -> str:
 def status_line(s: dict[str, Any], w: int = 0) -> str:
     """A record's one line as `ao status` prints it: id, state (`~` when scraped), age, adapter, mode
     and what is pending. `ao restart` prints the new record with it (design §4.7)."""
-    conf = "" if s["confidence"] == "hook" else " ~"
+    conf = " ~" if s["confidence"] == "scraped" else ""  # a guess alone; a `tick` state is observed (TD-490)
     pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
     mode = " [unattended]" if s.get("unattended") else ""
     return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
