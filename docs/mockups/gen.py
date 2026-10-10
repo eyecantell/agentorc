@@ -1866,6 +1866,7 @@ def settings_page():
         b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">.agentorc.yml · read per call · by PR — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     you = card("yours everywhere", "",
         '<div class="txt">' + field("editor", "vscode", "the card’s and Focus’s button; none removes it") + '</div>'
+        '<div class="txt">' + field("file link", "☑ opens the folder first", "so the file lands in the worktree’s window", 190) + field("wait", "1", "s before the file, 0–4 · your browser may ask twice until you tell it to always allow this site", 50) + '</div>'
         '<div class="txt">' + field("terminal size", "13", "px", 60) + field("terminal face", "JetBrains Mono", "monospace always the fallback · ligatures off", 160) + field("board items shown", "the next 10 per team ▾", "or: only what is past due · due this week · all — what is due is always shown; the rest is under not shown (TD-207)", 190) + '</div>',
         b("Save", "primary"))
     telegram = card("when you are not looking", "Telegram · TD-092",
