@@ -1326,6 +1326,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "prompts": [] if s.get("unattended") else await asyncio.to_thread(role_prompts, s),
                 # §4.5a *Focus: copy on select* (TD-174): the person's, from `settings.yml`
                 "copy_on_select": uiconf.copy_on_select(),
+                # §4.5a *Focus composer* **the bar** (TD-500): folded to one bar under the terminal, or open
+                "composer": uiconf.composer(),
                 # §4.5a *Focus side panel, Session card* **rounds** line (TD-191): display only
                 "rounds": rounds_lines(s, await _rounds_tail(call, s)),
             },
@@ -2767,9 +2769,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/settings/you")
     async def settings_you(request: Request):
         """§4.5a *Settings page: You* → **Save**: `{open_in?, terminal?: {size?, face?, copy_on_select?},
-        inbox?: {board_show?}, attach?: {max?}}` into `person:` through `set_settings`, which validates each and
-        refuses a session. `open_in` is `vscode`, `none` or `{label, url}` — a template the UI would refuse (§5:
-        its scheme) is refused here in the same words, before it is written; a `null` clears a key."""
+        inbox?: {board_show?}, attach?: {max?}, composer?}` into `person:` through `set_settings`, which validates
+        each and refuses a session. `open_in` is `vscode`, `none` or `{label, url}` — a template the UI would
+        refuse (§5: its scheme) is refused here in the same words, before it is written; a `null` clears a key."""
         body = await body_of(request)
         change: dict[str, Any] = {}
         if "open_in" in body:
@@ -2794,8 +2796,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not isinstance(attach, dict) or not set(attach) <= {"max"}:
                 raise HTTPException(400, "you: attach takes max")
             change["attach"] = attach
+        if "composer" in body:  # **the bar** (§4.5a *Focus composer*, TD-500); `set_settings` refuses a bad value
+            change["composer"] = body["composer"]
         if not change:
-            raise HTTPException(400, "you: send open_in, terminal, inbox or attach")
+            raise HTTPException(400, "you: send open_in, terminal, inbox, attach or composer")
         return answer(await call("set_settings", person=change))
 
     @app.post("/api/settings/notify")

@@ -302,12 +302,21 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         assert client.post("/api/settings/you", json={"attach": {"max": None}}).json()["ok"]
         assert "attach" not in call_sync("settings")["person"]
 
+        # **composer** (§4.5a *Focus composer* **the bar**, TD-500): folded until picked, written, refused in words
+        assert '<option value="folded" selected>folded</option>' in client.get("/settings").text
+        assert client.post("/api/settings/you", json={"composer": "open"}).json()["ok"]
+        assert call_sync("settings")["person"]["composer"] == "open"
+        assert '<option value="open" selected>always open</option>' in client.get("/settings").text
+        bad = client.post("/api/settings/you", json={"composer": "sideways"})
+        assert bad.status_code == 400 and "composer is folded or open, not 'sideways'" in bad.json()["detail"]
+        assert call_sync("settings")["person"]["composer"] == "open"
+
         nope = client.post("/api/settings/teams", json={"team": "nobody", "reserve": "10"})
         assert nope.status_code == 400 and "the org defines" in nope.json()["detail"]
     finally:
         call_sync(
             "set_settings",
-            person={"open_in": None, "terminal": None, "inbox": None, "attach": None},
+            person={"open_in": None, "terminal": None, "inbox": None, "attach": None, "composer": None},
             repos={"agentorc": None},
         )
 

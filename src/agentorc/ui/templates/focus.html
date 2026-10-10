@@ -152,9 +152,15 @@
     {#- §4.5 screen 2 *Focus watches* (TD-096, TD-296 #11): the read-only line sits over the terminal,
         not in it — tmux's attach switches xterm to its alternate buffer, which hid a line written there -#}
     <div class="note termro hidden" id="termro">watching: this session is unattended, so the terminal is read-only — Take over (above) to type.</div>
+    {#- design §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): with `person.composer` folded,
+        the default, the composer is one bar under the terminal and opens **over the terminal's foot** —
+        never by resizing it, so the pane is not made to repaint — and the terminal takes the page's
+        height down to the bar; `open` draws the composer under the terminal as before the bar -#}
+    {%- set folded = composer != 'open' %}
+    <div class="termwrap{% if folded %} cfold{% endif %}" id="termwrap">
     <div id="term" class="termbox"></div>
-    <div class="card composer{% if s.unattended %} hidden{% endif %}" id="composer">
-      <textarea id="compose" placeholder="Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal."></textarea>
+    <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended %} hidden{% endif %}" id="composer">
+      <textarea id="compose"{% if folded %} rows="6"{% endif %} placeholder="Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal."></textarea>
       <div class="row gap">
         {#- design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002):
             the picker, a file dropped on the terminal or the composer, or an image pasted into the
@@ -165,6 +171,7 @@
         <input type="file" id="attachfile" multiple hidden>
         <button type="button" class="btn sm hidden" id="attachcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
         <span class="note" id="composehint"></span>
+        {%- if folded %}<span class="note dim cfoldhint">Esc folds it back · Ctrl+Enter sends</span>{% endif %}
         <span class="grow"></span>
         {#- design §4.5a *Focus composer* **prompt chips** (§4.8, TD-161, built by TD-170): the role's
             `prompts:` in the file's order, beside Send; a press is Send with the chip's text, and
@@ -179,6 +186,18 @@
         <button class="btn primary" id="send">→ Send</button>
       </div>
     </div>
+    </div>
+    {%- if folded %}
+    {#- the bar: the text opens the composer (also `c`, a paste on the bar, a file dropped on it or the
+        terminal); its Attach is the composer's road, which then needs the box; its Send sends the draft.
+        While folded, the reason nothing can be sent is the bar's text, and an upload in flight shows here -#}
+    <div class="card composerbar row gap{% if s.unattended %} hidden{% endif %}" id="composerbar">
+      <button type="button" class="cbtext grow" id="cbtext" title="open the composer (c)">✎ Compose a prompt… (c · or paste / drop a file)</button>
+      <button type="button" class="btn sm" id="cbattach" title="attach files: the composer opens with their paths in it"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
+      <button type="button" class="btn sm hidden" id="cbcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
+      <button type="button" class="btn primary" id="cbsend">→ Send</button>
+    </div>
+    {%- endif %}
   </div>
   {# **The side panel** (design §4.5 *The Focus screen's anatomy*, TD-156): every card a fold,
      remembered per browser as a team's fold is (`data-side` is the key), in reading order — Git,

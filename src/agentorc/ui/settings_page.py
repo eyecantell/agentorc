@@ -466,8 +466,8 @@ def org_cards(defs: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
     """**You**, *yours everywhere* (§4.5 screen 8): `open_in` as the field takes it back and the
-    terminal's size and face, the attachment bound — what `settings.yml` holds, the defaults where it
-    holds nothing."""
+    terminal's size and face, the attachment bound, the composer's pick — what `settings.yml` holds, the
+    defaults where it holds nothing."""
     person = person or {}
     o = person.get("open_in")
     if isinstance(o, dict):
@@ -506,6 +506,8 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
         # **attachment bound** (§4.5 screen 8, §5 `person.attach.max`, TD-478): as written, the default beside it
         "attach_max": str(attach.get("max") or ""),
         "attach_default": settings_mod.ATTACH_MAX_DEFAULT,
+        # **composer** (§4.5a *Focus composer* **the bar**, §5 `person.composer`, TD-500): folded by default
+        "composer": "open" if person.get("composer") == "open" else "folded",
     }
 
 
