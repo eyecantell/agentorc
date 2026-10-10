@@ -908,7 +908,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   limit, no check runs at all — a commit CI has not looked at is not a green one). *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
   restart of the home; the readings are held in memory and re-read at start, and what must survive
-  one — a run in flight, a failure — is in the intent files below. **Three preconditions** stand
+  one — a run in flight, a failure — is in the intent files below. Beside the three, for the page's
+  build chip (§4.5a; TD-539): **`live_at`**, the live commit's committer time, and **`pending`**, the
+  commits of main past live as `{sha, subject}`, newest first, ten at most with the count of the rest —
+  one `git log` in the same pass, empty when live is main's head or cannot be compared. **Three preconditions** stand
   between the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
   `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree
   (the tree is a person's: the policy reads it and never makes it — no checkout, no reset, nothing
