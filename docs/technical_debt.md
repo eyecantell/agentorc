@@ -44,6 +44,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-536 | What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form | Medium | Open |
+| TD-538 | The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead | Medium | Open |
+| TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Open |
 
 ---
 
@@ -641,3 +643,35 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a design round settles a person setting for what a file link sends, in the page's terms. The page is a browser tab: it can hand URLs to the laptop's protocol handlers and run nothing on the laptop. A shell line like Paul's example would run on the host, where an editor CLI opens nothing on the person's screen. So the setting's shape is launches, not commands. Points to settle: (1) a template's own **folder** and **file** URLs (e.g. `{label, url, file}`, `file` defaulting to today's derivation), so an editor whose two forms differ is reachable; (2) whether a file link **sends the folder first** (on by default, as TD-532 built it; off gives TD-526's file-only launch into the last-used window, Paul's fallback if the pair proves fragile); (3) the **wait**, fixed or settable, within the browser's five-second activation window §4.6 names; (4) where it lives (`person.open_in` beside label and url) and how the Settings page shows it; (5) the presets (`vscode`) carry today's values, so nothing changes for a person who sets nothing. Lift §4.6's *one second, fixed, no setting* and §5's lines in the same round. **Done when** the design says it and the build entry it names is ledgered.
 
 **Related:** TD-532 / TD-535 (the two launches, #1483; Paul's look `m-846739e230fc`), TD-524 / TD-526 (the file form's line and window), TD-528 / TD-529 (a folder form drops `{line}`), TD-525 / TD-527 (the Session card's recent files).
+
+## TD-538: The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's question on TD-527)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 item 4 (the **Session** card's *recent files*, `docs/design/4.5-ui.md` ~L425: *the files the session edited in this run … absent until the first edit, and on a tool whose hook reports none*), §4.3 (the adapter contract's neutrality); `src/agentorc/adapters/claude_code/hook.py` (`EDIT_TOOLS` ~L73, `file` on a `PostToolUse`), `src/sessionorc/gitinfo.py` (the record's `git.files`, up to 20 porcelain lines)
+
+**Why:** On 2026-10-10, after TD-527 (#1476) went live, the card showed no recent files for any session: `ao status --json` gave `files: []` for ao-paul and both grinders. ao-paul had changed `docs/technical_debt.md` four times that day, each by a Python script run from Bash, which the hook does not report (only `Edit`, `Write`, `MultiEdit`, `NotebookEdit` do). Paul: *Is this the right design? Seems like it would be more prudent to have git tell us what files have changed and keep a running list as we commit/merge?* The hook list misses every shell edit, a generated file, a `git mv`, a rebase's resolution. It is Claude-Code-shaped too, so another adapter shows nothing (§4.3). Git sees every change, whatever made it, and the host agent already reads `git status` into the record's `git.files` for the **M** mark.
+
+**Fix:** a design round settles the list's source. Recommended to weigh: the files the session's branch has changed, from git. That is the working tree's changes (`git.files`, already read) and the files of the branch's commits since its base (`git diff --name-only <merge-base>...HEAD`), newest first by the last commit or modification that touched each, kept as a running list through commits so a committed file does not drop off. After a squash merge the branch is gone: say what the list holds then (last run's list kept, or cleared). Settle what is left for the hook: dropped, or one input among others. Settle a session with no branch of its own (a person's interactive session on `main`), and the twenty-file cap. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-525 / TD-527 (the card and its hook-fed list, #1474 / #1476), TD-112 (adapter neutrality), TD-501 (the pane's file links).
+
+## TD-539: No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 (the top bar, or the Settings page), §4.5a (a new display row), §6 *Promote*; the host agent's `build.info()` (`src/sessionorc/agent.py` ~L367, read once at start: the commit its install was built from), `ao promote status` (live sha, main sha, *n ahead*)
+
+**Why:** Paul, 2026-10-10, testing what had merged: *Should we add an ao version to the screens to be able to check which version is being used (what was promoted vs just merged) — I am thinking we could use a date+timestamp to make it easy on the user (me).* Through the day he could not tell from the page whether a fix he was asked to look at was live: `ao promote status` (`live a4cff5c · main e372bf1, 1 ahead`) and `ao service status` say it, in hashes, in a terminal.
+
+**Fix:** a design round settles a display of the live build on the page: where (top bar beside the usage, the Settings page, or both); what it reads (the live commit's time as a local date and time, e.g. *live 10-10 15:41*, with the hash and the commits not yet live on hover or press); a mark when `main` holds merges not yet live (*main +1, not live*) and when a promote is running or held; the UI's own build against the host agent's after a promote restarts one before the other; a node's build (`ao host status`). Display only, no control. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-062 (the promoted install), TD-120 / TD-132 (Promote), TD-226 (rollback, whose hold the display should name).
