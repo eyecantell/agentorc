@@ -44,7 +44,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
-| TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open |
+| TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open — record half built (#1474); page half left |
 | TD-530 | The Message and Reply dialog takes no file: a screenshot or a document for a session goes through Focus's composer and a send, or not at all | Medium | Designed 2026-10-10 — build TD-531 |
 | TD-531 | Build the Message and Reply dialog's Attach / drop / paste (TD-530): the Focus road on `#mailbox`, the addressee's id to `AO.compose`, the path at the caret, no Attach on an empty seat | Medium | Open |
 
@@ -658,7 +658,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (the designer, TD-525's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — the record half is built in PR #1474 (grinder-ao-1, 2026-10-10): the claude-code hook's `file` on a main-thread edit (`EDIT_TOOLS`), the record's `files` (node-owned, `RECENT_FILES = 20`, newest first, a path once) kept by `_apply_event`, `tests/test_recent_files.py`. The page half is left, all under `src/agentorc/ui/`: Fix items 3–5 and 7, and item 6's card, header and rail tests.
 **Blocked by:** TD-526
 **Location:** design §4.5 item 4 (the **Session** card: recent files, the editor button on its summary line; the acts line without it; the rail's **‹›**), §4.5a **Focus side panel, Session card: VS Code**, **recent files**, **» put away** (the glyph), **a path is a link** (*where the Session card draws its editor button*), §4.2 (`file` on a `PostToolUse`), §5 `person.open_in`; `src/agentorc/adapters/claude_code/hook.py` (`file` on a main-thread `PostToolUse` of `Edit`, `Write`, `MultiEdit`, `NotebookEdit`: `tool_input.file_path` / `notebook_path`), `src/sessionorc/agent_tick.py` (`rpc_hook`: `files` kept — newest first, a path once, `RECENT_FILES = 20`, `{path, at}`), `src/sessionorc/models.py` (`files`), `src/agentorc/ui/templates/focus.html` (the header's editor button removed; the Session card's summary line and its row), `src/agentorc/ui/static/app.js` (the row kept current from the delta; the click by `AO.pathLink`'s form with the modifier not required; the rail glyph), `src/agentorc/ui/help.py` and §4.5a *The help text* (**a path is a link**'s last sentence: *without an editor button on the Session card there are no file links*), mockup `Focus.dc.html`, `FocusRail.dc.html` (#TD-525's shots)
 
