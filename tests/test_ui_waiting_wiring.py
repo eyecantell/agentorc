@@ -142,8 +142,8 @@ def test_the_org_pages_cards_read_waiting(tmp_path, monkeypatch):
     open PR (`repos`), g3's on its ask to the person (`waits`)."""
     html = client(monkeypatch, tmp_path).get("/").text
     for sid in ("g1", "g3"):
-        card = html[html.index(f'id="card-{sid}"') - 40 :]
-        card = card[: card.index(">")]
+        at = html.index(f'id="card-{sid}"')
+        card = html[html.rfind("<div", 0, at) : html.index(">", at)]  # the card's opening tag
         assert "s-waiting" in card and 'data-pill="waiting"' in card and "s-idle" not in card, sid
 
 
