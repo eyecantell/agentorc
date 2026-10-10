@@ -78,8 +78,9 @@ def test_a_wheel_that_cannot_be_written_never_stops_the_units(tmp_path, monkeypa
 def test_the_tmux_system_unit_text():
     """Design §4.1 (TD-488, TD-495): the server as the person, in the foreground, outside the user
     manager — no bus and no runtime dir for tmux to open a scope with."""
-    t = service.tmux_unit_text("paul", "/usr/bin/tmux")
-    assert "User=paul\n" in t and "ExecStart=/usr/bin/tmux -D\n" in t
+    t = service.tmux_unit_text("paul", "/home/paul")
+    assert "User=paul\n" in t and "ExecStart=" in t and t.split("ExecStart=")[1].split("\n")[0].endswith("tmux -D")
+    assert ":/home/paul/.local/bin:" in t and "Environment=LANG=C.UTF-8\n" in t
     for line in (
         "Type=simple",
         "Restart=always",
@@ -111,7 +112,12 @@ def test_install_system_refuses_anyone_but_root(monkeypatch):
         service.install_system()
 
 
-def test_install_system_copies_the_staged_unit_and_starts_it(tmp_path, monkeypatch):
+def test_install_system_writes_the_unit_made_again_as_root_and_starts_it(tmp_path, monkeypatch):
+    """Never the staged file: any session can write it, and root would run what it says (review)."""
+    import getpass
+    import pwd
+
+    me = getpass.getuser()
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(service, "SYSTEM_DIR", tmp_path / "etc")
     (tmp_path / "etc").mkdir()
@@ -122,12 +128,21 @@ def test_install_system_copies_the_staged_unit_and_starts_it(tmp_path, monkeypat
         returncode, stdout, stderr = 0, "", ""
 
     monkeypatch.setattr(service.subprocess, "run", lambda argv, **kw: ran.append(argv) or Done())
-    with pytest.raises(FileNotFoundError, match="nothing staged"):
+    monkeypatch.setattr(service, "_server_answers", lambda uid: False)
+    monkeypatch.delenv("SUDO_USER", raising=False)
+    with pytest.raises(RuntimeError, match="no person to run the tmux server as"):
         service.install_system()
-    staged = service.stage_tmux_unit("paul")
+    monkeypatch.setenv("SUDO_USER", me)
+    staged = service.stage_tmux_unit(me)
+    staged.write_text("[Service]\nUser=root\nExecStart=/bin/sh -c 'evil'\n")  # rewritten by a session
     assert service.install_system() == str(tmp_path / "etc" / "agentorc-tmux.service")
-    assert (tmp_path / "etc" / "agentorc-tmux.service").read_text() == staged.read_text()
-    assert ran == [["systemctl", "daemon-reload"], ["systemctl", "enable", "--now", "agentorc-tmux.service"]]
+    assert (tmp_path / "etc" / "agentorc-tmux.service").read_text() == service.tmux_unit_text(
+        me, pwd.getpwnam(me).pw_dir
+    )
+    assert ran[1:] == [["systemctl", "daemon-reload"], ["systemctl", "enable", "--now", "agentorc-tmux.service"]]
+    monkeypatch.setattr(service, "_server_answers", lambda uid: True)  # the old server, not the unit's
+    with pytest.raises(RuntimeError, match="already answers on .* default socket"):
+        service.install_system()
 
 
 def test_status_says_where_the_tmux_server_runs(monkeypatch):

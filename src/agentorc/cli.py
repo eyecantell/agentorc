@@ -2816,7 +2816,7 @@ def cmd_service(args: argparse.Namespace) -> int:
     if args.action == "install" and args.system:
         try:
             target = service.install_system()
-        except (PermissionError, FileNotFoundError, RuntimeError) as e:
+        except (OSError, RuntimeError) as e:
             return fail(args, str(e), 1)
         return emit(
             args, {"written": [target]}, lambda: print(f"wrote {target}; {service.TMUX_UNIT} enabled and started")
@@ -2824,7 +2824,11 @@ def cmd_service(args: argparse.Namespace) -> int:
     if args.action == "install":
         written = service.install(bind=args.bind, port=args.port, start=not args.no_start)
         status = service.status()
-        staged = service.stage_tmux_unit()  # the tmux server's system unit, root's (design §4.1, TD-495)
+        try:
+            staged = service.stage_tmux_unit()  # the tmux server's system unit, root's (design §4.1, TD-495)
+        except OSError as e:  # the units are installed and running: a stage that failed is said, not raised
+            print(f"agentorc: the tmux system unit could not be staged ({e})", file=sys.stderr)
+            staged = None
         root = f"run once as root: {service.system_line()}" if staged else None
         return emit(
             args,

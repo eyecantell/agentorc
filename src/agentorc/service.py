@@ -10,7 +10,7 @@ is deliberately left running when the unit stops.
 A third unit, `agentorc-tmux`, is a **system** unit (design §4.1, TD-488): the tmux server under
 `system.slice`, outside the user manager's subtree, so a stop of `systemd --user` takes the agent
 and the UI down and no session. It is root's to write: `install` stages its text under the home and
-prints the one command the person runs as root, `ao service install --system`, which copies it in.
+prints the one command the person runs as root, `ao service install --system`, which writes it in.
 """
 
 from __future__ import annotations
@@ -40,12 +40,13 @@ def _bin(name: str) -> str:
     return shutil.which(name) or name
 
 
-def _path_env() -> str:
+def _path_env(home: str | None = None) -> str:
     """PATH for the units: the venv's bin (agentorc-hook must resolve at launch), the user's
-    ~/.local/bin (where `claude` usually lives), then the system defaults."""
+    ~/.local/bin (where `claude` usually lives), then the system defaults. `home` is the person's
+    home directory where the caller is not the person (root, at `install --system`)."""
     parts = [
         str(Path(sys.executable).parent),
-        str(Path("~/.local/bin").expanduser()),
+        str(Path(home) / ".local" / "bin") if home else str(Path("~/.local/bin").expanduser()),
         "/usr/local/bin",
         "/usr/bin",
         "/bin",
@@ -92,24 +93,29 @@ WantedBy=default.target
     raise ValueError(name)
 
 
-def tmux_unit_text(user: str, tmux: str | None = None) -> str:
+def tmux_unit_text(user: str, home: str | None = None) -> str:
     """The tmux server's system unit (design §4.1): `tmux -D` in the foreground on the default socket
     (`-D` is no daemon and turns `exit-empty` off), as the person, restarted always; its own stop is
     the one deliberate way to end every session at once (`KillMode=control-group`); `Delegate=yes`
     lets the host agent give each pane a cgroup of its own (§4.8a). No `XDG_RUNTIME_DIR` and no
-    `DBUS_SESSION_BUS_ADDRESS`, so tmux opens no scope under the user manager."""
+    `DBUS_SESSION_BUS_ADDRESS`, so tmux opens no scope under the user manager. The tmux binary is
+    the one the agent unit's PATH finds first, so client and server are one version; the text is
+    the same made by the person or by root for them (`home`)."""
+    path = _path_env(home)
+    tmux = shutil.which("tmux", path=path) or "/usr/bin/tmux"
     return f"""[Unit]
 Description=agentorc tmux server (every session's panes, outside the user manager)
 
 [Service]
 Type=simple
 User={user}
-ExecStart={tmux or shutil.which("tmux") or "/usr/bin/tmux"} -D
+ExecStart={tmux} -D
 Restart=always
 RestartSec=2
 KillMode=control-group
 Delegate=yes
-Environment=PATH={_path_env()}
+Environment=PATH={path}
+Environment=LANG=C.UTF-8
 
 [Install]
 WantedBy=multi-user.target
@@ -130,7 +136,7 @@ def system_line() -> str:
 def stage_tmux_unit(user: str | None = None) -> Path | None:
     """`ao service install`'s third step (design §4.1, TD-495): when the installed system unit is
     absent or differs from the text this install would write, the text is written under the home
-    for `install --system` to copy in, and its path returned; None when the installed one is current."""
+    for the person to read, and its path returned; None when the installed one is current."""
     text = tmux_unit_text(user or getpass.getuser())
     try:
         if (SYSTEM_DIR / f"{TMUX_UNIT}.service").read_text() == text:
@@ -143,21 +149,48 @@ def stage_tmux_unit(user: str | None = None) -> Path | None:
     return staged
 
 
+def _server_answers(uid: int) -> bool:
+    """Whether a tmux server listens on the person's default socket now."""
+    import socket
+
+    sock = Path(os.environ.get("TMUX_TMPDIR") or "/tmp") / f"tmux-{uid}" / "default"
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.settimeout(2)
+        try:
+            s.connect(str(sock))
+        except OSError:
+            return False
+    return True
+
+
 def install_system() -> str:
-    """`ao service install --system`, as root: the staged unit copied into `/etc/systemd/system`,
-    then `daemon-reload` and `enable --now`. Refused for anyone else, naming the line. The staged
-    file is read from the person's home: `sudo` keeps `SUDO_USER`, not `AGENTORC_HOME`."""
+    """`ao service install --system`, as root (design §4.1): the unit written into
+    `/etc/systemd/system`, then `daemon-reload` and `enable --now`. The text is **made again here**
+    for `SUDO_USER`, never read from the staged file: that file is the person's, and any session can
+    write it, so copying it would hand root to whatever rewrote it. Refused for anyone but root,
+    naming the line; without a person to run it as; and while a server not the unit's still answers
+    on the person's default socket — two servers on one socket orphan every session in the first."""
+    import pwd
+
     if os.geteuid() != 0:
         raise PermissionError(f"the tmux system unit is root's to install: run `{system_line()}`")
-    staged = _staged()
-    if not os.environ.get("AGENTORC_HOME") and (person := os.environ.get("SUDO_USER")):
-        import pwd
-
-        staged = Path(pwd.getpwnam(person).pw_dir) / ".agentorc" / "systemd" / f"{TMUX_UNIT}.service"
-    if not staged.is_file():
-        raise FileNotFoundError(f"nothing staged at {staged}: run `ao service install` as yourself first")
+    person = os.environ.get("SUDO_USER") or ""
+    try:
+        pw = pwd.getpwnam(person) if person and person != "root" else None
+    except KeyError:
+        pw = None
+    if pw is None:
+        raise RuntimeError(
+            f"no person to run the tmux server as (SUDO_USER={person or 'unset'}): run `{system_line()}`"
+        )
     target = SYSTEM_DIR / f"{TMUX_UNIT}.service"
-    shutil.copyfile(staged, target)
+    active = subprocess.run(["systemctl", "is-active", f"{TMUX_UNIT}.service"], capture_output=True, text=True)
+    if active.stdout.strip() != "active" and _server_answers(pw.pw_uid):
+        raise RuntimeError(
+            f"a tmux server already answers on {person}'s default socket: stop the teams and that server "
+            "first (every session in it ends), then run this again"
+        )
+    target.write_text(tmux_unit_text(person, pw.pw_dir))
     target.chmod(0o644)
     for args in (("daemon-reload",), ("enable", "--now", f"{TMUX_UNIT}.service")):
         cp = subprocess.run(["systemctl", *args], capture_output=True, text=True)
