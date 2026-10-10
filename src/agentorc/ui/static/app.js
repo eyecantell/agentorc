@@ -3478,11 +3478,14 @@
     const files = v.files || [];
     if (!files.length) return "";
     const under = (p, root) => (root && p.startsWith(root.replace(/\/+$/, "") + "/") ? p.slice(root.replace(/\/+$/, "").length + 1) : null);
-    const changed = new Set(((v.git && v.git.files) || []).map((f) => String(f).slice(String(f).indexOf(" ") + 1)));
+    // a porcelain path is relative to the worktree's root, which is the directory or above it
+    const changed = ((v.git && v.git.files) || []).map((f) => String(f).slice(String(f).indexOf(" ") + 1));
+    const dir = String(v.dir || "").replace(/\/+$/, "") + "/";
+    const isChanged = (p) => changed.some((c) => p.endsWith("/" + c) && dir.startsWith(p.slice(0, p.length - c.length)));
     const file = editor && editor.file;
     return files.map((f) => {
-      const p = String(f.path || ""), inDir = under(p, v.dir), rel = inDir ?? under(p, v.repo) ?? p;
-      const mark = inDir !== null && changed.has(inDir) ? '<span class="fmark" title="changed in the worktree">M</span> ' : "";
+      const p = String(f.path || ""), rel = under(p, v.dir) ?? under(p, v.repo) ?? p;
+      const mark = v.dir && isChanged(p) ? '<span class="fmark" title="changed in the worktree">M</span> ' : "";
       const title = esc(`${p}${f.at ? ` — edited ${String(f.at).slice(0, 16).replace("T", " ")}Z` : ""}`);
       const name = file
         ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}" data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`

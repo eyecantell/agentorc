@@ -52,6 +52,8 @@ console.log(JSON.stringify({
   text: AO.recentFiles(v, { url: "zed://x", label: "Zed", file: null }),
   none: AO.recentFiles({ dir: "/w/wt", files: [] }, editor),
   noFiles: AO.recentFiles({ dir: "/w/wt" }, editor),
+  sub: AO.recentFiles({ dir: "/w/wt/sub", files: [{ path: "/w/wt/sub/a.py" }, { path: "/w/wt/sub/b.py" }],
+    git: { files: ["M sub/a.py", "M b.py"] } }, editor),
   rail: AO.railGlyphs({ state: "idle" }, true, 0, {}, editor),
   railNone: AO.railGlyphs({ state: "idle" }, true, 0, {}, null),
 }));
@@ -82,6 +84,14 @@ def test_the_row_draws_the_records_files_newest_first_relative_with_their_marks_
     assert 'class="editor" href="vscode://file/w/wt/src/new%20file.py:1" data-label="VS Code"' in rows[0]
     # the absolute path and the edit's time on hover
     assert 'title="/w/wt/src/new file.py — edited 2026-10-10 20:05Z"' in rows[0]
+
+
+@pytest.mark.unit
+def test_m_reads_the_porcelain_from_the_worktrees_root_when_the_directory_is_below_it():
+    rows = re.findall(r"<div>(.*?)</div>", _probe()["sub"])
+    # the record carries no git root, so a root-level `b.py` and the directory's own read alike: only
+    # the directory's path below the root is pinned here
+    assert re.sub(r"<[^>]+>", "", rows[0]) == "M a.py"
 
 
 @pytest.mark.unit
