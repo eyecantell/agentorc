@@ -975,13 +975,13 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
 **Location:** `src/agentorc/ui/static/app.js` (`syncGroups`, the `Object.entries(g.lanes || {})` block), `tests/test_ui_team_summary.py` (`test_each_member_card_draws_its_own_lane_count_in_its_pill`)
 
-**Why:** The test-audit of #1424. The change has two halves: `render_heads` puts `lanes` on each group, and `app.js` reads `g.lanes` to patch each sibling's pill — the half that makes a sibling's claim move this card's count with no delta of its own. The test added reads only the server half (`ui.render_heads(...)[...]['lanes']`); it never opens `app.js`, though the neighbouring tests of this file do (`(ui.Path(ui.__file__).parent / "static" / "app.js").read_text()`, lines 275, 292, 382, 521, 831). Probe: the `// each member's lane count (TD-484)` block deleted from `syncGroups`, `pytest -q tests -k ui` — **604 passed**. The TD-484 **Resolved:** line says `syncGroups` patches each pill; nothing asserts it. A second, smaller gap in the same change: the `if g.get("summary") else {}` guard in `render_heads` is replaced by `if True` and `tests/test_ui_team_summary.py tests/test_ui.py` stay at 98 passed, so a group with no summary drawing no `lanes` is unpinned too.
+**Why:** The test-audit of #1424. The change has two halves: `render_heads` puts `lanes` on each group, and `app.js` reads `g.lanes` to patch each sibling's pill — the half that makes a sibling's claim move this card's count with no delta of its own. The test added reads only the server half (`ui.render_heads(...)[...]['lanes']`); it never opens `app.js`, though the neighbouring tests of this file do (`(ui.Path(ui.__file__).parent / "static" / "app.js").read_text()`, lines 275, 292, 382, 521; 831 hands the path to a node probe). Probe: the `// each member's lane count (TD-484)` block deleted from `syncGroups`, `pytest -q tests -k ui` — **604 passed**. The TD-484 **Resolved:** line says `syncGroups` patches each pill; nothing asserts it. A second, smaller gap in the same change: the `if g.get("summary") else {}` guard in `render_heads` is replaced by `if True` and `tests/test_ui_team_summary.py tests/test_ui.py` stay at 98 passed, so a group with no summary drawing no `lanes` is unpinned too.
 
 **Fix:** Add a source-reading test beside the file's others that the `app.js` `syncGroups` reads `g.lanes` and removes a stale `.lanecount` / inserts the new one in the pill (or a driven-DOM check where the suite has one), and a case in `render_heads`' test for a group with no summary giving `lanes == {}`. **Done when** both probes in the Why fail a test.
 
