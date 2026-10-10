@@ -624,6 +624,10 @@ class HostAgent(
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
         self.host_store = HostStore()
         self._host_rec: dict[str, Any] = self.host_store.load()
+        # the previous run's last tick, read before this run's first tick overwrites it: a pane found
+        # gone on that first tick ended while nobody was looking (§4.5 row 5 (b), TD-490)
+        self._prev_last_tick: str | None = self._host_rec.get("last_tick")
+        self._ticked = False
         # rule 8 (§6, TD-227): (team, id) → when the home first read that id as new in a wound-down
         # team's lane; in memory, so a restart of the home starts the settle again
         self._work_first: dict[tuple[str, str], datetime] = {}
@@ -1622,14 +1626,22 @@ class HostAgent(
         if identity.pane_cgroup(self.cgroup_root, server, sid, pane, live) is None:
             log.info("%s: no cgroup of its own under %s — the pane keeps the server's", sid, server)
 
-    async def rpc_kill(self, id: str) -> dict[str, Any]:
+    async def rpc_kill(self, id: str, caller: Any = None, killer: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Kill the session's pane and keep its record `exited`. Writes `ended: {how: kill, at, by,
+        why?}` (§4.2, TD-490): `by` as `closer_of` reads the caller — `person`, a session's id, or
+        the tick's own word handed in as `killer`."""
         s = self._get(id)
         if s.state == "scheduled":
             # nothing runs, so a kill is its Cancel (design §6 *Start time*, TD-328): a record left
             # `exited` would read as a run that never happened, and no policy would ever start it
             return await self._cancel_start(s)
         await asyncio.to_thread(self.tmux.kill_session, id)
-        s.set_state("exited", confidence="scraped")
+        if s.state != "exited":
+            who = closer_of(caller, killer, now_iso())
+            s.ended = {"how": "kill", "at": who["at"], "by": who["by"]}
+            if who["why"]:
+                s.ended["why"] = who["why"]
+        s.set_state("exited", confidence="tick")
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
         self._killed_at[id] = datetime.now(UTC)  # a tick's older pane list must not revive it (TD-063)
         self.store.save(s)
@@ -1648,7 +1660,7 @@ class HostAgent(
             # the record and its launch record are forgotten and the directory's slot is free
             return await self._cancel_start(s)
         await asyncio.to_thread(self.tmux.kill_session, id)
-        s.set_state("closed", confidence="scraped")
+        s.set_state("closed", confidence="tick")
         s.pane = False
         s.closed_at = now_iso()
         s.closer = closer_of(caller, closer, s.closed_at)

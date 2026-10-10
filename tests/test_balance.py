@@ -157,7 +157,7 @@ async def test_the_home_marks_a_team_over_its_line_and_clears_it(agent, tmp_path
         assert "balance" not in json.loads(paths.host_file().read_text())["teams"]["grind"]
         assert "balance" not in (await person.call("repos"))[root]
         await agent._balance_marks(datetime.now(UTC) + balance.FLAP)
-        assert json.loads(paths.host_file().read_text()) == {"teams": {}}
+        assert json.loads(paths.host_file().read_text())["teams"] == {}
 
 
 async def test_a_team_with_no_key_or_no_live_member_has_no_mark(agent, tmp_path):

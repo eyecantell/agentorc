@@ -18,7 +18,8 @@ from sessionorc import naming
 # the directory's slot, but no pane yet — the home's tick creates the session at its `start_at`
 State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited", "closed", "unreachable", "scheduled"]
 Kind = Literal["interactive", "command"]
-Confidence = Literal["hook", "scraped"]
+# `tick`: the host agent observed it — a pane dead or gone, a kill, a close, `stalled?` (design §4.2, TD-490)
+Confidence = Literal["hook", "scraped", "tick"]
 
 # Where a report entry came from (design §4.8, on the same rule as state): the session said so,
 # the tick worked it out, or a screen rule read it off the pane. §9 invariant 10 gives `declared`
@@ -69,6 +70,7 @@ NODE_OWNED = frozenset(
         "title",
         "last_output",
         "exit_code",
+        "ended",
         "git",
         "model",
         "context",
@@ -904,6 +906,13 @@ class Session:
     # where the socket is, so the node's to write, like `tail`.
     identity_alarms: list[dict[str, Any]] = field(default_factory=list)
     exit_code: int | None = None
+    # How the run ended (design §4.2 the `SessionEnd` row, §4.5 row 5 (b), TD-490): `{how, at, code?,
+    # reason?, by?, why?, found?, down_since?}` — `how` is `tool` (the tool's own end, its `reason`),
+    # `pane` (a dead pane, its status as `code`), `gone` (the tick found no tmux session: `found`,
+    # and `down_since` when that was the agent's first tick after a start) or `kill` (`by` who
+    # pressed it, as `closer` reads a caller). Observed where the pane is, so the node's; dropped
+    # when the record leaves `exited` for a live state.
+    ended: dict[str, Any] | None = None
     # A tmux pane (live or dead) still backs this record. False after `kill`/`close` (the session is
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
@@ -1372,6 +1381,8 @@ class Session:
         self.state = state
         self.confidence = confidence
         self.pending = pending
+        if state not in ("exited", "closed"):
+            self.ended = None  # a run that came back has not ended
 
     def report_progress(self, entry: ProgressEntry) -> bool:
         """Upsert a `progress` entry by reference, in place so the lane order the session declared

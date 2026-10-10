@@ -123,7 +123,8 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         reason = payload.get("reason") or payload.get("how_ended") or ""
         if reason in SESSION_END_STILL_RUNNING:
             return None  # /clear or an in-session /resume: same process, new transcript coming
-        return {**out, "state": "exited", "pending": None}
+        # the reason rides on the event as the record's `ended.reason` (§4.2, TD-490)
+        return {**out, "state": "exited", "pending": None, **({"reason": reason} if reason else {})}
     if ev == "SessionStart" and payload.get("source") in SESSION_START_NOT_A_START:
         return out or None  # the session id and model still count; the state is what it was
     if ev == "SessionStart" and (

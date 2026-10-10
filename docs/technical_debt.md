@@ -73,7 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-494 | A URL that wraps in the Focus pane links its first row only: Ctrl+click opens a cut URL, and the rest is no link | Low | Open |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Open |
-| TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | Open |
+| TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | In progress |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-502 | `tests/test_kill_guard.py` pins no `--`, no `sudo` inside a search substitution, no wrapper but `sudo`/`timeout`/`nice` and no xargs option value: four of the guard's branches go back unseen | Medium | Open |
@@ -1168,7 +1168,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (the designer, TD-490's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** In progress — slice 1, the host agent's half (part 1's `tick` and the `~`/`scraped` marks, part 2's `ended` and `last_tick`), is PR #1401 (grinder-ao-1, 2026-10-09). **Left:** slice 2, the words — part 3's `ending.exit_words`, the card's, the Inbox row's and the Focus overlay's hover and first line, `ao status -v`'s line, and the scratch-home check of each cause.
 **Location:** design §4.2 (the three confidences; the `SessionEnd` row), §4.5 row 5 (b) *an exit, and how*, §4.5a **state pill hover**, §4.7 `ao status -v`; `src/sessionorc/models.py` (`Confidence`, `ended`), `src/sessionorc/agent_tick.py` (~L3335 the gone pane, ~L3381 the dead pane: `tick`, `ended`; `last_tick` written to `host.json` each tick), `src/sessionorc/agent.py` (`rpc_kill` ~L1595: `tick` and `ended.by` from the caller as `rpc_close` ~L1609 does with `closer_of`), `src/sessionorc/agent_tick.py` `_apply_event` ~L3433 (the hook's state write ~L3490: a `SessionEnd` keeps `reason`), `src/agentorc/adapters/claude_code/hook.py` (`SessionEnd`'s `reason` on the event), `src/agentorc/ending.py` (`exit_words`), `src/agentorc/ui/cards.py` (~L212 `scraped`; the hover text), `src/agentorc/ui/templates/card.html` (L21, L36 `title`), `inbox_row.html` (~L457), `static/app.js` (~L3385 the end overlay), `src/agentorc/cli.py` (~L234 the `~` mark; the `-v` line)
 
 **Why:** TD-490: after the 2026-10-09 outage three members read *exited · guessed from the screen*, and finding out that they had not run out of work took a journal and a transcript.

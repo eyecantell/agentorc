@@ -209,7 +209,7 @@ def view(
     # `since`, which for a seat that has left is when it left (TD-200: *last came · 0s ago*)
     d["came_age"] = _age(s.get("created"), now) if d["seat"] else ""
     # *on call* is read from the seat's record, never from a screen: no dashed pill for it (TD-296 #10)
-    d["scraped"] = s.get("confidence") != "hook" and not d["seat"]
+    d["scraped"] = s.get("confidence") == "scraped" and not d["seat"]  # a `tick` state is observed (TD-490)
     # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
     # VS Code link only when a container node's reach names one — the ssh URL below is built from
     # *this* host's alias, which would open the wrong machine.

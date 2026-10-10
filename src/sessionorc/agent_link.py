@@ -155,7 +155,7 @@ class LinkMixin:
         closed = 0
         for s in self.remote.get(host, {}).values():
             if s.state != "closed":
-                s.set_state("closed", confidence="scraped")
+                s.set_state("closed", confidence="tick")
                 self._save(s)
                 closed += 1
         mux = self._link_muxes.pop(host, None)
