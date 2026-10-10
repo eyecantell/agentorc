@@ -676,7 +676,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-10 (the designer, TD-524's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Built by PR #1467 (the UI check held on a scratch home: the remote link carries `:line`, `:1` where none, no `windowId`); waits for Paul's look in VS Code over SSH — *Works* archives it
+**Status:** Built by PR #1467 (the UI check held on a scratch home: the remote link carries `:line`, `:1` where none, no `windowId`); merged 2026-10-10 (691a868); waits for Paul's look in VS Code over SSH, sent as m-4e7a04cfda2c — *Works* archives it
 **Blocked by:** decision (paul)
 **Location:** design §4.6 *A path in the pane is a link* (the line, the window), §4.5a **a path is a link**, §5 `person.open_in` (the file form, `{line}`); `src/agentorc/ui/uiconf.py` (`editor_file`: the three `vscode` forms without `?windowId=_blank`, `vscode_link` unchanged), `src/agentorc/ui/static/app.js` (`AO.pathLink`: the `at` suffix on every `vscode://` form, `:1` when no line was printed, `{line}` filled in a template), `tests/test_ui_focus_paths.py`
 
