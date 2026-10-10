@@ -25,7 +25,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-060 | The name `agentorc` is taken: rename the project — `shiftlead` leads, undecided; two packages, seven env vars, a state directory, two systemd units and a per-repo config file carry the name onto machines, so it is a migration and not a text sweep | Medium | Open — decided 2026-09-22: `shiftlead`; step 1 done, step 2 in a quiet window the anchor picks |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 built 2026-09-23 (PR #499); 8 is Paul's canvas |
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Low | Designed 2026-10-09 — TD-468 builds it |
-| TD-111 | `ao doctor`: one command that checks what the ledger keeps finding live — hooks, tmux, identity, usage, links, build | Medium | Designed 2026-10-09 — TD-465 builds it |
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
@@ -290,21 +289,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** "what happened overnight" is answered today by reading a manager's log on a launch branch and several transcripts; the records already know.
 
 **Related:** TD-053 (the wind-down's board line), TD-079 (outcomes), TD-069 (the Inbox), TD-087 (usage readings).
-
-## TD-111: `ao doctor`
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-09-22 (the anchor session; the design review — a feature the review recommended)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1330): design §4.7 **`ao doctor`** — seven checks in order (agent, tmux, hooks, identity, profiles, nodes, org), one line each in `ao org check`'s words (*ok*, *warning*, *lacking*), a warning being a reading that may be meant and every lack naming its cure in the line; the three probes the read found missing (the tmux server against the one the agent started with, the hooks' layer, feed and queue, each profile's credentials and usage endpoint); *n lacking, n warnings* or *ok: n checks*, exit 1 on a lack, 3 with no host agent; `ao doctor <check>…`, `--json`; a never-gated `doctor` RPC gathers the host side so a session may run it; the hooks probe behind `--probe`, a person's own, since it launches the tool; a node says *home only* for the home's checks. §4.8a names `doctor` beside `whoami` and `identity`. The build is TD-465. Was: Open — **Read 2026-10-08 (the anchor): half the checks exist, scattered over five commands, and the half that needs a probe does not.** Built, each its own command: `ao promote status` (the live build against `main`, the checks, `auto`); `ao identity` (the mode, the detached-process check, alarms); `ao org check` (`org.yml` and each repo's `.agentorc.yml` parse, the checkouts' state, exit 1 on a lack); `ao host status` (each node's link and build); `ao gate` (each profile's reading). Not built: a probe that the settings layer's hooks fire, the tmux server's pid, start and cgroup, and each profile's usage endpoint and credentials answering. **Recommended:** `ao doctor` as one read-only command that calls the five and adds the three probes, printing a line each with a verdict, and exiting 1 on any lack, as `ao org check` does. It repairs nothing. Priority stays Medium: entries that begin *found live* keep coming, and each costs a session the diagnosis a line would have printed. Was: for evaluation. A large share of the ledger's entries begin with *found live*: hooks that did not fire, a tmux server replaced under the agent, an identity clause that read the person as unknown, a usage endpoint refusing, a node linked but behind, a wheel older than `main`. One command runs the checks and prints a line each: the settings layer's hooks fire in a scratch session; the tmux server's pid, start time and cgroup; identity mode and the detached-process check; each profile's usage endpoint and credentials; each node's link state and build; the running build against `origin/main`; `settings.yml` and `org.yml` parse. Read-only, never repairs. `ao status -v` already prints some of these; this gathers them and adds the ones that need a probe. **Next:** the designer's round: which checks, their one-line verdicts, and the probe for hooks.
-**Blocked by:** TD-465
-**Location:** `src/agentorc/cli.py`, `src/sessionorc/agent.py` (`host`, `identity`, `usage` RPCs), design §4.7
-
-**Why:** every live incident in the ledger cost a session an hour of diagnosis that a check would have printed.
-
-**Related:** TD-062 (build versus main), TD-077 (identity), TD-087 (usage), TD-057 (nodes).
 
 ## TD-112: The adapter contract has grown Claude-shaped and neutrality is untested
 
