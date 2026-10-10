@@ -547,7 +547,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .railsheet[open] { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; padding: 16px; }
   .railchips .chip, .railsheet .btn, .railsheet .railline, .railsheet .input { min-height: 44px; }
   .inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }
-  .page.focus { flex-direction: column; } .focus .side { width: 100%; }
+  /* a column whose items take its width: at flex-start the main column took its content's, and the
+     terminal's grid, once fit, held the page wider than the phone (TD-521) */
+  .page.focus { flex-direction: column; align-items: stretch; } .focus .side { width: 100%; }
   /* put away on a phone, the rail is one row under the composer, 44px targets (TD-412) */
   .focus .side.rail { width: 100%; } .focus .siderail { flex-direction: row; flex-wrap: wrap; } .focus .railbtn { width: 44px; height: 44px; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
   /* a phone (TD-296 #9): the usage chip takes a row of its own under the buttons */
