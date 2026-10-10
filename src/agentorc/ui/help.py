@@ -204,6 +204,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "pane-path",
+        "a path is a link",
+        "Focus pane",
+        (
+            "Ctrl+click (Cmd+click on a Mac) on a file the session named — `src/x.py:12` — opens it in your "
+            "editor, at the line where the editor's link takes one; it underlines only when the file is in the "
+            "session's repo, which the host checks when you hover. A plain click or a drag selects, as before; "
+            "without an editor button on the header there are no file links."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -463,7 +474,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "switch-profile",
         ),
     ),
-    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel", "pane-link")),
+    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel", "pane-link", "pane-path")),
     (
         "inbox",
         "Inbox",

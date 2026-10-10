@@ -2154,6 +2154,15 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return JSONResponse({"ok": True, "path": got["path"]})
         return JSONResponse({"ok": True, "upload": got["upload"], "bytes": got["bytes"]})
 
+    @app.post("/api/sessions/{sid}/paths")
+    async def pane_paths(sid: str, request: Request):
+        """design §4.5a *Focus pane: a path is a link* (§4.6, TD-501): the runs one row of the pane
+        names, handed to the `paths` read on the record's host — a node's through `read` — and its
+        answer back, `{paths: {run: path | null}}`. A read, gated by nobody beyond the UI's own (§9
+        invariant 11); its refusals are the host agent's, as the transcript route's are."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        return JSONResponse(await call("paths", id=sid, runs=body.get("runs")))
+
     @app.post("/api/sessions/{sid}/{action}")
     async def action(sid: str, action: str, request: Request):
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
