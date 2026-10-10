@@ -483,7 +483,9 @@ def view(
     d["closer_text"] = closer_words(s, names)
     # an exit, and how (§4.5 row 5 (b), TD-490): the record's `ended` in `ending.exit_words`' words
     d["exit_text"] = exit_words(s, names, now) if state == "exited" else ""
-    d["pill_title"] = pill_title(d, ending_hover(s, names, now))
+    # the ending with its time: the pill's hover where nothing outranks it, and always the Focus end banner's first line
+    d["ending_text"] = ending_hover(s, names, now)
+    d["pill_title"] = pill_title(d, d["ending_text"])
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d

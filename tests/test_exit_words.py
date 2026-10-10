@@ -107,8 +107,13 @@ def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
     assert v["slot"]["text"] == "killed by manager-1" and v["slot"]["full"] == v["pill_title"]
     gone = _view({**kill, "ended": {"how": "gone", "at": _at(minutes=10), "found": _at(minutes=10)}})
     assert gone["pill_title"].startswith("pane gone · found ") and not gone["scraped"]
-    reach = _view({**kill, "host_link": {"supervisor": {"doing": "restarting the node"}}})
+    reach = _view(
+        {**kill, "host_link": {"supervisor": {"doing": "restarting the node"}}},
+        [{"id": "ao-r-manager-1", "name": "manager-1"}],
+    )
     assert reach["pill_title"] == "restarting the node"
+    # the end banner's first line is the ending whatever outranks it on the pill (review of #1415)
+    assert reach["ending_text"] == v["pill_title"]
     idle = {"id": "ao-r-i-1", "name": "i", "state": "idle"}
     assert _view({**idle, "confidence": "scraped"})["pill_title"] == "guessed from the screen"
     assert _view({**idle, "confidence": "hook"})["pill_title"] == "reported by the tool"
@@ -142,7 +147,7 @@ def test_the_focus_script_draws_the_hover_and_the_banners_first_line():
 
     js = (Path(cli.__file__).parent / "ui" / "static" / "app.js").read_text()
     assert 'title="${esc(v.pill_title || "")}"><span class="dot">' in js
-    assert '<div class="endwords"><b>${esc(v.pill_title)}</b></div>' in js
+    assert '<div class="endwords"><b>${esc(v.ending_text)}</b></div>' in js
 
 
 @pytest.mark.unit

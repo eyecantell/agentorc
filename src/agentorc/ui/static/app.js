@@ -3565,7 +3565,7 @@
         // …and, where the header draws **Transcript** (§4.5a, TD-166), *or read its transcript*
         const read = v.adapter_id ? ` — or <a href="/transcript/${id}" target="_blank" rel="noopener">read its transcript</a>` : "";
         // the first line is the ending in the card's words and its time (§4.5a **state pill hover**, TD-490)
-        const ending = v.pill_title && !v.host_note ? `<div class="endwords"><b>${esc(v.pill_title)}</b></div>` : "";
+        const ending = v.ending_text ? `<div class="endwords"><b>${esc(v.ending_text)}</b></div>` : "";
         ex.innerHTML = `${ending}This session's process has ${esc(v.state)}${esc(code)}. ${kept ? `The pane is kept so its last screen and run log stay readable${read}.` : `Its pane is gone (killed, or the tmux server restarted); the run log stays readable${read}.`} `
           // design §4.5a **Focus (exited / closed)** (TD-081 step 2, Paul: *a resume option that
           // requires no input from me*): **Resume** is one press and no form — the same name, so
