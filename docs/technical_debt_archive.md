@@ -9314,3 +9314,26 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-535 (the build), TD-532 (the design), TD-533 / TD-534 (earlier audit findings on the same area).
 
 **Resolved:** 2026-10-10 (PR #1496) — `tests/test_ui_focus_paths.py::test_open_editor_toasts_unless_quiet_and_a_pair_toasts_once` runs the real `AO.openEditor` under node, with `AO.toast` and the hidden frame recorded. A launch toasts once, a quiet one none, and `AO.openFile`'s pair sends both frames under one toast. With the guard reverted to `if (true)`, the test fails.
+
+## TD-546: The Settings You form's `file_link` and template `file` collection and its two toggles are in no test: five mutations of `app.js` leave the suite green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1492, TD-537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the `you:` collector ~L4636-4650, the `input` handler's `#setfilelink` / `wait.disabled` lines ~L4691, the `#setopenin` change handler and the `folder_first` change handler ~L4751-4757); `tests/test_ui_settings.py::test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file`
+
+**Why:** that test posts JSON to `/api/settings/you` itself and reads the server-rendered page, so no line of the form's own JavaScript runs under it, and its docstring (*"the wait input disabled with the switch off"*) is true only of the first paint. Each of these mutations of `app.js`, made one at a time in a scratch worktree, left `test_ui_open_in.py`, `test_ui_settings.py`, `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` at `67 passed`:
+- `wait: f.elements.wait.value === "" ? null : Number(…)` replaced by `wait: 1` — an edited wait is never saved, and an emptied one never cleared;
+- `folder_first: f.elements.folder_first.checked` replaced by `true` — the switch can never be saved off;
+- `open_in.file = f.elements.file.value.trim()` removed — a template's **file** is never sent;
+- the `#setopenin` handler's `fl.classList.toggle("hidden", openin.value === "none")` replaced by `false` — the file link rows stay drawn under *none*;
+- `wait.disabled = !first.checked` removed — the wait stays editable with the switch off.
+This is the part of #1492 a person touches; the PR body's scratch-home UI check is its only guard.
+
+
+**Related:** TD-537 (the build), TD-536 (the design), TD-290 (a UI change is verified by the grinder), TD-545.
+
+**Resolved:** 2026-10-10 (PR #PRNUM) — `tests/test_ui_settings_you.py` runs `AO.settings()` under node against a fake You form: what Save posts for `file_link` and a template's `file`, the editor pick's rows and the switch's wait, and Cancel's redraw. Each of the five mutations above fails it, as do the same two lines removed from Cancel.
