@@ -3549,10 +3549,14 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             try:
                 out, _ = await asyncio.wait_for(proc.communicate(), timeout=3)
             except TimeoutError:
-                with contextlib.suppress(ProcessLookupError):
-                    proc.kill()
-                await proc.wait()
                 return None
+            finally:
+                # timed out, or cancelled when the pump ended: a hung read (a stuck container's `docker
+                # exec`) is killed and reaped in the background, never left running
+                if proc.returncode is None:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.kill()
+                    reapers.add(asyncio.ensure_future(proc.wait()))
             return out.decode(errors="replace") if proc.returncode == 0 else None
 
         watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))

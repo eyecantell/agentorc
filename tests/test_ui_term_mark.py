@@ -112,6 +112,8 @@ def test_the_focus_wires_the_mark_to_the_socket_and_the_feed():
     assert "if (mk.retryAt != null) { mk.retryAt = null; drawMark(); }" in body
     assert "if (mk.retryAt == null) mk.retryAt = Date.now();" in js
     assert "mk.state = ev.session.state; drawMark();" in js
+    # a session that turns working counts its silence from then, not from the quiet idle before it
+    assert 'if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();' in js
     assert 'console.info("[agentorc] terminal", ...a, new Date().toISOString())' in js
     for event in ('tlog("open")', 'tlog("closed", e.code, e.reason || "")', 'tlog("clients"', "tlog(`output after"):
         assert event in js, event

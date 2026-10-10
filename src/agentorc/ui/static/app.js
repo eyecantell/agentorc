@@ -3961,7 +3961,11 @@
           endTerm("this session's pane is gone (see the banner).");
         }
         render(ev.session);
-        if (ev.session.state && ev.session.state !== mk.state) { mk.state = ev.session.state; drawMark(); }
+        if (ev.session.state && ev.session.state !== mk.state) {
+          // silence is counted from when the session began working, not from a quiet idle before it
+          if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();
+          mk.state = ev.session.state; drawMark();
+        }
         if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); }
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
