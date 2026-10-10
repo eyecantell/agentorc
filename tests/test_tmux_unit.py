@@ -123,3 +123,11 @@ async def test_the_doctor_says_where_the_server_runs(agent, monkeypatch):
         assert got["cgroup"] == cg and got["runs"] == runs
     monkeypatch.setattr(agent.tmux, "server_pid", lambda: None)
     assert (await agent.rpc_doctor())["tmux"]["runs"] is None
+
+
+async def test_a_failing_tmux_call_never_fails_the_create(agent, monkeypatch):
+    def hung():
+        raise TimeoutError("tmux display-message timed out")
+
+    monkeypatch.setattr(agent.tmux, "server_pid", hung)
+    agent._pane_cgroup("ao-any")  # logged, never raised: the session exists by now

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import threading
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -187,8 +188,18 @@ def pane_cgroup(root: str | os.PathLike[str], server: str, name: str, pid: int, 
     signal; TD-495): `<root><server>/pane-<name>`, the pane's pid written to its `cgroup.procs`, so
     what the pane starts inherits it as a `tmux-spawn-*.scope` would give it. First the empty
     `pane-*` directories `live` (the tmux sessions now listed) no longer names are removed. Any
-    failure leaves nothing made — the pane keeps the server's cgroup — and returns None."""
-    base = os.path.join(os.fspath(root), server.strip("/"))
+    failure leaves nothing made — the pane keeps the server's cgroup — and returns None. One call at a
+    time (`_PANE_CGROUP`): creates run in threads, and one's sweep must not take another's directory
+    between its `mkdir` and its write."""
+    with _PANE_CGROUP:
+        return _pane_cgroup(os.fspath(root), server, name, pid, live)
+
+
+_PANE_CGROUP = threading.Lock()
+
+
+def _pane_cgroup(root: str, server: str, name: str, pid: int, live: Collection[str]) -> str | None:
+    base = os.path.join(root, server.strip("/"))
     try:
         for old in os.listdir(base):
             if old.startswith("pane-") and old[5:] not in live and old[5:] != name:
@@ -209,7 +220,7 @@ def pane_cgroup(root: str | os.PathLike[str], server: str, name: str, pid: int, 
             with contextlib.suppress(OSError):
                 os.rmdir(path)
         return None
-    return "/" + os.path.relpath(path, os.fspath(root))
+    return "/" + os.path.relpath(path, root)
 
 
 def detached_check(reader: ProcReader, *, agent_pid: int, tmux_pid: int | None) -> str | None:

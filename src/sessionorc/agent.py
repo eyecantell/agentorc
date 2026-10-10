@@ -1598,7 +1598,14 @@ class HostAgent(
         """Under the installed home's tmux system unit (§4.1, `Delegate=yes`) tmux reaches no user bus
         to give a pane its own scope, so the host agent gives it a cgroup of its own, the fourth
         identity signal (§4.8a, TD-495). Anywhere else nothing is done: tmux's scope stands where it
-        made one. A write that fails leaves the pane in the server's cgroup, and the create goes on."""
+        made one. A write that fails leaves the pane in the server's cgroup, and the create goes on:
+        the session exists by now, so nothing here may fail it (a tmux call that times out included)."""
+        try:
+            self._pane_cgroup_write(sid)
+        except Exception:  # noqa: BLE001 — a pane without its own cgroup is a weaker signal, never a failed create
+            log.exception("%s: making the pane's own cgroup failed", sid)
+
+    def _pane_cgroup_write(self, sid: str) -> None:
         pid = self.tmux.server_pid()
         server = self.proc.cgroup(pid) if pid else None
         if identity.server_placement(server) != "system" or not server:
