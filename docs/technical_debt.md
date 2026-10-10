@@ -47,7 +47,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
 | TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
-| TD-465 | Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line | Medium | Built — live check of #1403 |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-469 | Build the attachment's life (TD-419): the run-log sweep prunes `attachments/<session>/` past `runs_keep_days`, folders removed once empty | Low | Open |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
@@ -77,6 +76,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
+| TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
 
 ---
 
@@ -729,22 +729,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-063 and TD-078 (archived; the same family), TD-285, TD-289, TD-326 (archived flakes, each fixed by waiting on its signal).
 
-## TD-465: Build `ao doctor` (TD-111): the `doctor` RPC, seven checks, `--probe`, `ao --skill`'s line
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-09 (the designer, TD-111's round)
-**Owner:** grinder
-**Kind:** live-check #1403
-**Status:** Built — slice 1 #1363 (the `doctor` RPC), slice 2 #1400 (`ao doctor`'s verdicts, `ao --skill`'s line), slice 3 #1403 (`--probe`). The **agent** line's watch is TD-497's. **The live check:** once #1403 is live (`ao promote status`), run `ao doctor` and `ao doctor --json` — never-gated reads — and check that the seven checks print with verdicts, that the JSON carries the raw readings, and that the exit code matches the lacks. A seeded lack and the probe both act: run them on a scratch home (`scripts/look_home.py`). The probe on kmaster's own profiles is Paul's: `ao doctor hooks --probe` from his terminal.
-**Location:** design §4.7 **`ao doctor`** (the whole of it), §4.8a (the never-gated reads), §4.2 (the layer, `confidence`, the queue); `src/agentorc/cli.py` (`cmd_doctor`, beside `cmd_identity`, `cmd_host`, `cmd_promote`, `cmd_gate` and the `org check` printing it reuses), `src/sessionorc/agent_identity.py` (the server read `_id_server` keeps; `rpc_identity`), `src/sessionorc/tmux.py` (`server_pid`), `src/agentorc/adapters/claude_code/__init__.py` (`hooks_file`, `hook_command`, `credentials_ok`, `usage_for`), `src/sessionorc/containers.py` (`host_status`), `src/agentorc/skill.md`
-
-**Why:** TD-111's read (2026-10-08): half the checks exist over five commands and the half that needs a probe does not; every *found live* entry cost a session an hour a line would have printed.
-
-**Fix:** as §4.7 **`ao doctor`** says, in slices if the PR grows: (1) the never-gated `doctor` RPC on the host agent returning the host-side readings — tmux (pid, start, cgroup, and whether the server differs from the one the agent first read — keep that first read beside `_id_tmux`, which today moves with the pid), hooks (each profile's layer file and whether its hook command resolves; each live agent session's `confidence` and its newest hook event's age; unapplied lines in `events/*.jsonl`), identity (`rpc_identity`'s fields), profiles (config dir, `credentials_ok`, `usage_for` from the last reading when younger than the poll, else one request per account; a metered profile's key presence), nodes (`host.links` and each node's build against the home's wheel), and `settings.yml` / `hosts.yml` parse errors in the reader's words; (2) `cmd_doctor`: the agent line from `host.promotes` and the org lines from `agentorc.orgcheck` on the client, the seven checks printed in order in `ao org check`'s verdict words, every lack carrying its cure, the closing count, exit 1 on a lack, `ao doctor <check>…`, `--json` as designed, *home only* on a node; (3) `--probe [<profile>]`: a scratch launch of the profile under its layer in a temporary directory with no prompt, the record watched for its SessionStart up to 30 s, the pane killed and the record deleted, refused to a session (`AGENTORC_SESSION` set) with the design's reason; (4) `ao doctor` in `ao --skill`'s read-only list, and `tests/` covering each verdict against faked readings (a replaced server, a scraped session, no credentials, a node behind) and the exit codes. **Done when** `ao doctor` on kmaster prints the seven checks with verdicts and exits 1 on a seeded lack, `ao doctor --json` carries the raw readings, the probe fires SessionStart on a profile and is refused to a session, and the tests pass.
-
-**Related:** TD-111 (the design), TD-062 (build versus main), TD-077 (identity; the replaced server of 2026-09-20), TD-087 (usage reasons), TD-057 (nodes), TD-115 (the hook queue).
-
 ## TD-466: Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default
 
 **Priority:** Medium
@@ -1228,3 +1212,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a segment whose words do not fit draws the count alone, and one too narrow for the count draws nothing inside (its hover keeps *n label*) — measured on render, or by a width threshold on `pct`; both bars, light and dark. Test: a facet with 4 High of 64 renders no clipped text (the segment's `scrollWidth` ≤ its `clientWidth` in a Playwright check on a scratch home), and 26 Medium still reads *26 Medium*. **Done when** the narrow segment reads cleanly on a scratch home with a ledger of 4 / 26 / 34, a UI check on the PR.
 
 **Related:** TD-428 (the declutter, whose live check found it), TD-418 (the design).
+
+## TD-507: `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, TD-465's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`layer_reading`: `c != CADENCE_HOOK_LINE`; `_resolves`; `CADENCE_WIRED_MARKERS`), `tests/` beside the hooks reading
+
+**Why:** `ao doctor` on the live copy (c469063, 2026-10-09) printed *warning: hooks — layer grind+cadence.json names f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi, which does not resolve*, and the same for `grind+cadence+unattended.json`. Those two layers were last written on 2026-09-11 and 2026-09-23 and carry dev-cadence's runner line from before 2026-09-25. `layer_reading` is meant to leave dev-cadence's line out, but it drops only a command equal to today's `CADENCE_HOOK_LINE`. `_resolves` then reads the shell snippet's first word (`f=…/cadence_hooks.sh;`) as a path that is not there. The line is guarded by `[ -x ]` and is harmless, so the warning names something that is not wrong. A person reading `ao doctor` learns to skip the hooks warnings, and the check exists for those warnings.
+
+**Fix:** leave out of the reading every command that names one of `CADENCE_WIRED_MARKERS` (dev-cadence's lines of any vintage), not just today's line. Add a test with a layer that carries the old line and a resolving `agentorc-hook`, which must read no warning.
+
+**Done when** that test passes, and `ao doctor hooks` on kmaster, once live, prints no *does not resolve* line for the `+cadence` layers.
+
+**Related:** TD-465 (the doctor, whose live check found it), TD-111 (the design).
