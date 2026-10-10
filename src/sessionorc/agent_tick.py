@@ -3526,8 +3526,8 @@ class TickMixin:
             if s.state != "exited" or s.ended is None:
                 # the tool's own end, when its hook landed first, keeps its words (§4.2, TD-490)
                 s.ended = {"how": "pane", "at": now_iso(), "code": pane.dead_status}
-            elif s.ended.get("how") == "pane" and s.ended.get("code") is None:
-                s.ended["code"] = pane.dead_status  # tmux's status lags its dead flag
+            elif s.ended.get("how") == "pane":
+                s.ended["code"] = pane.dead_status  # tmux's status lags its dead flag, as `exit_code` does
             if s.state != "exited":
                 s.set_state("exited", confidence="tick")
         elif adapter.state_source == "scraped":

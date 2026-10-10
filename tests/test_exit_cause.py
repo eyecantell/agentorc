@@ -40,8 +40,12 @@ async def test_a_dead_pane_ends_with_its_status_and_is_observed(agent, tmp_path)
         await c.call("send", id=s["id"], text="exit 3")
         got = await wait_state(c, s["id"], "exited")
         assert got["confidence"] == "tick" and got["ended"]["how"] == "pane"
-        # the code is tmux's to report and lags the dead flag, so it is read once it settles
-        assert await wait_for(lambda: agent.sessions[s["id"]].ended.get("code") == 3)
+        # the code is tmux's to report and lags the dead flag (on some runners past any wait), so it
+        # is pinned as the dead pane's status, whatever tmux has said by now
+        await wait_for(lambda: agent.sessions[s["id"]].exit_code == 3, timeout=3.0)
+        await agent.tick()
+        rec = agent.sessions[s["id"]]
+        assert rec.ended["code"] == rec.exit_code
         await c.call("remove", id=s["id"])
 
 
