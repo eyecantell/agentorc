@@ -104,14 +104,14 @@ state to change before concluding anything.
 - Never run `tmux` against an `ao-*` session yourself (§9 invariant 1): `ao` is the only writer.
 - Never answer another session's question, menu, or trust dialog (§9 invariant 6). Permissions
   only through `ao allow`/`ao deny`, only when that session is your member.
-- Never `send`, `kill`, or `close` a session you did not start unless your brief names it; the
-  session in a repo's main checkout is the person's anchor — leave it alone.
+- Never `send`, `kill`, or `close` a session you did not start unless your brief names it; the session in a repo's main checkout is the person's anchor — leave it alone.
 - Never send to, pause, or kill an interactive session (§9 invariant 5), including "are you done?";
   the host agent refuses it, so a refusal naming invariant 5 means stop, not retry.
 - Never `send` into `needs-you` (refused while a permission or question is pending), `limited`
   (nothing stops you, and the prompt fails or queues behind the cap), or `unreachable` (exit 3).
 - Never edit `~/.claude/settings.json`, `~/.claude.json`, or anything under `~/.agentorc`; never
   start, stop, or restart `agentorc-agent` / `agentorc-ui`. The host agent's state is not yours.
+- **Signal only a pid you started and still hold** (`$!`, a background task's id) — never a parent, never by matching a name across the machine (`pkill -f`, `killall`, `kill $(ps …)`): the user manager, the tmux server and the host agent are what such a kill reaches (design §4.8, TD-489). A helper you start gets a bound at birth (`timeout`), so nothing is left to hunt.
 - Never leave a session you started without a record: its work pushed, its ledger touched, then
   `ao close` once it is `idle` and its `ready_when` checks pass.
 
