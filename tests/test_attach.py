@@ -599,6 +599,7 @@ async function run() {
   out.shot = await paste({ read: async () => [item({ "image/png": "PNGDATA" })], readText: async () => "" });
   out.text = await paste({ read: async () => [item({ "text/plain": "hello", "text/html": "<b>hello</b>" })] });
   out.html_image = await paste({ read: async () => [item({ "text/html": "<img>", "image/png": "P" })] });
+  out.blank_text_image = await paste({ read: async () => [item({ "text/plain": "", "image/png": "P" })] });
   out.empty = await paste({ read: async () => [], readText: async () => "" });
   out.no_read = await paste({ readText: async () => "" });
   out.no_read_text = await paste({ readText: async () => "typed" });
@@ -635,6 +636,7 @@ def test_a_screenshot_pasted_on_the_terminal_takes_the_attach_road(tmp_path):
     assert got["shot"] == {"text": [], "file": [shot], "toast": []}
     assert got["text"] == {"text": ["hello"], "file": [], "toast": []}
     assert got["html_image"]["file"] == [{**shot, "size": 1}] and got["html_image"]["text"] == []
+    assert got["blank_text_image"]["file"] == [{**shot, "size": 1}]  # an empty text is no text
     assert got["empty"] == {"text": [], "file": [], "toast": []}
     assert got["no_read"] == {"text": [], "file": [], "toast": ["this browser pastes text only"]}
     assert got["no_read_text"] == {"text": ["typed"], "file": [], "toast": []}

@@ -221,8 +221,7 @@
       for (const it of items || []) {
         if (!(it.types || []).includes("text/plain")) continue;
         const t = await (await it.getType("text/plain")).text();
-        if (t) text(t);
-        return;
+        if (t) { text(t); return; }
       }
       for (const it of items || []) {
         const types = it.types || [];
