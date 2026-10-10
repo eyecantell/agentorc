@@ -205,6 +205,8 @@ def test_focus_paints_the_row_and_the_rail_from_each_view_with_its_editor():
     render = focus[focus.index("    function render(v) {") :]
     render = render[: render.index("\n    }\n")]
     assert '      AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));' in render
+    # the person's file_link with each view, onto the object the pane's link provider holds (TD-537)
+    assert "if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }" in render
     rail = focus[focus.index("    function renderRail(v, ready) {") :]
     rail = rail[: rail.index("\n    }\n")]
     assert "      const html = AO.railHtml(railV, railReady, inboxN, lines, s.editor);" in rail

@@ -4098,6 +4098,9 @@
         $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
+      // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
+      // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
+      if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
       renderReports(v);
       renderInbox(v);
