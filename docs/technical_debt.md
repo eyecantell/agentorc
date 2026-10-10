@@ -46,6 +46,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-536 | What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form | Medium | Open |
 | TD-538 | The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead | Medium | Open |
 | TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Open |
+| TD-540 | No test holds `AO.openEditor`'s `quiet` argument: the second launch of a file link's pair can toast again and the suite stays green (test audit of #1483) | Low | Open |
 
 ---
 
@@ -675,3 +676,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** a design round settles a display of the live build on the page: where (top bar beside the usage, the Settings page, or both); what it reads (the live commit's time as a local date and time, e.g. *live 10-10 15:41*, with the hash and the commits not yet live on hover or press); a mark when `main` holds merges not yet live (*main +1, not live*) and when a promote is running or held; the UI's own build against the host agent's after a promote restarts one before the other; a node's build (`ao host status`). Display only, no control. **Done when** the design says it and the build entry it names is ledgered.
 
 **Related:** TD-062 (the promoted install), TD-120 / TD-132 (Promote), TD-226 (rollback, whose hold the display should name).
+
+## TD-540: No test holds `AO.openEditor`'s `quiet` argument: the second launch of a file link's pair can toast again and `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` stay green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1483)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.openEditor`'s `if (!quiet) AO.toast(…)`, added by #1483, TD-535); `tests/test_ui_focus_paths.py` (`test_a_press_is_two_launches_the_folder_then_the_file_a_second_after`), `tests/test_ui_focus_recent_files.py` (`test_a_recent_file_click_sends_the_folder_then_the_file_and_the_cards_button_one_launch`)
+
+**Why:** the `AO.openFile` comment says *"One toast for the pair"*, and the test's docstring repeats it (*"quietly — one toast for the pair"*). Both tests replace the launcher (`open` as a recording stub, or `AO.openEditor = (...x) => opened.push(x)`) and assert only that the file launch is *called with* a third argument `true`; neither runs `AO.openEditor` itself, so what that argument does is never exercised. Probe, on `origin/main` 3e9cb7db, in the worktree: change `if (!quiet) AO.toast(` to `if (true) AO.toast(` and run `PYTHONPATH=$PWD/src python -m pytest -q tests/test_ui_focus_paths.py tests/test_ui_focus_recent_files.py` — **20 passed**, three runs of the unmutated pair also 20 passed. A press then toasts *opening in VS Code…* twice (the folder's and the file's) and the suite does not notice. (The other mutations tried, the dropped wait, the removed no-folder fallback and a 6 s wait, each fail a test.)
+
+**Fix:** a node probe that runs the real `AO.openEditor` with `AO.toast` and `document.body.appendChild` stubbed: a call without `quiet` toasts once, a call with `true` toasts none, and `AO.openFile` through it toasts exactly once across the pair. Revert the `if (!quiet)` guard to confirm the test fails, then restore. **Done when** the test is named here under **Resolved:**.
+
+**Related:** TD-535 (the build), TD-532 (the design), TD-533 / TD-534 (earlier audit findings on the same area).
