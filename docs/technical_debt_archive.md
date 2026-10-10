@@ -8679,3 +8679,21 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-511 (#1423), TD-490.
 
 **Resolved:** 2026-10-10 (PR #1445) — `tests/test_exit_words.py::test_the_pill_hover_takes_the_first_that_applies` holds two inputs at once: a host note with a waiting reason gives the note, and a waiting reason with a seat, or with an ending on an exited record, gives the reason; both probes in the Why now fail it.
+
+## TD-470: Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-458's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.2a *A metered profile's prompt cache lives an hour*; `src/agentorc/adapters/claude_code/__init__.py` (`launch`, the `env` dict beside `CLAUDE_CONFIG_DIR`, ~L504–L510), `src/agentorc/profiles.py` (`Profile.metered`)
+
+**Why:** TD-458: on an API key Claude Code caches for five minutes, and 4% of a week's requests fell in the 5–60-minute gap that an hour's cache turns from a re-write into a hit; no team runs metered yet, so the cost is still to come.
+
+**Fix:** in `launch`: when `CLAUDE_CODE_PROMPT_CACHE_TTL` is in `os.environ`, `env["CLAUDE_CODE_PROMPT_CACHE_TTL"]` is that value for either billing (the tmux session does not inherit the host agent's environment: `new-session -e` carries each key, `tmux.py` L133); else when `prof.metered`, `"1h"`; else nothing; nothing for the subagent key. Tests: a metered profile's launch carries `1h`, a subscription's carries nothing, either with the key in the environment (monkeypatched) carries that value. **Done when** a metered profile's session starts with the key and the tests pass.
+
+**Related:** TD-458 (the design), TD-151 (metered profiles), TD-459 / TD-467 (the doorbell's `CACHE_LIFETIME`), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 2.
+
+**Resolved:** 2026-10-10 (PR #1447) — `ClaudeCodeAdapter.launch` carries `CLAUDE_CODE_PROMPT_CACHE_TTL` (`CACHE_TTL_ENV`): the host agent's own value for either billing, else `1h` on a metered profile, else nothing; `tests/test_claude_adapter.py::test_a_metered_profiles_launch_pins_the_prompt_cache_to_an_hour`. The lasting content is design §4.2a *A metered profile's prompt cache lives an hour*.
