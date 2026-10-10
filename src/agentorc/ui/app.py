@@ -1167,7 +1167,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "person_overdue": person_overdue,
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
-                "build_chip": await asyncio.to_thread(build_chip, info),
+                "build_chip": None if agent_down else await chip_build(call, info),
                 "identity_note": identity_note(id_info),
                 "restart_note": "" if agent_down else restart_note(info, id_info),
                 "editor_note": uiconf.open_in().error,
@@ -1287,6 +1287,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         }
         if not part:  # the page's top bar; the part is the page's body alone
             ctx["usage"] = await chip_usage(call)
+            ctx["build_chip"] = await chip_build(call)
         return templates.TemplateResponse(request, "repo_part.html" if part else "repo.html", ctx)
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
@@ -1318,6 +1319,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "host": host_name(),
                 "active": "Org",
                 "usage": await chip_usage(call, fleet if known else None),
+                "build_chip": await chip_build(call),
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
                 "popped": window == "1",
                 # §4.5a **Reports** (TD-150): the base a claim in review's PR number links from
@@ -1371,6 +1373,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "host": host_name(),
                 "active": "Org",
                 "usage": await chip_usage(call),
+                "build_chip": await chip_build(call),
             },
         )
 
@@ -1429,6 +1432,16 @@ def tool_profile(profs: Mapping[str, profiles_mod.Profile], default: str, adapte
     if not adapter or adapter == "shell" or (profs.get(default) and profs[default].adapter == adapter):
         return ""
     return next((k for k, p in profs.items() if p.adapter == adapter), "")
+
+
+async def chip_build(call: Any, info: Any = None) -> dict[str, str] | None:
+    """The top bar's **build** chip on every page (§4.5a, TD-539): `build_chip` over `info`, the
+    page's own `host` answer, read here when it holds none. Any failure is no chip, never a page
+    that fails: the chip is display only."""
+    try:
+        return await asyncio.to_thread(build_chip, info if info is not None else await call("host"))
+    except Exception:  # noqa: BLE001
+        return None
 
 
 async def chip_usage(call: Any, sessions: Any = None) -> dict[str, Any]:
@@ -1607,6 +1620,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "host": host_name(),
                 "active": "Org",
                 "usage": await chip_usage(call, sessions_now),
+                "build_chip": await chip_build(call),
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
@@ -2561,6 +2575,7 @@ def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "host": host_name(),
                 "active": "",
                 "usage": await chip_usage(h.call),
+                "build_chip": await chip_build(h.call),
                 "volatile": hosts.local_host().volatile,
             },
         )
@@ -2645,6 +2660,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "agent_down": agent_down,
                 "volatile": local.volatile,
                 "usage": {} if agent_down else await chip_usage(call, fleet or None),
+                "build_chip": None if agent_down else await chip_build(call),
             },
         )
 
@@ -2905,6 +2921,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": {} if agent_down else await chip_usage(call, fleet),
+                "build_chip": None if agent_down else await chip_build(call),
             },
         )
 
@@ -2923,6 +2940,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "host": host_name(),
             "active": "Inbox",
             "usage": await chip_usage(call),
+            "build_chip": await chip_build(call),
             "volatile": hosts.local_host().volatile,
             "mid": mid,
             "back_url": f"/inbox{back}#{mid}",
@@ -3053,6 +3071,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # time, and nothing it says — the browser counts those newer than it last opened the group
         # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
         got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
+        # the top bar's **build** chip is drawn again on this poll (§4.5a, TD-539): a merge shows
+        # within the readings' cadence without a reload
+        got["build_chip"] = await chip_build(call)
         got["html"] = inbox_html(sections, page_origin(request))
         # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
         got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=page_origin(request))

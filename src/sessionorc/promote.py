@@ -28,7 +28,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import build, paths
 
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
@@ -141,6 +141,21 @@ def ahead(root: str | Path, live: str | None, main: str | None) -> int | None:
         return None
     n, _ = _git(root, "rev-list", "--count", f"{live}..{main}")
     return int(n) if n and n.isdigit() else None
+
+
+def read_since(root: str | Path, live: str | None, main: str | None) -> dict[str, Any]:
+    """The build chip's two readings (§6 *Promote*, §4.5a; TD-539): `live_at`, live's committer
+    time, and `pending`, the commits of main past live as `{sha, subject}`, newest first, the first
+    `build.PENDING_SHOWN` with `pending_more` the count of the rest — empty when live is main's
+    head. A failed read, or an unknown live or main, leaves a field absent."""
+    out: dict[str, Any] = {}
+    at, _ = build.commit_at(str(root), live)
+    if at:
+        out["live_at"] = at
+    got = build.pending(str(root), live, main)
+    if got is not None:
+        out["pending"], out["pending_more"] = got
+    return out
 
 
 def read_checks(root: str | Path, sha: str) -> tuple[str, str]:
@@ -526,6 +541,9 @@ def survey(
                 r.setdefault("live", None)
                 r["live_why"] = why
             r["ahead"] = ahead(root, r.get("live"), r.get("main"))
+            for k in ("live_at", "pending", "pending_more"):
+                r.pop(k, None)
+            r.update(read_since(root, r.get("live"), r.get("main")))
         if r["inflight"]:
             fl, note = _conclude(repo, r, now)
             if note:  # a promote or rollback that succeeds clears a failure standing, as Dismiss does (§6)

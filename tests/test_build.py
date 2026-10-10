@@ -144,21 +144,49 @@ async def test_status_v_prints_the_running_build(agent, repo, capsys):
     assert "host agent: build unknown" in capsys.readouterr().out
 
 
-def test_the_chip_is_nothing_when_current_and_says_behind_or_unknown(repo):
-    """Design §4.5a Org top bar **build** chip (TD-132 slice 5): hidden at main's head, as the unread
-    chip at zero; otherwise short, with `line` on hover."""
+def test_the_chip_is_always_drawn_as_the_live_commits_local_time(repo):
+    """Design §4.5a top bar **build** chip (TD-539): always drawn — *live <MM-DD HH:MM>*, the live
+    commit's committer time in this process's zone, `at` the ISO the page reprints — then *· main +n*
+    with the pending subjects on hover, measured here when no reading holds the build."""
     built = _git(repo, "rev-parse", "HEAD")
     _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
     b = {"commit": built, "source": str(repo), "built_at": "t"}
-    assert build.chip(b) is None
+    at = _git(repo, "log", "-1", "--format=%cI", built)
+    c = build.chip(b, "s")
+    assert c["cls"] == "live" and c["at"] == at and c["rest"] == ""
+    assert c["text"] == f"live {build.stamp(at)}" and c["title"].startswith(f"{built[:7]} one\nhost agent: built from")
+    assert "not live yet" not in c["title"] and "measured from this checkout's origin/main" in c["title"]
     _commit(repo, "2\n")
     _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
     c = build.chip(b, "s")
-    assert c == {"text": f"live {built[:7]} · main 1 commit ahead", "title": build.line(b, "s"), "cls": "behind"}
-    assert build.chip(b, a={"ref": "origin/main", "ahead": 4})["text"].endswith("main 4 commits ahead")
-    assert build.chip({})["text"] == "build unknown" and build.chip({})["cls"] == "unknown"
+    assert (c["cls"], c["rest"], c["text"]) == ("behind", " · main +1", f"live {build.stamp(at)} · main +1")
+    assert "1 commit ahead" in c["title"] and "\nnot live yet:\n" in c["title"]
+    assert f"\n{_git(repo, 'rev-parse', 'HEAD')[:7]} 2" in c["title"]
+    assert build.chip(b, a={"ref": "origin/main", "ahead": 4})["text"].endswith(" · main +4")
+    assert build.chip({}) == {"text": "build unknown", "title": build.line({}), "cls": "unknown", "at": "", "rest": ""}
     gone = build.chip({"commit": built, "source": str(repo / "gone")})
-    assert gone["text"] == f"live {built[:7]} · main unknown" and "not on this host" in gone["title"]
+    # no checkout to read its time from: the sha stands in, and nothing for the page to reprint
+    assert gone["text"] == f"live {built[:7]} · main unknown" and gone["at"] == ""
+    assert "not on this host" in gone["title"]
+
+
+def test_the_chip_says_promoting_held_the_page_and_a_stale_node():
+    """§4.5a (TD-539): *promoting…* while a run is in flight, *held* after a rollback, the pending
+    list from the reading with *… and n more*, the page's own build where it differs, and a stale node."""
+    b = {"commit": "a" * 40, "source": "/nonexistent", "built_at": "t"}
+    a = {"ref": "origin/main", "ahead": 12}
+    rows = [{"sha": f"{i:x}" * 40, "subject": f"s{i}"} for i in range(10)]
+    reading = {"live_at": "2026-10-10T15:41:00+00:00", "pending": rows, "pending_more": 2}
+    c = build.chip(b, "", a, **reading)
+    assert c["cls"] == "behind" and c["at"] == reading["live_at"] and c["text"].startswith("live ")
+    assert c["title"].endswith("s9\n… and 2 more") and "measured from" not in c["title"]
+    assert build.chip(b, "", a, **reading, inflight={"sha": "b"})["rest"] == " · promoting…"
+    assert build.chip(b, "", a, **reading, held={"sha": "a"})["cls"] == "held"
+    page = {"commit": "b" * 40, "source": "/nonexistent", "built_at": "2026-10-10T16:00:00Z"}
+    c = build.chip(b, "", a, page=page, nodes=[("box", "c" * 40)])
+    assert "\nthis page: bbbbbbb 2026-10-10T16:00:00Z" in c["title"] and c["title"].endswith("box: ccccccc, stale")
+    assert "this page" not in build.chip(b, "", a, page=dict(b))["title"]
+    assert build.stamp("2025-01-02T03:04:00+00:00").startswith("2025-")
 
 
 def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(repo):
@@ -174,14 +202,18 @@ def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(
     reading = {"root": str(repo), "live": built, "main": "9" * 40, "ahead": 3}  # the home's fetch: 3 ahead
     info = {"built_from": b, "started_at": "s", "promotes": {"src": reading}}
     got = build_chip(info)
-    assert got["text"] == f"live {built[:7]} · main 3 commits ahead" and "3 commits ahead" in got["title"]
-    assert build_chip({**info, "promotes": {"src": {**reading, "ahead": 0, "main": built}}}) is None
+    assert got["text"].endswith(" · main +3") and "3 commits ahead" in got["title"]
+    assert "measured from" not in got["title"]
+    pend = {"pending": [{"sha": "9" * 40, "subject": "the fix"}], "pending_more": 0, "inflight": {"sha": "9" * 40}}
+    got = build_chip({**info, "promotes": {"src": {**reading, **pend}}})
+    assert got["cls"] == "inflight" and "\nnot live yet:\n9999999 the fix" in got["title"]
+    assert build_chip({**info, "promotes": {"src": {**reading, "ahead": 0, "main": built}}})["cls"] == "live"
     # main moved to a line the build is not on (a force-push, a branch build): the row shows, and so
     # does the chip, with no count (the review of #743)
     for n in (0, None):
         off = build_chip({**info, "promotes": {"src": {**reading, "ahead": n}}})
-        assert off["text"] == f"live {built[:7]} · main unknown" and "cannot count back to" in off["title"]
+        assert off["text"].endswith(" · main unknown") and "cannot count back to" in off["title"]
     # a reading of another live commit, another checkout, or no count: measured here
     for other in ({**reading, "live": "0" * 40}, {**reading, "root": str(repo.parent)}, {**reading, "main": None}):
-        assert build_chip({**info, "promotes": {"src": other}})["text"].endswith("main 1 commit ahead")
+        assert build_chip({**info, "promotes": {"src": other}})["text"].endswith(" · main +1")
     assert build_chip(None) is None

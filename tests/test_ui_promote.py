@@ -188,11 +188,20 @@ def test_the_org_top_bar_counts_the_row_as_the_inbox_does(page):
     assert got.status_code == 200 and 'id="personneeds">1<' in got.text
 
 
-def test_the_org_top_bar_draws_the_build_chip_only_when_not_current(page, monkeypatch):
-    """Design §4.5a Org top bar **build** chip (TD-132 slice 5): display only, absent in the common
-    case; the agent here reports no build, so it reads *build unknown* with `build.line` on hover."""
+def test_every_page_and_the_inbox_poll_draw_the_build_chip(page, monkeypatch):
+    """Design §4.5a top bar **build** chip (TD-539): on every page, always drawn; the agent here
+    reports no build, so it reads *build unknown* with `build.line` on hover. A live build carries
+    `data-at` for the page to reprint in the browser's zone, and the Inbox poll brings it again."""
     c, _calls, _ = page
-    html = c.get("/").text
-    assert 'id="buildchip" title="host agent: build unknown' in html and ">build unknown</span>" in html
-    monkeypatch.setattr(uiapp, "build_chip", lambda info: None)
+    for path in ("/", "/inbox"):
+        html = c.get(path).text
+        assert 'id="buildchip" title="host agent: build unknown' in html and ">build unknown</span>" in html, path
+    assert c.get("/api/person/inbox").json()["build_chip"]["text"] == "build unknown"
+    live = {"text": "live 10-10 15:41 · main +2", "title": "a\nb", "cls": "behind", "at": "2026-10-10T15:41:00+00:00",
+            "rest": " · main +2"}  # fmt: skip
+    monkeypatch.setattr(uiapp, "build_chip", lambda info: live)
+    html = c.get("/inbox").text
+    want = 'class="mono behind" id="buildchip" title="a\nb" data-at="2026-10-10T15:41:00+00:00" data-rest=" · main +2"'
+    assert want in html
+    monkeypatch.setattr(uiapp, "build_chip", lambda info: None)  # the agent did not answer
     assert 'id="buildchip"' not in c.get("/").text

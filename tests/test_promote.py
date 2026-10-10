@@ -160,6 +160,30 @@ def test_by_hand_the_pass_reads_and_starts_nothing(checkout):
     assert r["live"] != r["main"]
 
 
+def test_the_pass_reads_live_at_and_the_pending_commits_for_the_build_chip(checkout):
+    """§6 *Promote* (TD-539): beside the three readings, `live_at` — live's committer time — and
+    `pending`, main's commits past live, newest first, with `pending_more` past ten; empty at main."""
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["live_at"] == _git(checkout, "log", "-1", "--format=%cI", r["live"])
+    assert (r["pending"], r["pending_more"]) == ([], 0)
+    shas = [_merge(checkout, n) for n in ("b", "c", "d")]
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["ahead"] == 3 and r["pending"] == [
+        {"sha": s, "subject": n} for s, n in zip(shas[::-1], "dcb", strict=True)
+    ]
+    assert r["pending_more"] == 0
+    for i in range(10):
+        _merge(checkout, f"m{i}")
+    r = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))[0]["repo"]
+    assert len(r["pending"]) == 10 and r["pending_more"] == 3 and r["pending"][0]["subject"] == "m9"
+    # an unknown live or main leaves what it cannot read absent
+    assert promote.read_since(checkout, None, r["main"]) == {}
+    assert set(promote.read_since(checkout, r["live"], None)) == {"live_at"}
+    assert promote.read_since(checkout, "0" * 40, r["main"]) == {}
+
+
 def test_auto_waits_for_main_to_settle(checkout, monkeypatch):
     _merge(checkout, "b")
     readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))

@@ -89,7 +89,8 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 #usagechip .old { opacity: .6; }  /* a reading past USAGE_FRESH (TD-233) */
 #usagechip .unknown { opacity: .6; font-style: italic; }  /* no reading yet, or none the chip still offers (TD-233) */
 #buildchip { font-size: var(--t-small); color: var(--topdim); white-space: nowrap; vertical-align: middle; }  /* §4.5a build chip (TD-132 slice 5) */
-#buildchip.behind { color: var(--topfg); font-weight: 600; } #buildchip.unknown { font-style: italic; }
+#buildchip.behind { color: var(--needs); font-weight: 600; } #buildchip.inflight { color: #9ec5ff; font-weight: 600; }
+#buildchip.held { color: var(--scraped); opacity: .8; } #buildchip.unknown { font-style: italic; }  /* TD-539: dim when live is main */
 #usagemore { cursor: default; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: var(--t-btn); font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn[hidden] { display: none; }  /* .btn sets display, which beats [hidden]: Settings' Cancel showed always (TD-296 #2) */

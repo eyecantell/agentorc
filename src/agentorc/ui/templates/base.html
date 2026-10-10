@@ -25,11 +25,13 @@
      collapsed. A reading prints its age once it is old, and reads *unknown since* past three hours
      (TD-233): `usage_chip`; `data-usage` is what `app.js` draws it again from as it ages. #}
   <span class="mono dim" id="usagechip" title="subscription usage per account a live session is running under: the worst quota window the tool reports, the rest on hover">{% for name, u in (usage or {}).items() %}{% set c = usage_chip(name, u) %}{% if c %}<span data-account="{{ name }}" data-usage='{{ u|tojson }}' data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></span>
-  {# design §4.5a Org top bar **build** chip (TD-132 slice 5, TD-062): display only, drawn only when
-     the running host agent is not main's head or cannot say — nothing in the common case, as the
-     unread chip. `build_chip`: `build.line` on hover, main's distance from the home's promote
-     reading where it has one, so the chip and the Inbox's Promote row agree. #}
-  {% if build_chip %}<span class="mono {{ build_chip.cls }}" id="buildchip" title="{{ build_chip.title }}">{{ build_chip.text }}</span>{% endif %}
+  {# design §4.5a Org top bar **build** chip (TD-539, TD-062): display only, on every page, always
+     drawn — *live <MM-DD HH:MM>*, the live commit's time, `data-at` the instant `app.js` prints in
+     the browser's zone, then `data-rest` (*· main +n*, *· promoting…*, *· held*, *· main unknown*).
+     `build_chip` (`common.build_chip`): the home's promote reading where it holds the build, so the
+     chip and the Inbox's Promote row agree; the hover lists what is not live yet. The Inbox poll
+     redraws it. #}
+  {% if build_chip %}<span class="mono {{ build_chip.cls }}" id="buildchip" title="{{ build_chip.title }}"{% if build_chip.at %} data-at="{{ build_chip.at }}" data-rest="{{ build_chip.rest }}"{% endif %}>{{ build_chip.text }}</span>{% endif %}
   {# design §4.5a Org top bar **Inbox** / **Inbox page** (§4.5 screen 6, §4.10, TD-069 step 1): the
      nav item for `/inbox`, which replaced the dialog that hung here until 2026-09-19. Its number is
      that page's **Needs you** section — open questions to you plus `steer`s you have paused, minus

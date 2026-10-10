@@ -594,17 +594,18 @@ def node_banner(info: dict[str, Any] | None) -> str:
 
 
 def build_chip(info: dict[str, Any] | None) -> dict[str, str] | None:
-    """The Org top bar's **build** chip (design §4.5a, TD-132 slice 5): `build.chip` over the
-    running host agent's `built_from` from `host`. How far main is ahead is the home's own
-    `promotes` reading when it holds one, with a main, for the checkout the build came from and read
-    the same live commit — shown exactly when the Inbox's Promote row would be, with its count —
-    and otherwise measured here, on the UI's side, as `ao status -v` measures it (§4.4). None
-    with nothing to say: the build is main's head, or the agent did not answer. Runs git: call it
-    in a thread."""
+    """The top bar's **build** chip on every page (design §4.5a, TD-539): `build.chip` over the
+    running host agent's `built_from` from `host`, always drawn. How far main is ahead, the live
+    commit's time, the pending commits and *promoting…* / *held* are the home's own `promotes`
+    reading when it holds one, with a main, for the checkout the build came from and read the same
+    live commit — so the chip and the Inbox's Promote row agree — and otherwise main is measured
+    here, on the UI's side, as `ao status -v` measures it (§4.4). The page's own `build.info()` is
+    named where it differs, and each linked node marked stale. None only when the agent did not
+    answer. Runs git: call it in a thread."""
     if not info:
         return None
     b = info.get("built_from") if isinstance(info.get("built_from"), dict) else {}
-    a = None
+    a, more = None, {}
     source, commit = b.get("source"), b.get("commit")
     if isinstance(source, str) and commit:
         for r in (info.get("promotes") or {}).values():
@@ -620,8 +621,14 @@ def build_chip(info: dict[str, Any] | None) -> dict[str, str] | None:
                 a = {"ref": build.REF, "ahead": r["ahead"]}
             else:
                 a = {"ref": build.REF, "why": f"main is at {str(r['main'])[:12]}, which it cannot count back to"}
+            more = {k: r.get(k) for k in ("live_at", "pending", "pending_more", "inflight", "held")}
             break
-    return build.chip(b, str(info.get("started_at") or ""), a)
+    links = info.get("links") if isinstance(info.get("links"), dict) else {}
+    more["nodes"] = [
+        (n, s.get("build")) for n, s in links.items() if isinstance(s, dict) and s.get("up") and s.get("stale")
+    ]
+    more["page"] = build.info()
+    return build.chip(b, str(info.get("started_at") or ""), a, **more)
 
 
 def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) -> str:
