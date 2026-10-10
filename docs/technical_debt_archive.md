@@ -9007,3 +9007,19 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-472 (the design), TD-002 (the attach), TD-473/TD-478 (the road in pieces and the bound), TD-096 (read-only Focus).
 
 **Resolved:** 2026-10-10 (PRs #1448, #1450) — Paul's look (m-37f220f9e955) answered on 2026-10-10 (m-071d09fa4a08): *This works* — a screenshot pasted with Ctrl+V on an interactive Claude Code session's Focus terminal lands as its path in the prompt. His *but*: the browser first draws a white *Paste* button that must be pressed before the paste happens. That is filed as TD-523.
+
+## TD-523: Ctrl+V on the Focus terminal makes the browser draw a *Paste* button the person must press: the page reads the clipboard by script (`clipboard.read()`) instead of the paste event's own data
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-1, from Paul's answer to TD-479's look)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/static/app.js` (`AO.pasteKey` ~L286, which cancels the keydown and calls the paste road; Focus `pasteClip` ~L3598 and `AO.clipPaste`, which read `navigator.clipboard.read()` / `readText()`; `term.attachCustomKeyEventHandler` ~L3606), `tests/test_attach.py` (the node harness); design §4.5a **Copy / Paste**
+
+**Why:** Paul, 2026-10-10, answering TD-479's look (m-071d09fa4a08): *This works, but on hitting ctrl-v a white "paste" option (looks like a right click menu item) appears that must be pressed for the paste to happen. Is that desired/required?* It is neither. Since TD-520 (#1449), `AO.pasteKey` cancels Ctrl+V's keydown and the page reads the clipboard itself through the async Clipboard API. Firefox and Safari guard a script's clipboard read outside a paste event with exactly that one-time *Paste* button; Chrome asks a site permission once. A real paste event carries the clipboard in `event.clipboardData` (text and files alike) with no prompt in any browser. Every Ctrl+V on the terminal therefore costs a second press.
+
+**Resolved:** 2026-10-10 (PRs #1462, #1464) — the paste chords no longer cancel their keydown; the terminal's box catches the browser's own `paste` event in the capture phase and reads `clipboardData` (`AO.pasteKey`, `AO.wireTermPaste`, `AO.pasteData` in `app.js`; design §4.5a **Copy / Paste**; `tests/test_attach.py`). Paul's look (m-c34d930db6db) answered *Works* (m-e9f8fcb175ac): Ctrl+V pastes with no *Paste* button in his browser.
+
+**Related:** TD-479 (the file paste, whose look found it), TD-520 (#1449, the doubled paste whose fix moved Ctrl+V to the script read), TD-472.
