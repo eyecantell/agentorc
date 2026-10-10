@@ -74,7 +74,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-498 | Build the exited pill's cause (TD-490): `confidence: tick`, the record's `ended`, `ending.exit_words`, the pill hover on the card, the Inbox row and the Focus overlay, `ao status -v`'s line, `host.json`'s `last_tick` | Medium | In progress |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-503 | No test reaches the pane cgroup through the create path: `_start` can drop its `self._pane_cgroup(sid)` call and the suite stays green | Medium | Open |
 | TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
@@ -1177,24 +1176,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Focus of a session that printed `src/agentorc/cli.py:364` underlines it on hover and Ctrl+click opens VS Code at that file and line; `build/review` in the same pane's prose, and a path outside the checkout, never underline; `open_in: none` registers no provider and the hover asks nothing (the network tab is empty); a read-only Focus and a popped-out window link as the interactive one does; a node's record is asked through `read`; `pdm run test` covers the RPC's bounds and the provider's runs.
 
 **Related:** TD-493 (the design), TD-421 / TD-422 (the URL link, the modifier gate and the vendored addon), TD-494 (a wrapped URL — its join serves a wrapped path too), TD-164 / TD-095 (`open_in`, the editor button), TD-011 (the percent-encoded path), TD-370 (page functions tested under node).
-
-## TD-503: No test reaches the pane cgroup through the create path: `_start` can drop its `self._pane_cgroup(sid)` call and the suite stays green
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`_start`, `_pane_cgroup`), `tests/test_tmux_unit.py` (`test_the_create_path_makes_the_pane_cgroup_only_under_the_unit`)
-
-**Why:** The test-audit of #1392 (TD-495 slice 1). `test_the_create_path_makes_the_pane_cgroup_only_under_the_unit` is named for the create path, but it calls `agent.tmux.new_session(...)` and then `agent._pane_cgroup("ao-unit")` itself; no create RPC and not `_start` runs. Probe: in the worktree, `_start`'s line `self._pane_cgroup(sid)` replaced with `pass`, then `pytest -q tests/test_tmux_unit.py tests/test_agent.py tests/test_identity.py` — **103 passed**. `grep -rn "_pane_cgroup\|cgroup_root" tests/` finds only `test_tmux_unit.py`. The TD-495 entry's Done-when says the pane cgroup is made *after `new-session`* on the create path; today nothing would notice it is never made.
-
-**Fix:** Make the test create through the real path (`agent.rpc_new` or `agent._start` with `cgroup_root` on a temp dir and `proc.cgroup` patched to the unit's), assert the `pane-<sid>` directory holds the pane pid, then the same with the user-manager cgroup and see none made; confirm by the probe above.
-
-**Done when** the probe in the Why fails the suite.
-
-**Related:** TD-495 (#1392).
 
 ## TD-504: `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test
 
