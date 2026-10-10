@@ -45,6 +45,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-532 | A file link opens the file without the worktree when no VS Code window holds it: send the folder link first, since VS Code brings a window that already holds the folder forward | Medium | Designed 2026-10-10 — build TD-535 |
 | TD-535 | Build a file link's two launches (TD-532): the folder link then, a second after, the file form, from the pane's links and the recent files alike; one toast; the help says a press may be two asks | Medium | Built — live check of #1483 |
+| TD-536 | What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form | Medium | Open |
 
 ---
 
@@ -668,3 +669,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a path press and a recent-file click each send the folder link then the file form a second later, the file opens in the worktree's window whether or not one held it, the Session card's button still sends the one launch, the help says a press may be two asks, and the tests pin the pair.
 
 **Related:** TD-532 (the design), TD-524 / TD-526 (the file form's line and window), TD-525 / TD-527 (recent files, #1476), TD-528 / TD-529 (a template's folder form), TD-501 (the pane's links).
+
+## TD-536: What a file link sends is fixed: always the folder then the file, a second apart, the file form derived from the one `open_in` template; a person cannot turn the folder launch off or give the file its own form
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask after testing TD-535)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §5 `person.open_in` (`docs/design/5-configuration.md` ~L73-95: `vscode`, a `{label, url}` template, `none`; `{path}`, `{line}`, `{remote}`; a folder form drops `:{line}`), §4.6 *A path in the pane is a link* (`docs/design/4.6-transport.md` ~L140-179: *the press is two launches*, *one second, fixed, no setting*, *No person setting*), §4.5a the Settings page's editor row; `src/agentorc/ui/uiconf.py` (`open_in`, `editor_link`, `editor_file`), `src/agentorc/ui/static/app.js` (`AO.openFile`, `AO.FOLDER_WAIT`)
+
+**Why:** Paul, 2026-10-10, testing TD-535 (#1483): it works, the worktree opens and the file within it, but *I wonder if this is too fragile and we should just require users to open the worktree (hit open) then choose a file… we can find out by using it for a while. We will want to have the command that fires when a file link is chosen to be configurable (e.g. vscode <worktree_path> && sleep 1 && vscode <file_path>) that way users can set it for their favorite ide/editor.* Today a template gives one URL, from which the page derives both launches (the folder form drops `:{line}`), and §4.6 fixes the rest: both launches on every press, one second apart, no setting. So if the pair proves fragile in use, nothing turns it off, and an editor whose file form is not the folder form plus `:{line}` cannot be reached.
+
+**Fix:** a design round settles a person setting for what a file link sends, in the page's terms. The page is a browser tab: it can hand URLs to the laptop's protocol handlers and run nothing on the laptop. A shell line like Paul's example would run on the host, where an editor CLI opens nothing on the person's screen. So the setting's shape is launches, not commands. Points to settle: (1) a template's own **folder** and **file** URLs (e.g. `{label, url, file}`, `file` defaulting to today's derivation), so an editor whose two forms differ is reachable; (2) whether a file link **sends the folder first** (on by default, as TD-532 built it; off gives TD-526's file-only launch into the last-used window, Paul's fallback if the pair proves fragile); (3) the **wait**, fixed or settable, within the browser's five-second activation window §4.6 names; (4) where it lives (`person.open_in` beside label and url) and how the Settings page shows it; (5) the presets (`vscode`) carry today's values, so nothing changes for a person who sets nothing. Lift §4.6's *one second, fixed, no setting* and §5's lines in the same round. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-532 / TD-535 (the two launches, #1483; Paul's look `m-846739e230fc`), TD-524 / TD-526 (the file form's line and window), TD-528 / TD-529 (a folder form drops `{line}`), TD-525 / TD-527 (the Session card's recent files).
