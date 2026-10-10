@@ -63,6 +63,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-513 | The client half of TD-484's lane-count patch is pinned by no test: deleting the `syncGroups` block leaves every UI test green | Medium | Open |
 | TD-514 | Two `review_pr` reads in `ui/org.py` (the TDs-in-motion row, the compact line's `→ #N`) are pinned by no test: dropping both leaves the whole suite green | Low | Open |
 | TD-515 | `pill_title`'s *first that applies* order is pinned only where one input is present: a waiting pill's reason and a host note can swap with their neighbours unseen | Low | Open |
+| TD-516 | Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new | Medium | Open |
 
 ---
 
@@ -982,3 +983,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** Add cases holding two inputs: `{host_note, state_class: waiting}` gives the host note; `{state_class: waiting, seat: True}` and `{state_class: waiting}` with an ending give the waiting reason (or, if the design says a seat wins, the test says so and §4.5a is read first). **Done when** both probes fail a test.
 
 **Related:** TD-511 (#1423), TD-490.
+
+## TD-516: Every host-agent restart fills the anchor seat with nothing new: until the first promote reading, every live check reads not live, leaves `lane_seen`, and comes back as new
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (the anchor, filled for the eighth time that evening with nothing new in its lane)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`self._promotes = {}` at start), `src/sessionorc/agent_tick.py` (`_live_commits`, `_work_due`), `src/sessionorc/ledger.py` (a live check's `live` is `"no"` when `live` is unknown), `src/sessionorc/work.py` (`reread` prunes an id the reading holds and the lane no longer matches)
+
+**Why:** On 2026-10-09 the user journal shows the host agent restarted by a promote at 19:56, 20:49, 21:15, 23:06 and 23:42 MDT, and each restart followed, 5–6 minutes later, by *ao-agentorc-ao-grind-anchor: the seat is due (work) — filling it* (20:02, 20:55, 21:21, 23:12, 23:47). Each fill found every anchor entry already read that day (TD-292, TD-358, TD-413, TD-460, TD-463, TD-466, TD-497 — all waiting on an event or the calendar) and closed as *a seat with nothing due*. The mechanism, read in the code: `_promotes` starts empty, so `_live_commits()` is `{}` until the promote survey's first reading. A ledger reading taken in that window marks every live check `live: "no"`, so `lane_matches` drops it from the `anchor` lane; `work.reread` prunes each such id from `lane_seen` (it is held by the reading and no longer matches — the rule meant for a live check that goes live after the seat saw it as a build). When the survey lands, every live check matches again, is missing from `lane_seen`, and is *new*: `seat_due: {by: work, ids: [...]}`. Each cold fill reads the brief and the ledger for nothing. The same window reaches rule 6's lane news for any member whose lane holds a live check (a `free-pick` lane takes one whose build is live).
+
+**Fix:** Unknown is not *not live*. Until the promote reading has run once since the start, `_live_commits` answers None (or the reading marks a live check `live: "unknown"`), and `reread` neither prunes nor reports an id whose match turns on it — or the tick skips the `work` trigger and rule 6's lane news until the first promote reading. Say it in design §6 rule 6 (*`lane_seen` is the lane's memory*) beside the go-live case. Tests: a restart (empty `_promotes`) then a reading then the survey raises no `seat_due` for live checks already in `lane_seen`; a live check whose build goes live after the seat saw it as a build is still due once.
+
+**Done when** a promote's restart is followed by no anchor fill when the lane gained nothing, and the tests above pass.
+
+**Related:** TD-386 (the anchor seat's `work` trigger), TD-407 (`reread`), TD-323 (a live check's `live`).
