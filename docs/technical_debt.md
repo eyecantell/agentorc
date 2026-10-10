@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
-| TD-504 | `ao service install --system`'s success output and the stage-failure branch of `ao service install` have no test | Low | Open |
 | TD-505 | `test_another_tools_command_is_not_read` never reaches the kill guard: it asserts `translate`'s event name, which the guard does not touch | Low | Open |
 | TD-506 | The repo facet's bar segment too narrow for its words draws them clipped: *4 High* reads *l High* on the live Org | Low | Open |
 | TD-507 | `ao doctor`'s hooks check warns that dev-cadence's older SessionStart line *does not resolve*: `layer_reading` leaves out only today's line, byte for byte | Low | Open |
