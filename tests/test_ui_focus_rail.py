@@ -191,3 +191,14 @@ def test_focus_wires_the_rail_to_the_templates_ids():
     for part in ('side: $("#side")', 'away: $("#sideaway")', 'back: $("#sideback")', 'glyphs: $("#railglyphs")'):
         assert part in call, part
     assert 'details.side[data-side="${name}"]' in call
+
+
+@pytest.mark.unit
+def test_the_phones_focus_column_takes_the_pages_width_not_its_terminals():
+    """TD-521: at `align-items: flex-start` the narrow mode's column held the main column at its
+    content's width — the terminal's grid, once fit — and a 600px page scrolled to 2488px sideways
+    on a scratch home; stretched, the column is the page's width and the terminal fits it."""
+    css = (UI / "static" / "app.css").read_text()
+    phone = css[css.index("@media (max-width: 720px)") :]
+    phone = phone[: phone.index("\n}\n")]
+    assert ".page.focus { flex-direction: column; align-items: stretch; }" in phone
