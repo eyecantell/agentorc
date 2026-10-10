@@ -43,7 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-459 | The doorbell rings a member whose prompt cache lapsed hours ago, and the ring re-writes its whole context: restart it on its brief instead | Medium | Designed 2026-10-09 — TD-467 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-461 | The Inbox rail's find count keeps its line while empty (TD-427) and no design line says so | Low | Open |
-| TD-462 | Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees | Low | Designed 2026-10-09 — TD-471 builds it |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-470 | Build the metered profile's one-hour prompt cache (TD-458): `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` in the launch environment unless the host agent's carries it | Low | Open |
@@ -654,26 +653,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** one sentence in §4.5 screen 6 *The rail* and in §4.5a's rail row, in the present tense: the find count holds its line while empty, so typing moves no toggle. The dated fact (TD-427, 2026-10-08) goes to `docs/design-history.md` under §4.5. **Done when** both design files say it and the history line exists.
 
 **Related:** TD-427 (archived), TD-423 (the model for the wording), TD-455.
-
-## TD-462: Mail's `conflict` kind has never been sent: fold it into an `ask` with several addressees
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-08 (the anchor, TD-105's evaluation)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1343): the kind goes. §4.10 *Two controllers disagree* replaces *A `conflict` is an `ask` for every rule* — an `ask` to both controllers with `--cites`, which is accepted on an `ask` to two or more sessions and refused otherwise, an `ask` to two or more never naming the person (the gate that was the conflict's); the kinds table loses its row; `--kind conflict` is refused naming the paragraph, and a retained entry of that kind is read as an `ask`; *A disagreement, worked* keeps the judgement; every *ask, steer or conflict* enumeration in §4.10 and §4.5 reads *ask or steer*; §4.7's `--kind` list loses it. The build is TD-471. Was: Open — filed from TD-105's reading. The design round decides whether the kind goes, and files the build entry if it does.
-**Blocked by:** TD-471
-**Location:** design §4.10 (the kinds table, *A conflict is an `ask` for every rule in this section*, *A conflict, worked*), §4.5a (the conflict's rows), `src/sessionorc/mail.py`, `src/sessionorc/agent_mail.py`, `src/agentorc/briefs/` (each brief that names `--kind conflict`), `ao msg --kind conflict --cites`
-
-**Why:**
-- No session has sent a `conflict` since the kind was built (TD-039). Not one of the more than 650 run logs from 2026-09-07 holds a conflict send, and the roughly 300 retained entries hold none.
-- A conflict is an `ask` addressed to two or more controllers. Every team gives a member one controller, its manager, so the case cannot arise in today's shape.
-- §4.10 already says *a conflict is an ask for every rule in this section*. Yet every brief, every Inbox row renderer, every open-question count and every fact-check carries it as its own kind.
-
-**Fix:** design: fold `conflict` into an `ask` with several addressees and `--cites`. Keep what the kind uniquely carries: the cited `sends` and the rule that it never names the person. Alternatively, write down why the kind earns its place before a second controller exists. Then a build entry. **Done when** the design has one kind fewer, or says why it keeps it.
-
-**Related:** TD-105 (archived; the evaluation), TD-039 (the conflict), TD-052 (mail).
 
 ## TD-463: Four CI flakes since 2026-10-03, one of them seen four times
 
