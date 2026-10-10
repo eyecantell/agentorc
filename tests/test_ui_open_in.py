@@ -151,3 +151,65 @@ def test_a_failed_read_keeps_the_last_and_a_retired_ui_yml_is_named(home):
         agent_down=False, volatile=False, usage={}, editor_note="", migrate_note=uiconf.migrate_note(),
     )  # fmt: skip
     assert 'id="migratenote"' in html and "ui.yml is no longer read" in html
+
+
+def test_file_link_parses_its_bounds_and_a_template_takes_a_file():
+    """§5 `person.file_link` and a template's `file` (TD-536, built by TD-537): the switch, the wait 0–4
+    refused outside with its bound, unknown keys refused; the reader's side drops what does not parse."""
+    from sessionorc import settings as settings_mod
+
+    assert settings_mod.parse_person({"file_link": {"folder_first": False, "wait": 2.5}}) == {
+        "file_link": {"folder_first": False, "wait": 2.5}
+    }
+    for bad, why in (
+        ({"wait": 5}, "0 to 4"),
+        ({"wait": -1}, "0 to 4"),
+        ({"wait": True}, "0 to 4"),
+        ({"folder_first": "yes"}, "true or false"),
+        ({"colour": 1}, "unknown key colour"),
+    ):
+        with pytest.raises(ValueError, match=why):
+            settings_mod.parse_person({"file_link": bad})
+    assert settings_mod.parse_person({"file_link": {"wait": 9, "folder_first": False}}, drop=True) == {
+        "file_link": {"folder_first": False}
+    }
+    tpl = {"label": "Zed", "url": "zed://ssh/{remote}{path}", "file": "zed://file/{remote}{path}:{line}"}
+    assert settings_mod.parse_open_in(tpl) == tpl
+    with pytest.raises(ValueError):
+        settings_mod.parse_open_in({**tpl, "file": ""})
+    with pytest.raises(ValueError):
+        settings_mod.parse_open_in({**tpl, "other": "x"})
+
+
+def test_editor_file_serves_the_templates_file_form_and_file_link_its_defaults(home):
+    write(home, "open_in: {label: Zed, url: 'zed://ssh/{remote}{path}', file: 'zed://f/{remote}{path}:{line}'}\n")
+    assert uiconf.editor_file(local=False, remote="km") == "zed://f/km{path}:{line}"
+    assert uiconf.editor_link("/r", local=False, remote="km")["url"] == "zed://ssh/km/r"  # the folder is url's
+    write(home, "open_in: {label: Zed, url: 'zed://ssh/{remote}{path}', file: 'zed://f/{remote}'}\n")
+    assert uiconf.editor_file(local=False, remote="km") is None  # a file form without {path} names no file
+    write(home, "open_in: {label: Zed, url: 'zed://ssh/{remote}{path}', file: 'javascript://x{path}'}\n")
+    got = uiconf.open_in()
+    assert got.kind == "vscode" and "file's javascript scheme is refused" in got.error  # named, the default drawn
+    write(home, "open_in: {label: Zed, url: 'zed://ssh/{remote}{path}', file: 'nourl{path}'}\n")
+    assert "file 'nourl{path}' is not scheme://" in uiconf.open_in().error
+    # file_link: one second and the folder first where unset or out of bounds; the person's otherwise
+    write(home, "")
+    assert uiconf.file_link() == {"folder_first": True, "wait": 1}
+    write(home, "file_link: {folder_first: false, wait: 3}\n")
+    assert uiconf.file_link() == {"folder_first": False, "wait": 3}
+    write(home, "file_link: {wait: 7}\n")
+    assert uiconf.file_link() == {"folder_first": True, "wait": 1}
+    write(home, "file_link: sideways\n")
+    assert uiconf.file_link() == {"folder_first": True, "wait": 1}
+
+
+def test_the_records_editor_carries_first_and_wait(home):
+    (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import view
+
+    rec = {"id": "ao-x-1", "name": "w", "kind": "agent", "dir": str(home), "state": "idle"}
+    ed = view(rec)["editor"]
+    assert ed["first"] is True and ed["wait"] == 1 and ed["file"] == "vscode://file{path}"
+    write(home, "file_link: {folder_first: false, wait: 0.5}\n")
+    ed = view(rec)["editor"]
+    assert ed["first"] is False and ed["wait"] == 0.5

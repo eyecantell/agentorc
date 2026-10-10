@@ -471,9 +471,19 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
     person = person or {}
     o = person.get("open_in")
     if isinstance(o, dict):
-        mode, label, url = "template", str(o.get("label") or ""), str(o.get("url") or "")
+        mode, label, url, file = (
+            "template",
+            str(o.get("label") or ""),
+            str(o.get("url") or ""),
+            str(o.get("file") or ""),
+        )
     else:
-        mode, label, url = (str(o) if o in ("vscode", "none") else "vscode"), "", ""
+        mode, label, url, file = (str(o) if o in ("vscode", "none") else "vscode"), "", "", ""
+    # **file link** (§4.5a *Settings page: You, file link*, §5 `person.file_link`; TD-536): the defaults where unset
+    try:
+        fl = settings_mod.parse_file_link(person.get("file_link"), drop=True)
+    except ValueError:
+        fl = {}
     term = person.get("terminal") if isinstance(person.get("terminal"), dict) else {}
     lo, hi = settings_mod.TERMINAL_SIZE
     attach = person.get("attach") if isinstance(person.get("attach"), dict) else {}
@@ -499,6 +509,10 @@ def you(person: Mapping[str, Any] | None) -> dict[str, Any]:
         "open_in": mode,
         "label": label,
         "url": url,
+        "file": file,
+        "folder_first": fl.get("folder_first", True),
+        "wait": fl.get("wait", 1),
+        "wait_bounds": settings_mod.FILE_LINK_WAIT,
         "size": term.get("size") if isinstance(term.get("size"), int) else None,
         "face": str(term.get("face") or ""),
         "copy_on_select": term.get("copy_on_select") is not False,  # on by default (§4.5a, TD-164)

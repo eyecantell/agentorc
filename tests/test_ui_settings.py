@@ -321,6 +321,42 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         )
 
 
+def test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file(client, subprocess_agent):
+    """§4.5a *Settings page: You, file link* (TD-536, built by TD-537): the switch on and one second until
+    set, under the editor pick and absent under `none`; written through `set_settings`, the wait refused
+    outside 0–4 in its words, the wait input disabled with the switch off; a template's **file** saved and
+    a refused one named."""
+    from sessionorc.client import call_sync
+
+    try:
+        page = client.get("/settings").text
+        assert 'id="setfilelink"' in page and 'class="setfilelink"' in page
+        assert 'name="folder_first" title="Has a file link open' in page and re.search(
+            r'name="folder_first" title="[^"]*" checked>', page
+        )
+        assert 'name="wait" type="number" min="0" max="4" step="0.5" value="1">' in page
+        assert 'name="file" value=""' in page and "the file link's own form; empty, url with the file's path" in page
+        got = client.post("/api/settings/you", json={"file_link": {"folder_first": False, "wait": 2.5}})
+        assert got.json()["ok"]
+        assert call_sync("settings")["person"]["file_link"] == {"folder_first": False, "wait": 2.5}
+        page = client.get("/settings").text
+        assert re.search(r'name="folder_first" title="[^"]*">', page)  # drawn unticked
+        assert 'value="2.5" disabled>' in page
+        bad = client.post("/api/settings/you", json={"file_link": {"wait": 5}})
+        assert bad.status_code == 400 and "0 to 4" in bad.json()["detail"]
+        assert client.post("/api/settings/you", json={"file_link": {"colour": 1}}).status_code == 400
+        tpl = {"label": "Zed", "url": "zed://ssh/{remote}{path}", "file": "zed://f/{remote}{path}:{line}"}
+        assert client.post("/api/settings/you", json={"open_in": tpl}).json()["ok"]
+        assert call_sync("settings")["person"]["open_in"] == tpl
+        assert 'name="file" value="zed://f/{remote}{path}:{line}"' in client.get("/settings").text
+        refused = client.post("/api/settings/you", json={"open_in": {**tpl, "file": "javascript://x{path}"}})
+        assert refused.status_code == 400 and "refused" in refused.json()["detail"]
+        assert client.post("/api/settings/you", json={"open_in": "none"}).json()["ok"]
+        assert 'class="setfilelink hidden"' in client.get("/settings").text
+    finally:
+        call_sync("set_settings", person={"open_in": None, "file_link": None})
+
+
 def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
     from sessionorc.client import call_sync
 

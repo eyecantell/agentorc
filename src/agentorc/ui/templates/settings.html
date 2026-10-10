@@ -170,7 +170,7 @@
   </section>
 
   {# **You** (§4.5a *Settings page: You*): two halves by write path #}
-  {% set info_you = "Yours everywhere: the editor button (open_in) and the terminal's size and face, in settings.yml's person: through set_settings — every browser reads them. Telegram: whether the home tells you on Telegram what stops a session or a team while no page is open, in settings.yml's notify:. This browser: what this browser remembers — the theme and the folds — each set by its own control, and Reset this browser, which clears them all here and nothing anywhere else." %}
+  {% set info_you = "Yours everywhere: the editor button (open_in), what a file link sends (file_link) and the terminal's size and face, in settings.yml's person: through set_settings — every browser reads them. Telegram: whether the home tells you on Telegram what stops a session or a team while no page is open, in settings.yml's notify:. This browser: what this browser remembers — the theme and the folds — each set by its own control, and Reset this browser, which clears them all here and nothing anywhere else." %}
   <section class="isec" id="sec-you">
     <div class="row gap sechead"><span class="h2">You</span>{{ imark("you", "You", info_you) }}</div>
     {{ panel("you", info_you) }}
@@ -183,9 +183,20 @@
           <option value="none"{% if you.open_in == "none" %} selected{% endif %}>none</option>
         </select>
         <span class="note">the card's and Focus's button; none removes it</span></label>
+      {#- **file link** (§4.5a *Settings page: You, file link*, §4.6, §5 `person.file_link`; TD-536): what a
+          file link sends, whatever the editor, absent under `none`; the wait disabled with the switch off -#}
+      <div class="setfilelink{% if you.open_in == 'none' %} hidden{% endif %}" id="setfilelink">
+        <label class="setrow"><span class="setlabel">file link</span>
+          <input type="checkbox" name="folder_first" title="{{ help_title('file-link') }}"{% if you.folder_first %} checked{% endif %}>
+          <span class="note">opens the folder first, so the file lands in the worktree's window; off, the file alone</span></label>
+        <label class="setrow"><span class="setlabel">wait</span>
+          <input class="input setin" name="wait" type="number" min="{{ you.wait_bounds[0] }}" max="{{ you.wait_bounds[1] }}" step="0.5" value="{{ you.wait }}"{% if not you.folder_first %} disabled{% endif %}>
+          <span class="note">s before the file, {{ you.wait_bounds[0] }}–{{ you.wait_bounds[1] }} · your browser may ask twice until you tell it to always allow this site</span></label>
+      </div>
       <div class="settemplate{% if you.open_in != 'template' %} hidden{% endif %}" id="settemplate">
         <label class="setrow"><span class="setlabel">label</span><input class="input setin" name="label" value="{{ you.label }}" placeholder="Cursor" autocomplete="off"></label>
         <label class="setrow"><span class="setlabel">url</span><input class="input setin mono" name="url" value="{{ you.url }}" placeholder="cursor://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank" autocomplete="off" spellcheck="false"><span class="note"><span class="mono">{path}</span> the directory or file, <span class="mono">{remote}</span> the host, <span class="mono">{line}</span> the line, on a file link; a folder drops it with the <span class="mono">:</span> before it</span></label>
+        <label class="setrow"><span class="setlabel">file</span><input class="input setin mono" name="file" value="{{ you.file }}" placeholder="zed://ssh/{remote}{path}:{line}" autocomplete="off" spellcheck="false"><span class="note">the file link's own form; empty, url with the file's path</span></label>
       </div>
       <label class="setrow"><span class="setlabel">terminal size</span>
         <input class="input setin" name="size" type="number" min="{{ you.size_bounds[0] }}" max="{{ you.size_bounds[1] }}" value="{{ you.size or '' }}" placeholder="13">

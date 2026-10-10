@@ -7,10 +7,13 @@ Its first key is **`open_in:`**, the editor button of the card and the Focus hea
 
 - `vscode` — the default, and what a missing key, or no read yet, means: today's two forms;
 - `none` — no button anywhere;
-- `{label: "…", url: "…"}` — a template of the person's own, which is how any other editor is
-  reached. `{path}` is the directory, percent-encoded (TD-011); `{remote}` is the host's
+- `{label: "…", url: "…", file: "…"}` — a template of the person's own, which is how any other editor
+  is reached. `{path}` is the directory, percent-encoded (TD-011); `{remote}` is the host's
   `vscode_host` from `hosts.yml`. A template must be `scheme://…`, and `javascript`, `data`,
-  `vbscript` and `file` are refused as schemes — the scheme parsed, never a substring.
+  `vbscript` and `file` are refused as schemes — the scheme parsed, never a substring. `file`,
+  optional, is the file link's own form under the same check (TD-536).
+
+Beside it, **`file_link:`** says what a file link sends (§4.6; TD-536): `{folder_first, wait}`.
 
 A value that does not parse, or is refused, is **named on the page** and the default button drawn:
 the file is the person's own, and a pasted bad line must still not become a link that runs.
@@ -27,7 +30,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
-from sessionorc.settings import BOARD_SHOW_DEFAULT, parse_board_show
+from sessionorc.settings import BOARD_SHOW_DEFAULT, parse_board_show, parse_file_link
 
 REFUSED_SCHEMES = ("javascript", "data", "vbscript", "file")
 _SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*)://")
@@ -49,6 +52,7 @@ class OpenIn:
     kind: str = "vscode"
     label: str = "VS Code"
     url: str = ""
+    file: str = ""
     error: str = ""
 
 
@@ -64,12 +68,16 @@ def parse_open_in(raw: object) -> OpenIn:
         label, url = raw.get("label"), raw.get("url")
         if not isinstance(label, str) or not label.strip():
             return OpenIn(error="open_in: a template needs a label, the button's words")
-        if not isinstance(url, str) or not (m := _SCHEME.match(url.strip())):
-            return OpenIn(error=f"open_in: {url!r} is not scheme://… — a template must name its scheme")
-        if m.group(1).lower() in REFUSED_SCHEMES:
-            return OpenIn(error=f"open_in: the {m.group(1).lower()} scheme is refused (design §5)")
-        return OpenIn(kind="template", label=label.strip(), url=url.strip())
-    return OpenIn(error=f"open_in: {raw!r} is not vscode, none or {{label, url}}")
+        file = raw.get("file")
+        for what, form in (("url", url), ("file", file)):
+            if what == "file" and file is None:
+                continue
+            if not isinstance(form, str) or not (m := _SCHEME.match(form.strip())):
+                return OpenIn(error=f"open_in: {what} {form!r} is not scheme://… — a template must name its scheme")
+            if m.group(1).lower() in REFUSED_SCHEMES:
+                return OpenIn(error=f"open_in: {what}'s {m.group(1).lower()} scheme is refused (design §5)")
+        return OpenIn(kind="template", label=label.strip(), url=url.strip(), file=(file or "").strip())
+    return OpenIn(error=f"open_in: {raw!r} is not vscode, none or {{label, url, file}}")
 
 
 WHERE = "settings.yml person.open_in"
@@ -111,6 +119,19 @@ def open_in() -> OpenIn:
     that does not parse is named, and the default drawn."""
     got = parse_open_in(_read["person"].get("open_in"))
     return OpenIn(error=f"{WHERE}: {got.error}") if got.error else got
+
+
+FILE_LINK_DEFAULT = {"folder_first": True, "wait": 1}
+
+
+def file_link() -> dict[str, Any]:
+    """The person's `file_link` as last read (design §5 `person.file_link`, §4.6; TD-536): `{folder_first,
+    wait}`, each the default — the folder first, one second — where unset or out of its bounds."""
+    try:
+        got = parse_file_link(_read["person"].get("file_link"), drop=True)
+    except ValueError:
+        got = {}
+    return {**FILE_LINK_DEFAULT, **got}
 
 
 def copy_on_select() -> bool:
@@ -185,8 +206,8 @@ def editor_file(*, local: bool, remote: str, reach: str = "") -> str | None:
     ssh-remote, and a container's (the reach link's own prefix with the file in place of its folder)
     — end at `{path}`, the page putting the line after it, and carry no `windowId=_blank`: a file
     lands in the window used last, where the button's folder opens a new one (TD-524, TD-526). A
-    template of the person's own keeps `{path}` and fills `{remote}`, and one without `{path}` names
-    no file, so it links none."""
+    template of the person's own serves its `file` form when it has one (TD-536), else its `url`, keeping
+    `{path}` and filling `{remote}`; a form without `{path}` names no file, so it links none."""
     o = open_in()
     if o.kind == "none":
         return None
@@ -194,7 +215,8 @@ def editor_file(*, local: bool, remote: str, reach: str = "") -> str | None:
         m = re.match(r"(vscode://vscode-remote/attached-container\+[^/?]+)[^?]*(\?.*)?$", reach)
         return f"{m.group(1)}{{path}}" if o.kind == "vscode" and m else None
     if o.kind == "template":
-        return o.url.replace("{remote}", remote) if "{path}" in o.url else None
+        form = o.file or o.url
+        return form.replace("{remote}", remote) if "{path}" in form else None
     if local:
         return "vscode://file{path}"
     return f"vscode://vscode-remote/ssh-remote+{remote}{{path}}"

@@ -209,6 +209,13 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
       file: SSH }, "/r/a.py", 12),
     pairPlain: pair({}, { url: "vscode://file/r?windowId=_blank", label: "VS Code", file: FILE }, "/r/a.py", 12),
     wait: AO.FOLDER_WAIT,
+    // the person's `file_link` on the record's editor (TD-536): off, the file alone; on, their wait
+    pairOff: pair({ ctrlKey: true }, { url: "vscode://file/r?windowId=_blank", label: "VS Code", file: FILE,
+      first: false, wait: 2 }, "/r/a.py", 12),
+    pairWait: pair({ ctrlKey: true }, { url: "vscode://file/r?windowId=_blank", label: "VS Code", file: FILE,
+      first: true, wait: 2.5 }, "/r/a.py", 12),
+    pairNoWait: pair({ ctrlKey: true }, { url: "vscode://file/r?windowId=_blank", label: "VS Code", file: FILE,
+      first: true, wait: 0 }, "/r/a.py", 12),
   }));
 })();
 """
@@ -298,6 +305,19 @@ def test_a_press_is_two_launches_the_folder_then_the_file_a_second_after():
         ["vscode://vscode-remote/ssh-remote+km/r/a.py:12", "VS Code", True],  # quiet: no second toast
     ]
     assert got["pairPlain"] == {"r": False, "atPress": [], "waits": [], "opened": []}
+
+
+@pytest.mark.unit
+def test_the_persons_file_link_turns_the_folder_off_and_sets_the_wait():
+    """§4.6, §5 `person.file_link` (TD-536, built by TD-537): `first: false` on the record's editor is
+    TD-526's one launch, the file form alone and with its toast; on, the wait is the person's seconds."""
+    got = _probe()
+    off = got["pairOff"]
+    assert off["r"] is True and off["waits"] == [] and off["opened"] == [["vscode://file/r/a.py:12", "VS Code"]]
+    on = got["pairWait"]
+    assert on["waits"] == [2500] and on["atPress"] == [["vscode://file/r?windowId=_blank", "VS Code"]]
+    assert on["opened"][1] == ["vscode://file/r/a.py:12", "VS Code", True]
+    assert got["pairNoWait"]["waits"] == [0] and len(got["pairNoWait"]["opened"]) == 2
 
 
 @pytest.mark.unit
