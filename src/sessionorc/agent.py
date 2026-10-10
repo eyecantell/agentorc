@@ -369,6 +369,7 @@ class HostAgent(
         self._id_tmux: tuple[int, int] | None = None  # (pid, start time): the server the answer is about
         # the first server read, kept: `ao doctor` reads a server replaced under the agent against it (§4.7, TD-465)
         self._id_tmux_first: tuple[int, int] | None = None
+        self.cgroup_root = "/sys/fs/cgroup"  # where a pane's own cgroup is made (§4.8a, TD-495); tests point it away
         self._id_rechecked = 0.0  # monotonic; the check is re-read on a cadence, not per connection
         # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
         # from outside every pane — is evidence, and evidence that dies with the process is a page
@@ -1591,6 +1592,23 @@ class HostAgent(
     def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()
         self.tmux.new_session(sid, cwd, argv, env, logfile=run_log)  # log from the first byte (invariant 3)
+        self._pane_cgroup(sid)
+
+    def _pane_cgroup(self, sid: str) -> None:
+        """Under the installed home's tmux system unit (§4.1, `Delegate=yes`) tmux reaches no user bus
+        to give a pane its own scope, so the host agent gives it a cgroup of its own, the fourth
+        identity signal (§4.8a, TD-495). Anywhere else nothing is done: tmux's scope stands where it
+        made one. A write that fails leaves the pane in the server's cgroup, and the create goes on."""
+        pid = self.tmux.server_pid()
+        server = self.proc.cgroup(pid) if pid else None
+        if identity.server_placement(server) != "system" or not server:
+            return
+        pane = self.tmux.pane_pid(sid)
+        if not pane:
+            return
+        live = {p.session for p in self.tmux.list_panes()}
+        if identity.pane_cgroup(self.cgroup_root, server, sid, pane, live) is None:
+            log.info("%s: no cgroup of its own under %s — the pane keeps the server's", sid, server)
 
     async def rpc_kill(self, id: str) -> dict[str, Any]:
         s = self._get(id)

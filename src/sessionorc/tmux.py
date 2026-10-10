@@ -212,6 +212,12 @@ class Tmux:
         out = cp.stdout.strip()
         return int(out) if cp.returncode == 0 and out.isdigit() else None
 
+    def pane_pid(self, name: str) -> int | None:
+        """The pid of a session's first pane's process, or None when tmux cannot say."""
+        cp = self.run("display-message", "-p", "-t", f"={name}:", "#{pane_pid}", check=False)
+        out = cp.stdout.strip()
+        return int(out) if cp.returncode == 0 and out.isdigit() else None
+
     def main_panes(self, prefix: str = "ao-") -> dict[str, PaneInfo]:
         """One pane per session — the lowest window/pane index, deterministically."""
         best: dict[str, PaneInfo] = {}
