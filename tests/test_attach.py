@@ -191,19 +191,54 @@ def _client(monkeypatch, tmp_path, calls):
 
 @pytest.mark.unit
 def test_the_route_hands_the_upload_to_the_host_agent_and_answers_the_path(tmp_path, monkeypatch):
-    """`POST /api/sessions/<id>/attach`, multipart: the file goes to `attach` as base64 under its own
-    name, and the answer is the path for the composer; one past the bound is refused before the host
-    agent is asked."""
+    """`POST /api/sessions/<id>/attach`, multipart: a file of one piece goes to `attach` as base64
+    under its own name, and the answer is the path for the composer; a piece past
+    `paths.ATTACH_PIECE_BYTES` is refused before the host agent is asked (TD-478)."""
     calls: list = []
     c = _client(monkeypatch, tmp_path, calls)
     r = c.post("/api/sessions/ao-x-1/attach", files={"file": ("shot.png", b"PNGDATA", "image/png")})
     assert r.status_code == 200 and r.json() == {"ok": True, "path": "/h/attachments/ao-x-1/shot.png"}
     ((method, kw),) = [x for x in calls if x[0] == "attach"]
     assert kw["id"] == "ao-x-1" and kw["name"] == "shot.png" and base64.b64decode(kw["data"]) == b"PNGDATA"
-    monkeypatch.setattr(paths, "ATTACH_BYTES_MAX", 4)
+    assert "upload" not in kw and "total" not in kw
+    monkeypatch.setattr(paths, "ATTACH_PIECE_BYTES", 4)
     r = c.post("/api/sessions/ao-x-1/attach", files={"file": ("big.png", b"12345", "image/png")})
     assert r.status_code == 413 and "past the" in r.json()["detail"]
     assert len([x for x in calls if x[0] == "attach"]) == 1
+
+
+@pytest.mark.unit
+def test_the_route_carries_a_pieces_upload_offset_total_and_cancel(tmp_path, monkeypatch):
+    """TD-478 (5): the first piece carries `total` and is answered `{upload, bytes}`; a later piece
+    names the `upload` and its `offset`, the last answered with the path; `cancel` with the upload
+    reaches `attach` as `cancel: true` with no file, and a cancel naming no upload is refused here."""
+    calls: list = []
+    c = _client(monkeypatch, tmp_path, calls)
+    answers = iter([{"upload": "ab" * 8, "bytes": 3}, {"path": "/h/attachments/ao-x-1/deck.pptx", "bytes": 5}])
+
+    async def fake(method, **kw):
+        calls.append((method, kw))
+        return next(answers) if method == "attach" and not kw.get("cancel") else {"cancelled": True}
+
+    from agentorc.ui import app as ui
+
+    monkeypatch.setattr(ui.LocalClient, "call", lambda self, method, **kw: fake(method, **kw))
+    r = c.post("/api/sessions/ao-x-1/attach", data={"total": "5"}, files={"file": ("deck.pptx", b"abc")})
+    assert r.json() == {"ok": True, "upload": "ab" * 8, "bytes": 3}
+    r = c.post(
+        "/api/sessions/ao-x-1/attach", data={"upload": "ab" * 8, "offset": "3"}, files={"file": ("deck.pptx", b"de")}
+    )
+    assert r.json() == {"ok": True, "path": "/h/attachments/ao-x-1/deck.pptx"}
+    r = c.post("/api/sessions/ao-x-1/attach", data={"upload": "cd" * 8, "cancel": "1"})
+    assert r.json() == {"ok": True, "cancelled": True}
+    first, second, third = (kw for m, kw in calls if m == "attach")
+    assert first["total"] == 5 and "upload" not in first and base64.b64decode(first["data"]) == b"abc"
+    assert second["upload"] == "ab" * 8 and second["offset"] == 3 and "total" not in second
+    assert base64.b64decode(second["data"]) == b"de"
+    assert third == {"id": "ao-x-1", "upload": "cd" * 8, "cancel": True}
+    r = c.post("/api/sessions/ao-x-1/attach", data={"cancel": "1"})
+    assert r.status_code == 400 and "names the upload" in r.json()["detail"]
+    assert len([x for x in calls if x[0] == "attach"]) == 3
 
 
 @pytest.mark.unit
@@ -361,6 +396,164 @@ def test_the_composers_drop_and_paste_handlers_run_as_themselves(tmp_path):
         "uploaded": ["one.png", "two.png", "shot.png"],
     }
     assert got["shut"] == {"prevented": False, "uploaded": ["one.png", "two.png", "shot.png"], "input_value": ""}
+
+
+PIECES_PROBE = (
+    PRELUDE
+    + """
+const fileOf = (text) => ({ size: text.length, slice: (a, b) => text.slice(a, b) });
+function host(opts) {
+  const seen = [];
+  let had = 0;
+  const post = async (fields) => {
+    seen.push(Object.assign({}, fields));
+    if (fields.cancel) return { ok: true, cancelled: true };
+    if (opts.refuseAt !== undefined && seen.length === opts.refuseAt) throw new Error("upload 12 was cancelled");
+    if (!fields.upload && fields.file.length === fields.total) return { ok: true, path: "/a/" + fields.name };
+    if (fields.upload && fields.offset !== had) throw new Error("bad offset");
+    had += fields.file.length;
+    if (had === opts.total) return { ok: true, path: "/a/" + fields.name };
+    return { ok: true, upload: "u1", bytes: had };
+  };
+  return { seen, post };
+}
+async function run() {
+  const out = {};
+  {
+    const h = host({ total: 10 }), pct = [];
+    const path = await AO.uploadPieces(fileOf("0123456789"), { name: "deck.pptx", piece: 4, post: h.post,
+      progress: (n, last) => pct.push([n, last]), cancelled: () => false });
+    out.whole = { path, pct, seen: h.seen };
+  }
+  {
+    const h = host({ total: 3 }), pct = [];
+    const path = await AO.uploadPieces(fileOf("abc"), { name: "s.png", piece: 4, post: h.post,
+      progress: (n) => pct.push(n), cancelled: () => true });
+    out.one = { path, pct, seen: h.seen };
+  }
+  {
+    const h = host({ total: 0 });
+    const path = await AO.uploadPieces(fileOf(""), { name: "empty.txt", piece: 4, post: h.post,
+      progress: () => {}, cancelled: () => true });
+    out.empty = { path, seen: h.seen };
+  }
+  {
+    const h = host({ total: 10 });
+    let asked = 0;
+    const path = await AO.uploadPieces(fileOf("0123456789"), { name: "d.pdf", piece: 4, post: h.post,
+      progress: () => {}, cancelled: () => ++asked > 0 });
+    out.cancelled = { path, seen: h.seen };
+  }
+  {
+    const h = host({ total: 10, refuseAt: 2 });
+    let err = "";
+    try { await AO.uploadPieces(fileOf("0123456789"), { name: "d.pdf", piece: 4, post: h.post,
+      progress: () => {}, cancelled: () => false }); } catch (e) { err = e.message; }
+    out.refused = { err, seen: h.seen };
+  }
+  console.log(JSON.stringify(out));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.mark.unit
+def test_the_page_sends_a_file_in_pieces_and_cancels_what_is_half_up(tmp_path):
+    """TD-478 (6), under node: `AO.uploadPieces` slices a file by the piece size and sends it in
+    order — the first piece with `total`, each later one with the `upload` and its `offset` — with
+    the percent after each middle piece and the path from the last; a file of one piece is one call
+    and is never asked to cancel; the ✕ before a later piece sends `{upload, cancel}` and answers no
+    path; a refused piece cancels what is up and throws the host agent's words; an empty file is one call."""
+    got = _node(tmp_path, PIECES_PROBE)
+    whole = got["whole"]
+    assert whole["path"] == "/a/deck.pptx" and whole["pct"] == [[40, False], [80, True]]
+    assert [(x.get("upload"), x.get("offset"), x.get("total"), x["file"]) for x in whole["seen"]] == [
+        (None, None, 10, "0123"),
+        ("u1", 4, None, "4567"),
+        ("u1", 8, None, "89"),
+    ]
+    assert got["one"] == {"path": "/a/s.png", "pct": [], "seen": [{"total": 3, "name": "s.png", "file": "abc"}]}
+    assert got["empty"] == {"path": "/a/empty.txt", "seen": [{"total": 0, "name": "empty.txt", "file": ""}]}
+    cancelled = got["cancelled"]
+    assert cancelled["path"] is None
+    assert [x.get("cancel") or x["file"] for x in cancelled["seen"]] == ["0123", "1"]
+    assert cancelled["seen"][1] == {"upload": "u1", "cancel": "1"}
+    refused = got["refused"]
+    assert refused["err"] == "upload 12 was cancelled"
+    assert refused["seen"][-1] == {"upload": "u1", "cancel": "1"} and len(refused["seen"]) == 3
+
+
+PROGRESS_PROBE = (
+    PRELUDE
+    + """
+const tick = () => new Promise((r) => setImmediate(r));
+const stub = (extra) => { const on = {}; const cls = new Set(extra && extra.hidden ? ["hidden"] : []);
+  return Object.assign({ on,
+  classList: { contains: (c) => cls.has(c), add: (c) => cls.add(c), remove: (c) => cls.delete(c),
+    toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)) },
+  addEventListener: (k, f) => { on[k] = f; }, dispatchEvent: () => {}, focus: () => {}, click: () => {} }, extra); };
+async function run() {
+  const button = stub({ lastChild: { textContent: "Attach" }, disabled: false });
+  const cancel = stub({ hidden: true });
+  const compose = stub({ value: "", selectionStart: 0, selectionEnd: 0 });
+  let gate, seen = {};
+  const upload = async (f, ctl) => {
+    if (f.name === "two.bin") {
+      ctl.progress(60, true); seen.last_shown = !cancel.classList.contains("hidden"); return "/a/two.bin";
+    }
+    ctl.progress(37);
+    seen.label = button.lastChild.textContent; seen.shown = !cancel.classList.contains("hidden");
+    await new Promise((r) => { gate = r; });
+    seen.cancelled = ctl.cancelled();
+    return ctl.cancelled() ? null : "/a/" + f.name;
+  };
+  const attach = AO.wireAttach({ button, input: stub({ files: [], value: "" }), composer: stub(), compose,
+    targets: [], upload, fail: () => {}, cancel });
+  const done = attach([{ name: "deck.pptx" }]);
+  await tick(); await tick();
+  cancel.on.click();
+  seen.hidden_on_press = cancel.classList.contains("hidden");
+  gate(); await done;
+  seen.cancel_value = compose.value;
+  await attach([{ name: "two.bin" }]);
+  seen.value = compose.value; seen.after = !cancel.classList.contains("hidden");
+  seen.label_after = button.lastChild.textContent;
+  console.log(JSON.stringify(seen));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.mark.unit
+def test_the_composer_shows_an_uploads_percent_and_its_cancel(tmp_path):
+    """TD-478 (6), §4.5a *Attach*: past a file's first piece the label reads *Attaching <name> · n%*
+    and the ✕ is shown; its press marks the upload cancelled and hides it, and a cancelled upload
+    inserts no path; the label is *Attach* again afterwards. Once only the last piece is left the ✕ is
+    hidden: that piece links the file into place, past cancelling (the review of #1413)."""
+    got = _node(tmp_path, PROGRESS_PROBE)
+    assert got == {
+        "label": "Attaching deck.pptx · 37%", "shown": True, "hidden_on_press": True, "cancelled": True,
+        "cancel_value": "", "value": "/a/two.bin ", "after": False, "label_after": "Attach", "last_shown": False,
+    }  # fmt: skip
+
+
+@pytest.mark.unit
+def test_the_focus_page_serves_the_piece_size_and_the_cancel(tmp_path, monkeypatch):
+    """TD-478: the Attach button carries the host agent's `paths.ATTACH_PIECE_BYTES`, so the page
+    slices by the constant the host agent reads, and the ✕ is drawn hidden beside it."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {"id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+            "state": "idle", "since": "2026-10-07T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
+            "created": "2026-10-07T15:00:00Z"}  # fmt: skip
+    html = templates.get_template("focus.html").render(
+        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+    )
+    assert f'id="attach" data-piece="{paths.ATTACH_PIECE_BYTES}"' in html
+    assert 'class="btn sm hidden" id="attachcancel"' in html
 
 
 @pytest.mark.integration

@@ -26,7 +26,7 @@ from markupsafe import Markup
 from agentorc import org as orgmod
 from agentorc import repoconfig, teamrun, teams
 from agentorc.cli import stop_time as clistop
-from sessionorc import build, hosts, identity, mail
+from sessionorc import build, hosts, identity, mail, paths
 from sessionorc.client import AgentError
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import (
@@ -44,6 +44,9 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 # The role badge's picture (design §4.8 *Role presets*, TD-074): the markup lives in one place and
 # the template asks for it by name, so no config file ever carries an SVG.
 templates.env.globals["role_svg"] = role_svg
+# The size of a Focus attachment's piece (§4.4 *Attachment drop*, TD-478), served on the Attach button
+# so the page slices by the host agent's own constant.
+templates.env.globals["attach_piece"] = paths.ATTACH_PIECE_BYTES
 
 
 @functools.cache

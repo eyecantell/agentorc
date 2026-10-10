@@ -148,16 +148,30 @@
   // handed in, so the rules run as themselves under node (TD-370): the picker, a drop on any of
   // `targets` and a paste into `compose` each attach their files one upload at a time, the path each
   // answers inserted at the caret; nothing while `composer` is closed, and a paste carrying
-  // `text/plain` is the text's. Answers `attach(files)`, the promise of the queue.
-  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail }) {
+  // `text/plain` is the text's. `upload(f, ctl)` is handed `ctl.progress(pct, last)`, which past a file's
+  // first piece makes the label *Attaching <name> · n%* and shows `cancel`, the ✕, until `last`, and
+  // `ctl.cancelled()`, true once the ✕ was pressed for this file; an upload that answers no path was
+  // cancelled and inserts nothing (TD-478). Answers `attach(files)`, the promise of the queue.
+  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel }) {
     const label = button.lastChild, word = label.textContent;
     const shut = () => composer.classList.contains("hidden");
     let attaching = Promise.resolve();  // one upload at a time: a drop during a picker's run waits its turn
+    let stopNow = () => {};
+    if (cancel) cancel.addEventListener("click", () => { stopNow(); cancel.classList.add("hidden"); });
     async function each(list) {
       button.disabled = true;
       for (const f of list) {
         label.textContent = `Attaching ${f.name}…`;
-        try { AO.insertAtCaret(compose, await upload(f)); } catch (e) { fail(`Attach failed: ${e.message}`); }
+        let stopped = false;
+        stopNow = () => { stopped = true; };
+        const ctl = {
+          // the ✕ goes once only the last piece is left: that one links the file into place, past cancelling
+          progress: (pct, last) => { label.textContent = `Attaching ${f.name} · ${pct}%`; if (cancel) cancel.classList.toggle("hidden", stopped || !!last); },
+          cancelled: () => stopped,
+        };
+        try { const path = await upload(f, ctl); if (path) AO.insertAtCaret(compose, path); } catch (e) { fail(`Attach failed: ${e.message}`); }
+        stopNow = () => {};
+        if (cancel) cancel.classList.add("hidden");
       }
       label.textContent = word; button.disabled = false;
       compose.dispatchEvent(new Event("input")); compose.focus();
@@ -180,6 +194,32 @@
       e.preventDefault(); attach(cd.files);
     });
     return attach;
+  };
+
+  // One file up the attach road in pieces (§4.4 *Attachment drop*, TD-478): sliced by `piece` (the
+  // host agent's `paths.ATTACH_PIECE_BYTES`, served on the Attach button) and sent in order through
+  // `post(fields)`, which answers the route's JSON. The first piece carries `total`; the host agent
+  // answers an `upload` id while more is to come, and each later piece names it and its `offset`,
+  // the bytes it has. `progress(pct, last)` after each middle piece, `last` when only the final piece is
+  // left; `cancelled()` is asked before each
+  // later piece, and true sends `{upload, cancel}` and answers null. A refusal or a broken answer
+  // cancels what is half up and throws, so no `.part` waits for the hour's sweep. Answers the path.
+  AO.uploadPieces = async function (f, { name, piece, post, progress, cancelled }) {
+    const total = f.size;
+    let upload = "", offset = 0;
+    const drop = async () => { if (upload) { try { await post({ upload, cancel: "1" }); } catch (_) { /* the sweep has it */ } } };
+    for (;;) {
+      if (upload && cancelled()) { await drop(); return null; }
+      const end = Math.min(total, offset + piece);
+      let got;
+      try {
+        got = await post({ ...(upload ? { upload, offset } : { total }), name, file: f.slice(offset, end) });
+      } catch (e) { await drop(); throw e; }
+      if (got && got.path) return got.path;
+      if (!got || !got.upload || !(got.bytes > offset)) { await drop(); throw new Error("the host agent answered no path"); }
+      upload = got.upload; offset = got.bytes;
+      progress(Math.floor((offset * 100) / total), total - offset <= piece);
+    }
   };
 
   // ---- Pop out (design §4.5 screen 2 *Pop out*, §4.5a **Pop out** / **Focus** / **title**, TD-046) ----
@@ -3355,14 +3395,19 @@
     // closed: an unattended session takes nothing typed (§4.5 screen 2 *Focus watches*).
     AO.wireAttach({
       button: $("#attach"), input: $("#attachfile"), composer: $("#composer"), compose, targets: [$("#term"), compose],
-      fail: banner,
-      upload: async (f) => {
-        const fd = new FormData();
-        fd.append("file", f, AO.attachName(f, new Date()));
-        const r = await fetch(`/api/sessions/${id}/attach`, { method: "POST", body: fd });
-        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
-        return (await r.json()).path;
-      },
+      fail: banner, cancel: $("#attachcancel"),
+      upload: (f, ctl) => AO.uploadPieces(f, {
+        name: AO.attachName(f, new Date()), piece: Number($("#attach").dataset.piece) || 2 * 1024 * 1024,
+        progress: ctl.progress, cancelled: ctl.cancelled,
+        post: async ({ file, name, ...fields }) => {
+          const fd = new FormData();
+          for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
+          if (file) fd.append("file", file, name);
+          const r = await fetch(`/api/sessions/${id}/attach`, { method: "POST", body: fd });
+          if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+          return r.json();
+        },
+      }),
     });
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
@@ -4087,7 +4132,9 @@
         const mode = f.elements.open_in.value;
         const open_in = mode === "template" ? { label: f.elements.label.value.trim(), url: f.elements.url.value.trim() } : mode;
         const terminal = { size: f.elements.size.value ? Number(f.elements.size.value) : null, face: f.elements.face.value.trim() || null, copy_on_select: f.elements.copy_on_select.checked };
-        return ["you", { open_in, terminal, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
+        // **attachment bound** (TD-478): an empty field clears `person.attach.max`, back to its default
+        const attach = { max: f.elements.attach_max ? f.elements.attach_max.value.trim() || null : null };
+        return ["you", { open_in, terminal, attach, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
       // **Telegram** (§4.5a **You**, §4.10; TD-319): the three fields whole, an empty one cleared by the route
       notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],

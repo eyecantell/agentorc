@@ -196,6 +196,11 @@
       <label class="setrow"><span class="setlabel">copy on select</span>
         <input type="checkbox" name="copy_on_select"{% if you.copy_on_select %} checked{% endif %}>
         <span class="note">a selection in Focus copies itself — the same switch as Focus's <i>more ▾</i></span></label>
+      {#- **attachment bound** (§4.5 screen 8, §5 `person.attach.max`, §4.4 *Attachment drop*; TD-478):
+          the most a Focus attachment may be, drawn as the terminal size is, the default beside it -#}
+      <label class="setrow"><span class="setlabel">attachment bound</span>
+        <input class="input setin" name="attach_max" value="{{ you.attach_max }}" placeholder="{{ you.attach_default }}" autocomplete="off" spellcheck="false">
+        <span class="note">the most a Focus attachment may be · <span class="mono">&lt;n&gt;M</span> or <span class="mono">&lt;n&gt;G</span>, 1M to 4G · {{ you.attach_default }} by default</span></label>
       {#- **board items shown** (§4.5a *Settings page*, §4.5 screen 6 *The board's horizon*; TD-220 slice 4):
           a pick of four, the two numbers beside their choice, written to `person.inbox.board_show` -#}
       {% set info_board = "which board items the Inbox shows before they are due; they are listed under \"Not due yet\" and are not counted; what this hides is under \"not shown\"" %}
