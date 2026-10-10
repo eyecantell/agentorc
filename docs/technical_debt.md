@@ -36,7 +36,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-358 | Apply never restarts a member that declared out of work: it resumes its old run, on its pre-flow brief, when its lane gains work | High | Built — live check of #1186: the next Apply on idle declared members |
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287); live check: a week's journal, `ao team start ao-grind`'s line |
-| TD-420 | The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums | Low | Open |
 | TD-457 | New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart | Medium | Designed 2026-10-09 — TD-466 builds it |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
@@ -504,19 +503,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a Start on a team with an on-call manager creates no manager pane and its members' `controllers` name the manager's id; the manager is filled the first time one of its readings is due, a Start with a question kept in its mail filling on the first tick; a fill's prompt ends with the cause line; `docs/briefs/manager-ao-1.md` names no first reads of its own; the tests above pin each; `pdm run test` and `pdm run lint` pass. The live check, once this is live: a week's host-agent journal shows no *a seat with nothing due* close of a manager that was never filled for a cause, and `ao team start ao-grind`'s output names the manager *on call*. TD-410 is archived with this entry.
 
 **Related:** TD-410 (the design), TD-259 (the seat on call), TD-386 (the held create), TD-395 (`held_reason`), TD-400 (Apply creates a seat the run lacks), TD-217 (the replay fills the brief again).
-
-## TD-420: The Org rollup's PRs in motion disagrees with the team's repo facet (93 / 92 against 85 / 85 on 2026-10-08) and the page does not say what the rollup sums
-
-**Priority:** Low
-**Added:** 2026-10-08 (ao-paul, a UI/UX review with Paul, split from TD-418)
-**Owner:** grinder
-**Kind:** evaluation
-**Status:** Open
-**Location:** `src/agentorc/ui/templates/rollup.html` (`ro.prs`), the rollup's builder in `src/agentorc/ui/app.py`; `team_summary.html`'s pull requests block; design §4.5a *Org: rollup*
-
-**Why:** Paul's screenshot of 2026-10-08: the rollup's PRs in motion read 93 opened / 92 closed for the day while ao-grind's repo facet, the only live team's, read 85 / 85. A later capture the same evening read 84 / 83 in both. §4.5a says the rollup sums over every live team; with one live team the two should agree, or the page should say what else is counted (another repo, a stopped team's, a different window edge).
-
-**Fix:** find what the rollup sums that the facet does not (read both builders against §4.5a), then either make them agree or label the rollup's scope on the page. **Done when** the two numbers agree with one live team, or the difference is named where it is shown.
 
 ## TD-457: New work in a finished member's lane waits for the whole team to wind down: one live seat keeps it from winding down, and the only road back is a full team restart
 
