@@ -91,6 +91,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     NODE_READS,  # noqa: F401
     OWED_NAMED,  # noqa: F401
     PASTE_SHOW_SECONDS,  # noqa: F401
+    PATHS_RUN_CHARS,
+    PATHS_RUNS_MAX,
     PRUNE_EVERY,  # noqa: F401
     PUSH_OPEN,  # noqa: F401
     RELAUNCH_KEYS,
@@ -237,6 +239,21 @@ def _place_attachment(where: Path, name: str, place: Any) -> Path:
             continue
         return path
     raise RpcError(f"attach: {base} is taken a thousand times over in {where}")
+
+
+def _resolve_paths(runs: list[str], cwd: Path, roots: list[str]) -> dict[str, str | None]:
+    """`rpc_paths`' disk half: each run to its real path when that is a regular file inside one of
+    `roots`' real paths, else `None`. Any `OSError` on the way is `None` too."""
+    real_roots = [Path(os.path.realpath(r)) for r in roots]
+    out: dict[str, str | None] = {}
+    for run in runs:
+        try:
+            p = Path(os.path.realpath(cwd / Path(run).expanduser()))
+            inside = any(p.is_relative_to(root) for root in real_roots)
+            out[run] = str(p) if inside and p.is_file() else None
+        except (OSError, ValueError, RuntimeError):
+            out[run] = None
+    return out
 
 
 def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
@@ -2254,6 +2271,24 @@ class HostAgent(
         if t is None:
             raise RpcError(f"no transcript for {id or adapter_id}: the tool's file is not on {self.host}")
         return t.to_dict()
+
+    async def rpc_paths(self, id: str, runs: list[str] | None = None) -> dict[str, Any]:
+        """The Focus pane's file check (design §4.6 *A path in the pane is a link*, TD-501): for each
+        run a row of the pane named, the real absolute path when it is a regular file under the real
+        path of the record's `dir` or of its `repo`, else `None` — a directory, a file outside both, a
+        symlink out, a missing or unreadable one alike, since the page needs no reason. A relative run
+        is resolved against `dir`, `~` is this user's home. It stats and reads nothing else. Served
+        here, on the record's host — a node's record reaches its node through `read` (`NODE_READS`).
+        A read: never gated (§9 invariant 11)."""
+        s = self._get(id)
+        if not isinstance(runs, list) or not all(isinstance(r, str) for r in runs):
+            raise RpcError("paths takes runs, a list of strings (design §4.6)")
+        if len(runs) > PATHS_RUNS_MAX:
+            raise RpcError(f"paths: {len(runs)} runs, past the {PATHS_RUNS_MAX} one row may ask about (design §4.6)")
+        if long := [r for r in runs if len(r) > PATHS_RUN_CHARS]:
+            raise RpcError(f"paths: a run of {len(long[0])} characters, past the {PATHS_RUN_CHARS} one may be")
+        roots = [s.dir] + ([s.repo] if s.repo else [])
+        return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(s.dir), roots)}
 
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads
