@@ -3500,10 +3500,10 @@
   };
   // The Session card's **recent files** (§4.5 item 4, §4.5a, TD-525): the record's `files`, newest
   // first, each drawn relative to the session's directory (else its repo) with the absolute path and
-  // the edit's time on hover, **M** before one `git.files` holds (its porcelain lines, relative to the
-  // worktree), and a link by the editor's file form at line 1 — the `a.editor` handler opens it on a
+  // its time on hover — the file's, or the commit's and its short sha (TD-538) — **M** before one
+  // `git.files` holds (its porcelain lines, relative to the worktree), and a link by the editor's file form at line 1 — the `a.editor` handler opens it on a
   // plain click, after the session's folder unless the person turned that off (`editor.first`, TD-536).
-  // No file form, no links: the paths are text. "" when the run has edited nothing.
+  // No file form, no links: the paths are text. "" when the work has changed nothing.
   AO.recentFiles = function (v, editor) {
     const files = v.files || [];
     if (!files.length) return "";
@@ -3518,7 +3518,9 @@
     return files.map((f) => {
       const p = String(f.path || ""), rel = under(p, v.dir) ?? under(p, v.repo) ?? p;
       const mark = v.dir && isChanged(p) ? '<span class="fmark" title="changed in the worktree">M</span> ' : "";
-      const title = esc(`${p}${f.at ? ` — edited ${String(f.at).slice(0, 16).replace("T", " ")}Z` : ""}`);
+      // the time the file's own for one uncommitted, the commit's and its short sha for one committed (§4.5a)
+      const when = f.at ? `${String(f.at).slice(0, 16).replace("T", " ")}Z` : "";
+      const title = esc(`${p}${f.sha ? ` — committed ${String(f.sha).slice(0, 7)} ${when}` : when ? ` — edited ${when}` : ""}`);
       const name = file
         ? `<a class="editor" href="${esc(AO.fileUrl(file, p, 1))}"${folder} data-label="${esc(editor.label || "the editor")}" title="${title}">${esc(rel)}</a>`
         : `<span title="${title}">${esc(rel)}</span>`;
@@ -3526,7 +3528,7 @@
     }).join("");
   };
   // …painted into the Session card's row and its term from the view and each delta: shown with
-  // the run's first edit, hidden while it has none
+  // the work's first change, hidden while it has none
   AO.paintRecent = function (v, editor, row, dt) {
     const rf = AO.recentFiles(v, editor);
     row.innerHTML = rf;

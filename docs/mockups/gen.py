@@ -708,7 +708,7 @@ def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, lo
         f'<div style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; color: #065f46; font-weight: 600;">{"M" if m else ""}</span>'
         f'<a href="#" class="mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{full} — edited {at}; click opens it in your editor at the top (design §4.5a, TD-525)">{rel}</a></div>'
         for rel, full, at, m in files)
-    recent_row = (f'<dt title="the files this session edited in this run, newest first, from its tool hook (design §4.5a, TD-525)">recent files</dt>'
+    recent_row = (f'<dt title="the files this session changed against its base, newest first, read from git with the status (design §4.2, §4.5a, TD-538)">recent files</dt>'
                   f'<dd style="display: flex; flex-direction: column; gap: 3px; line-height: 1.5; min-width: 0;">{recent}</dd>') if files else ""
     linked = "".join(
         f'<a href="#" class="mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{full} — printed {at}; opens in a new tab (design §4.5a, TD-543)">{short}</a>'

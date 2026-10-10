@@ -527,6 +527,8 @@ class HostAgent(
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
+        # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
+        self._files_read: dict[str, tuple[Any, ...]] = {}
         self._derived_at: dict[str, datetime] = {}
         self._model_checked: dict[str, datetime] = {}
         self._context_checked: dict[str, datetime] = {}  # the context reading's cadence (TD-190)

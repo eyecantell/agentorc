@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -153,6 +154,72 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
     )
 
 
+def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeout: float = 5.0) -> list[dict] | None:
+    """The paths the work in `directory` has changed against its base, `{path, at, sha}` newest first, a
+    path once, the newest `limit` (design §4.2 *The record's `files`*, TD-538): `git diff --name-only`
+    from `merge-base HEAD <base_ref>` and the untracked paths — the tree alone where `base_ref` is None
+    (no origin) — each path absolute. One the porcelain holds is the file's own: its modification time
+    and no `sha` (a deleted one the newest commit's time, else the read's); any other is the newest of
+    the branch's commits that touched it, from one `git log --name-only`. None when a read fails, so the
+    record keeps what it had. Computed on each read and never kept; nothing is fetched."""
+    top = toplevel(directory, timeout=timeout)
+    if not top:
+        return None
+    status = _git(top, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=timeout)
+    if status is None:
+        return None
+    dirty: list[str] = []
+    fields = status.split("\0")
+    i = 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        dirty.append(entry[3:])
+        if entry[0] in "RC":
+            i += 1  # a rename's or copy's source follows its path: the source is no longer in the tree
+    paths = dict.fromkeys(dirty)
+    commits: dict[str, tuple[str, int]] = {}  # path → the newest commit since the base that touched it
+    if base_ref:
+        base = _git(top, "merge-base", "HEAD", base_ref, timeout=timeout)
+        if base is None:
+            return None
+        base = base.strip()
+        diff = _git(top, "diff", "--name-only", "-z", base, timeout=timeout)
+        log_out = _git(top, "log", "--name-only", "-z", "--format=%x01%H %ct", f"{base}..HEAD", timeout=timeout)
+        if diff is None or log_out is None:
+            return None
+        paths.update(dict.fromkeys(p for p in diff.split("\0") if p))
+        for chunk in log_out.split("\x01")[1:]:  # `<sha> <time>\0\n<path>\0…`, newest first as git gives them
+            head, _, names = chunk.partition("\0")
+            sha, _, ct = head.partition(" ")
+            for name in names.split("\0"):
+                name = name.lstrip("\n")
+                if name and name not in commits and ct.isdigit():
+                    commits[name] = (sha, int(ct))
+    now = datetime.now(UTC).timestamp()
+    dirty_set = set(dirty)
+    out: list[tuple[float, dict]] = []
+    for rel in paths:
+        path = os.path.join(top, rel)
+        if rel in dirty_set:
+            try:
+                at = os.stat(path).st_mtime
+            except OSError:  # deleted: the commit's time, or the read's
+                at = commits[rel][1] if rel in commits else now
+            out.append((at, {"path": path, "at": _iso(at)}))
+        elif rel in commits:
+            sha, ct = commits[rel]
+            out.append((ct, {"path": path, "at": _iso(ct), "sha": sha}))
+    out.sort(key=lambda t: -t[0])
+    return [f for _, f in out[:limit]]
+
+
+def _iso(ts: float) -> str:
+    return datetime.fromtimestamp(ts, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 UNKNOWN = "git state unknown"
 
 
@@ -177,9 +244,7 @@ def _git(directory: Path | str, *args: str, timeout: float) -> str | None:
     """One read-only git command, or None when it could not be run or failed. The host agent never
     fetches for any of this: it reads the refs it has (design §4.2)."""
     try:
-        cp = subprocess.run(
-            ["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=timeout
-        )
+        cp = subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return cp.stdout if cp.returncode == 0 else None
