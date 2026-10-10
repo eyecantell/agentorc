@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448; the look sent to Paul (m-37f220f9e955) |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
-| TD-491 | The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot | Low | Designed 2026-10-09 — build TD-500 |
 | TD-493 | A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page | Low | Designed 2026-10-09 — build TD-501 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
@@ -646,23 +645,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design first, two parts. (1) A rule in every role brief and in `ao --skill`: signal only a pid this session started itself and still holds (a `$!`, a background task id), never a parent, and never by matching a name across the machine. Look at whether a guard fits too, such as a `PreToolUse` hook that refuses a `kill` of pid 1, the user manager, the tmux server or the host agent; a guard is wiring, so it goes in the adapter. (2) An alarm that does not need the host agent alive: something outside `user@1000` that sees the agent socket silent past a bound and reaches the person through the board's push or Telegram (§4.10; TD-092, built as TD-319). **Done when** the briefs and the skill carry the rule, the guard is built or written down as not built, and stopping the host agent on a scratch home raises the alarm within the bound.
 
 **Related:** TD-488, TD-092 and TD-319 (Telegram), TD-111 (`ao doctor`).
-
-## TD-491: The Focus composer takes ~130px from the terminal all the time: fold it to a one-line bar that opens over the terminal's foot
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (ao-paul, Paul's review of the Focus composer; shape 2 and 3 of the mockups chosen over the side panel)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-09 (the designer, PR #1394): §4.5a *Focus composer* **the bar** — folded by default to *✎ Compose a prompt… · Attach · Send* with the terminal taking the height down to it (no bar on an unattended Focus; the terminal takes that too); opened over the terminal's foot by a click, `c`, a paste or a drop, never by a resize; Send and `Esc` fold it, the draft kept and named on the bar; `person.composer: folded | open` on the You card (§5); the narrow mode unchanged; §4.5 screen 2 and *Keyboard focus*; the keys row; the mockup's composer redrawn as the bar, shot `docs/mockups/reviews/2026-10-09-td491-focus-composer-bar.png`, beside Paul's chosen shots of 2026-10-09. The build is TD-500, and this entry archives with it.
-**Blocked by:** TD-500
-**Location:** `src/agentorc/ui/templates/focus.html` (`#composer`), `static/app.css` (`.termbox` 60vh, `.composer`), `static/app.js` (composer, `fit`); design §4.5 (Focus anatomy), §4.5a (*Focus composer* rows); mockups `docs/mockups/reviews/2026-10-09-focus-composer-{current,collapsed,collapsed-open,sidebar,sidebar-folded}.png`, their source `docs/mockups/reviews/focus-composer-src/`
-
-**Why:** the composer is useful (Attach, Send's confirmation, Steer, the prompt chips, typing while the terminal reconnects, the phone layout), but it holds about 130px under a terminal fixed at 60vh even when unused. The side panel was weighed and not taken: it is about 300px wide, the hint wraps to seven lines, and with Inbox open it is off the screen.
-
-**Fix:** design first, starting from the chosen mockups: the composer folds to one bar (*✎ Compose a prompt… · Attach · Send*) and the terminal takes the height down to it. A click on the bar, `c`, a paste or a dropped file opens it over the terminal's foot, never by resizing the terminal (a resize makes Claude Code repaint, one of TD-474's causes). It folds again on Send, or on Esc when empty, and a draft survives a fold. A Settings → You choice decides whether it starts folded or always open. The terminal also takes the height an unattended Focus leaves empty under it today. This is the anchor of a wider Focus-screen round: other changes Paul names join this entry before its design. **Done when** the design says the fold, the overlay and the setting, the build lands, and the shapes are drawn again from the built page.
-
-**Related:** TD-472 (paste on the terminal), TD-474 (the struggling-terminal mark, which takes the header room), TD-003 (the phone).
 
 ## TD-493: A file the session names in the Focus pane is not a link: a repo path printed in the conversation cannot be opened in the editor from the page
 
