@@ -913,3 +913,14 @@ def test_each_member_card_draws_its_own_lane_count_in_its_pill():
     lanes = {"members": {"g1": {"n": 0, "k": 2}}}
     assert ui.lane_count({"id": "g1", "lane": grind, "state": "idle"}, lanes) is None
     assert ui.lane_count({"id": "g1", "lane": grind, "state": "idle"}, None) is None
+
+
+def test_a_claims_pr_the_tick_set_is_its_review_row_and_its_compact_lines_pr():
+    # TD-514: the tick's `review_pr` on a claim whose branch no open PR names — the grinder asked its
+    # reader and moved on — is the row's PR and the compact line's `→ #N`, as the claim's own `pr` is
+    r = reading("/r/s")
+    asked = {"ref": "TD-1", "status": "claimed", "pr": None, "review_pr": 1302}
+    ms = [member("g1", progress=[asked])]
+    (row,) = ui.motion_rows(ms, r)
+    assert row["phase"] == "review" and row["pr"] == 1302 and row["pr_url"].endswith("/pull/1302")
+    assert ui.compact_line({**ms[0], "role_label": "Grinder"}) == "Grinder · TD-1 → #1302"
