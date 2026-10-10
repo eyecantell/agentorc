@@ -854,8 +854,13 @@ class HostAgent(
         start_of: str | None = None,
         held: bool = False,
         held_reason: dict[str, Any] | None = None,
+        team_start: bool = False,
     ) -> dict[str, Any]:
-        """`held` (design §4.9b *The anchor seat*, TD-386): a seat's record written alone, `closed`
+        """`team_start` marks a create that is part of `ao team start`: the dispatcher reads it at
+        the home, before any routing, to keep the start's usage reading (`_mark_team_start`, §4.9a
+        *The home's note says more*, TD-468); the create itself does nothing more with it.
+
+        `held` (design §4.9b *The anchor seat*, TD-386): a seat's record written alone, `closed`
         with no pane, for a team's start whose seat's checkout is not free — held by another session,
         dirty, or off its default branch, as the fill reads it (`checkout_held`, TD-395) — so §6 rule 3
         fills it once the checkout is free. `held_reason` is that reading, `{by, why}`, written as the

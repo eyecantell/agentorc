@@ -1056,8 +1056,9 @@ class Session:
     # `wanted` (rule 2) or `fill` (rule 3), `done: [{ref, pr}]` and `left: [ref]` what the run it
     # replaced reported `done` since its `created` and what it claimed and did not close (§4.9a,
     # TD-249: the new record keeps none of the old one's `progress`), and `error` the text of a
-    # replay that failed, which counts all the same — carried across the tick's
-    # own supersede so the count survives the restart it counts, and empty on any other create (a
+    # replay that failed, which counts all the same, and `said` a `wanted` one's own why (rule 9's
+    # note, TD-468) — carried across the tick's own supersede so the count survives the restart it
+    # counts, and empty on any other create (a
     # person's Resume starts it again; a person's Restart leaves the one entry `{at, why: person}`,
     # which never counts — §6 rule 2, TD-250). `restart_ceiling` is `{at, count}` once `RESTART_CEILING` is
     # reached: the tick stops and the session is a person's. Both the home's (§4.4a).

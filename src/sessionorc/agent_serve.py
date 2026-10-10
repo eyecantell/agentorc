@@ -350,6 +350,8 @@ class ServeMixin:
                         )
                     return {**await self._forward(rid, str(name), params, caller), "_via_home": True}
             self._gate(caller, str(name), params)
+            if name == "create" and params.pop("team_start", False) is True and params.get("unattended"):
+                self._mark_team_start(str(params.get("team") or ""))  # §4.9a, TD-468: the home's, wherever it lands
             if (target := self._act_host(str(name), params)) is not None:
                 # Another host's record (design §4.4a, step 4a): gated above over the one graph,
                 # executed by that host's node, its verdict returned — or refused as unreachable.

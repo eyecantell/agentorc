@@ -152,17 +152,20 @@ def waiting_of(entries: Iterable[Any]) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+def bound_words(bound: Any) -> str:
+    """A question's bound as a person reads it, in this host's clock (*09:57*); empty for none."""
+    try:
+        return datetime.fromisoformat(str(bound)).astimezone().strftime("%H:%M") if bound else ""
+    except ValueError:
+        return ""
+
+
 def waiting_clause(name: str, questions: list[dict[str, Any]]) -> str:
     """A waiting member's clause in `finished`'s `why`: *designer-ao-1 waiting on the person: TD-222,
     until 09:57* — the sooner bound's question, in this host's clock, *and n more* for the rest; an
     `ask` has no bound and says none."""
     q = questions[0]
-    until = ""
-    if q.get("bound"):
-        try:
-            until = f", until {datetime.fromisoformat(str(q['bound'])).astimezone().strftime('%H:%M')}"
-        except ValueError:
-            until = ""
+    until = f", until {hhmm}" if (hhmm := bound_words(q.get("bound"))) else ""
     more = f" and {len(questions) - 1} more" if len(questions) > 1 else ""
     return f"{name} waiting on the person: {q['ref']}{until}{more}"
 

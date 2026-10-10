@@ -655,7 +655,8 @@ def start(
     closed = _close_concluded(call, org, name, held) if held else []
 
     def params(x: teams.Launch, controllers: list[str]) -> dict[str, Any]:
-        return {**x.create_params(controllers), **({"keep_mail": True} if x.name in keeps else {})}
+        # `team_start`: the home keeps the start's usage reading for rule 9's note (§4.9a, TD-468)
+        return {**x.create_params(controllers), "team_start": True, **({"keep_mail": True} if x.name in keeps else {})}
 
     created: list[dict[str, Any]] = []
     notes += plan.notes  # said, and the start goes ahead (a seat without its primer, §4.9b)
