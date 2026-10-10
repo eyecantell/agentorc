@@ -31,6 +31,8 @@ from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.gitinfo import work_left
 from sessionorc.models import (
+    CITES_ON_AN_ASK,
+    FOLDED_KINDS,
     GRANTS,
     STATE_RANK,
     context_over,
@@ -3247,6 +3249,14 @@ def _refs(value: str) -> list[str]:
     return [r.strip() for r in value.split(",") if r.strip()]
 
 
+def _msg_kind(value: str) -> str:
+    """`ao msg --kind`: a folded kind is refused in the RPC's own words, naming §4.10, before
+    argparse's bare *invalid choice* (TD-471)."""
+    if value in FOLDED_KINDS:
+        raise argparse.ArgumentTypeError(CITES_ON_AN_ASK)
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ao", description="agentorc — sessions in tmux, one view")
     ap.add_argument("--json", action="store_true", help="print the RPC result as JSON (every subcommand; TD-018)")
@@ -3637,6 +3647,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("words", nargs="*", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
     p.add_argument(
         "--kind",
+        type=_msg_kind,
         choices=["note", "ask", "steer", "reply"],
         help="default: note (reply with --reply-to)",
     )

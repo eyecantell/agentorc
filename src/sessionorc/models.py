@@ -50,6 +50,8 @@ ASK_KINDS = ("ask", "steer")
 # the kind folded into `ask` (§4.10 *Two controllers disagree*, TD-462): refused on a send, and an
 # entry of it still retained is read as an `ask`
 FOLDED_KINDS = {"conflict": "ask"}
+# `--kind conflict` and a misplaced `--cites` are refused in the same words, at the CLI and the RPC
+CITES_ON_AN_ASK = "a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)"
 PERSON = "person"  # `from` when a person sent the entry; never a session id
 SYSTEM = "system"  # the third sender (design §4.10): the home saying what became of a session's own message
 # How an entry closed (design §4.10 "One way of being closed"). `expired` is a session-to-session

@@ -26,6 +26,7 @@ from sessionorc.agent_common import (
 )
 from sessionorc.models import (
     ASK_KINDS,
+    CITES_ON_AN_ASK,
     FOLDED_KINDS,
     MAIL_KINDS,
     PERSON,
@@ -36,9 +37,6 @@ from sessionorc.models import (
     Tally,
     now_iso,
 )
-
-# `--kind conflict` and a misplaced `--cites` are refused in the same words (§4.10, TD-462)
-CITES_ON_AN_ASK = "a conflict is an `ask` to both controllers with `--cites` (design §4.10 *Two controllers disagree*)"
 
 
 def _shots(shots: Any, kind: str) -> list[str]:

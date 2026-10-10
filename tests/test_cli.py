@@ -19,6 +19,7 @@ from conftest import pane_line, run_hook, wait_for_sync, wait_screen
 
 from agentorc import cli
 from sessionorc.client import AgentError, call_sync
+from sessionorc.models import CITES_ON_AN_ASK
 
 pytestmark = pytest.mark.integration
 
@@ -904,7 +905,7 @@ def test_the_skill_tells_a_session_that_ao_wait_exists():
     assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
 
 
-def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction():
+def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction(capsys):
     """TD-134, TD-471 (design §4.10 *A disagreement, worked*): an `ask` to both and its citations are named, the worker
     never picks one, and the unanswered case goes to the person — never a stalled worker."""
     text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
@@ -914,8 +915,9 @@ def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction():
     argv = example.split()[1:]
     args = cli.build_parser().parse_args([a.replace("<", "").replace(">", "") for a in argv])
     assert args.kind == "ask" and len(cli._refs(args.cites)) == 2
-    with pytest.raises(SystemExit):  # the folded kind is no choice of `ao msg`
+    with pytest.raises(SystemExit):  # the folded kind is no choice of `ao msg`, refused naming §4.10
         cli.build_parser().parse_args(["msg", "a", "b", "x", "--kind", "conflict"])
+    assert CITES_ON_AN_ASK in capsys.readouterr().err
     assert "never pick one" in text and "the first reply is the ruling" in text
     assert "ask the person yourself" in text
 
