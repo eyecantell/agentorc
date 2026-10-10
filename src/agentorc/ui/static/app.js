@@ -415,13 +415,16 @@
   // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
   // the protocol handler without navigating this tab away (a plain click replaced the Org with a
   // blank page when the handler declined — first-use finding).
+  AO.openEditor = function (url, label) {
+    const f = document.createElement("iframe"); f.style.display = "none"; f.src = url;
+    document.body.appendChild(f); setTimeout(() => f.remove(), 3000);
+    AO.toast(`opening in ${label || "the editor"}…`, true);
+  };
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest("a.editor");
     if (!a) return;
     ev.preventDefault();
-    const f = document.createElement("iframe"); f.style.display = "none"; f.src = a.href;
-    document.body.appendChild(f); setTimeout(() => f.remove(), 3000);
-    AO.toast(`opening in ${a.dataset.label || "the editor"}…`, true);
+    AO.openEditor(a.href, a.dataset.label);
   });
 
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
@@ -3338,6 +3341,81 @@
     (open || window.open)(uri, "_blank", "noopener");
     return true;
   };
+  // **a path is a link** (§4.6 *A path in the pane is a link*, §4.5a, TD-501): the runs one row of
+  // the pane names that could be a file — a run with a `/` in it, relative, `./`, `~/` or absolute,
+  // with an optional `:line` or `:line:col`, the bracket or sentence stop at its tail cut off; a run
+  // inside a URL is the URL's. Each is `{run, path, line, col, start, end}`, `start`/`end` the run's
+  // columns in the row's text (end exclusive). The shape only asks: the host says which are files.
+  AO.pathRuns = function (text) {
+    const urls = [];
+    for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g)) urls.push([m.index, m.index + m[0].length]);
+    const out = [];
+    for (const m of String(text).matchAll(/(?:~|\.{1,2})?\/?[\w.@+-]+(?:\/[\w.@+-]+)+(?::\d+(?::\d+)?)?/g)) {
+      const start = m.index;
+      let run = m[0];
+      if (urls.some(([a, b]) => start < b && start + run.length > a)) continue;
+      const lc = run.match(/:(\d+)(?::(\d+))?$/);
+      let path = lc ? run.slice(0, lc.index) : run;
+      if (!lc) { path = path.replace(/[.,;:)\]}'"]+$/, ""); run = path; }
+      if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
+      out.push({ run, path, line: lc ? +lc[1] : null, col: lc && lc[2] ? +lc[2] : null, start, end: start + run.length });
+    }
+    return out;
+  };
+  // …and the press, `AO.paneLink`'s shape: no modifier, nothing; else the editor's file form filled
+  // with the host's resolved path, percent-encoded with `/` kept (§5, TD-011), the printed line riding
+  // after it only on the `vscode` default's `vscode://file` form, and handed to the protocol handler
+  // as the header's editor button is.
+  AO.pathLink = function (event, file, resolved, line, col, open) {
+    if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
+    const path = String(resolved).split("/").map(encodeURIComponent).join("/");
+    const at = file.startsWith("vscode://file{path}") && line ? `:${line}${col ? `:${col}` : ""}` : "";
+    (open || AO.openEditor)(file.replace("{path}", path + at), "the editor");
+    return true;
+  };
+  // The provider the page registers beside the web-links addon when the header has an editor button:
+  // a row with candidates asks the `paths` route once — the answer kept by the row's text until
+  // `clear` (a re-attach) — and the runs the host resolved are links; a failed ask is no link and is
+  // remembered nowhere, so the next hover asks again.
+  AO.pathProvider = function (term, id, file, fetchPaths) {
+    const known = new Map();
+    let era = 0;  // an answer that lands after a `clear` belongs to the attach before it
+    const ask = fetchPaths || ((runs) => fetch(`/api/sessions/${encodeURIComponent(id)}/paths`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runs }),
+    }).then((r) => (r.ok ? r.json() : Promise.reject(r.status))));
+    return {
+      clear: () => { known.clear(); era += 1; },
+      provideLinks(y, callback) {
+        const row = term.buffer.active.getLine(y - 1);
+        const text = row ? row.translateToString(true) : "";
+        const runs = AO.pathRuns(text).slice(0, 8);
+        if (!runs.length) { callback(undefined); return; }
+        // the text's indices as the row's cells: a wide character is one character over two cells
+        const cellOf = [];
+        if (row && row.getCell) {
+          for (let x = 0; x < row.length; x++) {
+            const c = row.getCell(x);
+            if (!c || c.getWidth() === 0) continue;
+            for (let k = 0; k < (c.getChars() || " ").length; k++) cellOf.push(x);
+          }
+        }
+        const col = (i) => (i < cellOf.length ? cellOf[i] : i);
+        const links = (paths) => runs.filter((r) => paths[r.path]).map((r) => ({
+          range: { start: { x: col(r.start) + 1, y }, end: { x: col(r.end - 1) + 1, y } },
+          text: r.run,
+          decorations: { underline: true, pointerCursor: true },
+          activate: (event) => AO.pathLink(event, file, paths[r.path], r.line, r.col),
+        }));
+        if (known.has(text)) { const l = links(known.get(text)); callback(l.length ? l : undefined); return; }
+        const asked = era;
+        ask([...new Set(runs.map((r) => r.path))]).then((got) => {
+          const paths = (got && got.paths) || {};
+          if (asked === era) known.set(text, paths);
+          const l = links(paths); callback(l.length ? l : undefined);
+        }, () => callback(undefined));
+      },
+    };
+  };
   // **a cut row is one line** (§4.6, TD-494): a program that breaks its own lines at the width prints
   // rows with no wrap mark, so the addon would read a URL wider than the pane as a cut URL and rows
   // that are no link.
@@ -3404,6 +3482,9 @@
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
+    // **a path is a link** (TD-501): only where the header draws its editor button
+    const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor.file) : null;
+    if (pathLinks) term.registerLinkProvider(pathLinks);
     term.open($("#term")); fit.fit();
     AO.termRenderer(term);
     AO.termFont(term, fit);
@@ -3445,6 +3526,7 @@
       ws.onopen = () => {
         ws.send(JSON.stringify({ resize: [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows] }));
         mk.open = true; mk.lastByte = Date.now(); tlog("open");
+        if (pathLinks) pathLinks.clear();  // a re-attach asks the host again (TD-501)
       };
       // The backoff resets on pane output, never on open (TD-029): a connection the server accepts
       // and then ends is not a working terminal, and resetting there retried twice a second forever.

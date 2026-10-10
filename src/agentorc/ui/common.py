@@ -855,6 +855,13 @@ def editor_link(directory: str, reach: str = "") -> dict[str, str] | None:
     return uiconf.editor_link(directory, local=h.local, remote=h.vscode_host, reach=reach)
 
 
+def editor_file(reach: str = "") -> str | None:
+    """The editor button's file form for a record on this host, `{path}` unfilled (design §4.6 *A
+    path in the pane is a link*, TD-501), or None for no file links."""
+    h = hosts.local_host()
+    return uiconf.editor_file(local=h.local, remote=h.vscode_host, reach=reach)
+
+
 templates.env.globals["editor_link"] = editor_link  # the Settings page's **Open file** (§4.5a, TD-148)
 templates.env.globals["person_terminal"] = uiconf.terminal  # every page hands it to its terminals (goal 12)
 

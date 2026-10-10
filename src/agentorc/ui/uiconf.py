@@ -176,6 +176,26 @@ def editor_link(directory: str, *, local: bool, remote: str, reach: str = "") ->
     return {"label": "VS Code", "url": vscode_link(directory, local=local, remote=remote)}
 
 
+def editor_file(*, local: bool, remote: str, reach: str = "") -> str | None:
+    """The editor button's file form (design §4.6 *A path in the pane is a link*, TD-501): the same
+    template with `{path}` left for the page to fill with a path the host resolved, or None — no
+    file links — wherever the button is not drawn. The `vscode` default's local form is the one a
+    printed `:line` rides on (`vscode://file{path}`); a container's is the reach link's own prefix
+    with the file in place of its folder; a template of the person's own keeps `{path}` and fills
+    `{remote}`, and one without `{path}` names no file, so it links none."""
+    o = open_in()
+    if o.kind == "none":
+        return None
+    if reach:
+        m = re.match(r"(vscode://vscode-remote/attached-container\+[^/?]+)[^?]*(\?.*)?$", reach)
+        return f"{m.group(1)}{{path}}{m.group(2) or ''}" if o.kind == "vscode" and m else None
+    if o.kind == "template":
+        return o.url.replace("{remote}", remote) if "{path}" in o.url else None
+    if local:
+        return "vscode://file{path}?windowId=_blank"
+    return f"vscode://vscode-remote/ssh-remote+{remote}{{path}}?windowId=_blank"
+
+
 def vscode_link(directory: str, *, local: bool, remote: str) -> str:
     """The default's two forms (design §4.5): `vscode://vscode-remote/ssh-remote+<alias><path>` — the
     alias must be in the person's own ~/.ssh/config — or `vscode://file/…` when the UI runs where
