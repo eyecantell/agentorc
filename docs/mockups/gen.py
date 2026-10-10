@@ -1065,7 +1065,7 @@ RESUMABLE = [
 def message_dialogs():
     """The Message composer (§4.5a **Message**, TD-158): the sentence under the kind selector that
     says when the message will be read, from the addressee's record, changing with the kind."""
-    def dlg(title, kind, line, note=False):
+    def dlg(title, kind, line, note=False, attaching=""):
         sel = ('<span class="input" style="width: 230px;">ask — needs an answer ▾</span>' if kind == "ask"
                else '<span class="input" style="width: 230px;">note — no reply expected ▾</span>')
         return f'''<div class="card" style="width: 560px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
@@ -1074,12 +1074,12 @@ def message_dialogs():
   <div style="display: flex; gap: 10px; align-items: center;"><span class="meta">kind</span>{sel}<span class="meta">about</span><span class="input" style="flex-grow: 1; color: #9ca3af;">TD-052, a PR, a session (optional)</span></div>
   <div style="font-size: 14px; padding: 8px 10px; background: #eef1f5; border-radius: 4px; display: flex; gap: 8px;"><span style="color: #6b7280;">⏱</span><span>{line}</span></div>
   <div class="input" style="height: 84px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">First what you want, then why…</div>
-  <div style="display: flex; align-items: center; gap: 8px;"><span class="note">Mail lands in the inbox and is read when the session next looks. It types nothing into the pane — that is <b>Send</b>.</span><span style="flex-grow: 1;"></span><span class="btn ghost">Cancel</span><span class="btn primary">✉ Mail it</span></div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="note">Mail lands in the inbox and is read when the session next looks. It types nothing into the pane — that is <b>Send</b>.</span><span style="flex-grow: 1;"></span><span class="btn ghost" title="a file or a screenshot for this session — picked, dropped on the dialog or pasted into the text; it lands under the session's attachments and its path goes into the message (design §4.5a, TD-530)">📎 {("Attaching " + attaching) if attaching else "Attach"}</span>{'<span class="btn ghost" title="cancels the upload and leaves nothing on disk">✕</span>' if attaching else ""}<span class="btn ghost">Cancel</span><span class="btn primary">✉ Mail it</span></div>
 </div>'''
     boards = [
         dlg("Message techlead-ao-1", "ask", "<b>On call.</b> An ask fills this seat: a session starts on the next tick and reads it first. An ask takes the default bound of 12 h."),
         dlg("Message techlead-ao-1", "note", "<b>On call.</b> A note waits in the seat's mailbox: it fills no seat, and is read at the next fill, which a question causes."),
-        dlg("Message grinder-ao-2", "ask", "<b>Working.</b> Read when its turn ends: it is rung on the tick after its Stop."),
+        dlg("Message grinder-ao-2", "ask", "<b>Working.</b> Read when its turn ends: it is rung on the tick after its Stop.", attaching="deck.pptx · 37%"),
         dlg("Message designer-ao-1", "note", "<b>Exited.</b> Read when this session is resumed, or started again under this name — the mail moves with the name."),
         dlg("Message main", "ask", "<b>Yours.</b> Lands in its inbox and wakes nothing: a person's session is never rung; the card's unread chip shows it."),
         dlg("Message grinder-ao-1", "ask", "<b>Idle.</b> Rung within a tick: the doorbell types <span class=\"mono\">[agentorc] you have 1 unread message</span> into its pane."),
