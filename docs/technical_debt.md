@@ -658,6 +658,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Why:** #1474 added `if isinstance(f := event.get("file"), str) and f and not stale:` with the comment *a stale queued edit is dropped, since at the top it would read newer than the edits after it*. Probe, on `origin/main` 65ef7f0f: change that line to `... and f:` in the worktree and run `pytest -q tests/test_recent_files.py` — **3 passed**. The module's integration test sends only live hooks (`person.call("hook", ...)` with no `at` older than the last live one), so the drop of a stale edit, the one decision the guard makes, is held by no test; a later edit reordered under an older queued one would go unseen.
 
 **Fix:** add a test that applies a queued `PostToolUse` event carrying `file` whose `at` is older than the session's last live hook (`stale`, ~L3637) and asserts the record's `files` does not move, and that the same event with a newer `at` does. Revert the guard to confirm it fails, then restore it. **Done when** the test is named here under **Resolved:**.
+
 ## TD-534: The Focus page's render wiring for the recent files and the rail's editor glyph is held by no test: both lines can be deleted and `test_ui_focus_recent_files.py` passes
 
 **Priority:** Medium
