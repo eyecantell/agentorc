@@ -698,7 +698,7 @@ def side_card(title, meta="", body="", open_=True):
     head = f'<div class="side-h"><span class="chev">{chev}</span><span>{title}</span><span style="flex-grow: 1;"></span>{meta}</div>'
     return f'<div class="card" style="padding: 12px;">{head}{body if open_ else ""}</div>'
 
-def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, log, grants, controllers, open_=False, files=()):
+def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, log, grants, controllers, open_=False, files=(), links=()):
     """The Session card: profile, ids, times, mode, the stops control when no time is set, run log,
     and the grants and controllers chips the header carried until TD-156 — read at a session's
     start and rarely pressed after, so it is last and folded, its summary the profile — and, at the
@@ -710,6 +710,11 @@ def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, lo
         for rel, full, at, m in files)
     recent_row = (f'<dt title="the files this session edited in this run, newest first, from its tool hook (design §4.5a, TD-525)">recent files</dt>'
                   f'<dd style="display: flex; flex-direction: column; gap: 3px; line-height: 1.5; min-width: 0;">{recent}</dd>') if files else ""
+    linked = "".join(
+        f'<a href="#" class="mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{full} — printed {at}; opens in a new tab (design §4.5a, TD-543)">{short}</a>'
+        for short, full, at in links)
+    links_row = (f'<dt title="the http/https URLs this session printed, newest first, from its transcript (design §4.5a, TD-543)">recent links</dt>'
+                 f'<dd style="display: flex; flex-direction: column; gap: 3px; line-height: 1.5; min-width: 0;">{linked}</dd>') if links else ""
     body = f'''<dl class="kv" style="margin: 10px 0 0;">
         <dt>profile</dt><dd class="mono" style="font-size: 12px;">{profile} · <span title="the context reading: the last call's input and cache tokens, from the transcript (design §6 rule 5, TD-188)">context 212k of 1M · bound 200k</span></dd>
         <dt>adapter id</dt><dd class="mono" style="font-size: 12px;">{adapter_id}</dd>
@@ -720,6 +725,7 @@ def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, lo
         <dt>stops</dt><dd><span class="badge" title="click to set or change it, empty to clear">{stops}</span></dd>
         <dt>run log</dt><dd><a href="#">{log}</a></dd>
         {recent_row}
+        {links_row}
         <dt>rounds</dt><dd class="mono" style="font-size: 12px;" title="the session's round log (ao log), display only (design §4.8, TD-175)">20:14 round 41: two claims re-checked · 20:02 round 40: #811 in review</dd>
         <dt>grants</dt><dd><span class="badge" title="capabilities: click to grant or revoke (design §4.8)">{grants}</span></dd>
         <dt>controllers</dt><dd><span class="badge" title="the sessions that may act on this one; + adds one">{controllers}</span> <span class="btn sm ghost">+</span></dd>
@@ -806,7 +812,7 @@ def focus():
       <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
     </div>
     {side_card("Ready to close", '<span class="btn sm" style="opacity: .5;">Close</span>', "", open_=False)}
-    {focus_session_card("claude-code · grind (pro) · sonnet", "1c8e0b2f…f42a", "ao-samscrape-tdgrind-1", "2026-09-04 20:02 MDT · 3h 14m", "14 s ago", "unattended", "stops 06:00", "tdgrind-1-20260904.log · 1.2 MB", "none", "under orc-1 ×", open_=True, files=(("scripts/recover_stuck_notices.py", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/scripts/recover_stuck_notices.py", "20:11", True), ("tests/test_scripts/test_recover_stuck_notices.py", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/tests/test_scripts/test_recover_stuck_notices.py", "20:09", True), ("docs/technical_debt.md", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/docs/technical_debt.md", "19:52", False)))}
+    {focus_session_card("claude-code · grind (pro) · sonnet", "1c8e0b2f…f42a", "ao-samscrape-tdgrind-1", "2026-09-04 20:02 MDT · 3h 14m", "14 s ago", "unattended", "stops 06:00", "tdgrind-1-20260904.log · 1.2 MB", "none", "under orc-1 ×", open_=True, files=(("scripts/recover_stuck_notices.py", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/scripts/recover_stuck_notices.py", "20:11", True), ("tests/test_scripts/test_recover_stuck_notices.py", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/tests/test_scripts/test_recover_stuck_notices.py", "20:09", True), ("docs/technical_debt.md", "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/docs/technical_debt.md", "19:52", False)), links=(("eyecantell/samscrape#811", "https://github.com/eyecantell/samscrape/pull/811", "20:03"), ("github.com/eyecantell/samscrape/actions/runs/38071…/job/114281…", "https://github.com/eyecantell/samscrape/actions/runs/38071122904/job/114281004412", "20:05"), ("docs.pytest.org/en/stable/how-to/capture-warnings.html", "https://docs.pytest.org/en/stable/how-to/capture-warnings.html", "19:48")))}
   </div>
 </div>
 </div>
