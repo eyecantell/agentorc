@@ -155,7 +155,9 @@
   // with `put`, the terminal's paste of a file (TD-479), each path goes to `put` and not to the caret,
   // and the composer need not be open. The folded composer (§4.5a **the bar**, TD-500): `unfold()` opens
   // it before a path goes to its caret, and `mirror`, the bar's own Attach and ✕, says the upload there too.
-  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel, unfold, mirror }) {
+  // `token()`, where given, is read when a batch is queued and handed to each of its files as `ctl.token`,
+  // so an upload can tell the batch's moment from now (the Message dialog closed since, TD-531).
+  AO.wireAttach = function ({ button, input, composer, compose, targets, upload, fail, cancel, unfold, mirror, token }) {
     const buttons = [button, ...(mirror ? [mirror.button] : [])];
     const cancels = [cancel, ...(mirror ? [mirror.cancel] : [])].filter(Boolean);
     const labels = buttons.map((b) => b.lastChild), word = labels[0].textContent;
@@ -165,7 +167,7 @@
     let stopNow = () => {};
     const cancelOff = (off) => cancels.forEach((c) => c.classList.toggle("hidden", off));
     for (const c of cancels) c.addEventListener("click", () => { stopNow(); cancelOff(true); });
-    async function each(list, put) {
+    async function each(list, put, tok) {
       buttons.forEach((b) => { b.disabled = true; });
       for (const f of list) {
         say(`Attaching ${f.name}…`);
@@ -175,6 +177,7 @@
           // the ✕ goes once only the last piece is left: that one links the file into place, past cancelling
           progress: (pct, last) => { say(`Attaching ${f.name} · ${pct}%`); cancelOff(stopped || !!last); },
           cancelled: () => stopped,
+          token: tok,
         };
         try {
           const path = await upload(f, ctl);
@@ -190,7 +193,8 @@
       const list = Array.from(files || []);
       if (!list.length || (!put && shut())) return attaching;
       if (!put && unfold) unfold();
-      attaching = attaching.then(() => each(list, put)).catch((e) => fail(`Attach failed: ${e.message}`));
+      const tok = token ? token() : undefined;
+      attaching = attaching.then(() => each(list, put, tok)).catch((e) => fail(`Attach failed: ${e.message}`));
       return attaching;
     }
     buttons.forEach((b) => b.addEventListener("click", () => input.click()));
@@ -340,6 +344,22 @@
       progress(Math.floor((offset * 100) / total), total - offset <= piece);
     }
   };
+  // The upload `AO.wireAttach` is handed, for session `id`: each file in pieces of `piece` bytes to
+  // `/api/sessions/<id>/attach`, a refusal thrown in the host agent's words. One road shared by the
+  // Focus composer and the Message and Reply dialog (§4.5a, TD-530): the file lands under `id`'s
+  // `attachments/`, whichever page sent it.
+  AO.attachUpload = (id, piece) => (f, ctl) => AO.uploadPieces(f, {
+    name: AO.attachName(f, new Date()), piece: piece || 2 * 1024 * 1024,
+    progress: ctl.progress, cancelled: ctl.cancelled,
+    post: async ({ file, name, ...fields }) => {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
+      if (file) fd.append("file", file, name);
+      const r = await fetch(`/api/sessions/${encodeURIComponent(id)}/attach`, { method: "POST", body: fd });
+      if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      return r.json();
+    },
+  });
 
   // ---- Pop out (design §4.5 screen 2 *Pop out*, §4.5a **Pop out** / **Focus** / **title**, TD-046) ----
   // A session's Focus in its own browser window, for the OS window switcher. Client-side only:
@@ -488,8 +508,49 @@
     .replace(/(?<!!)\[([^[\]\n]+)\]\(([^()\s]+)\)/g, "$1")
     .replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, "$1")
     .replace(/(^|[^*\w])\*(?=[^\s*])(.*?[^\s*])\*(?![*\w])/g, "$1$2");
+  // §4.5a *Message and Reply dialog: Attach / drop / paste* (TD-530, built by TD-531): the Focus
+  // composer's road on `#mailbox`, wired once, for the session the open dialog addresses (`AO.mailTo`).
+  // With none — a seat with nobody in it, a board's Reply — the button is hidden, the note says why, and
+  // a drop or a paste attaches nothing (the dialog reads as a closed composer). Each path goes in at the
+  // caret and nothing is sent until **Mail it**. A batch belongs to the dialog it was given in: once that
+  // closes, its file in flight is cancelled, inserts nothing, and the files queued behind it are never
+  // sent, to that addressee or the next. `els` are the dialog's parts, handed in so it runs under node.
+  AO.mailTo = "";
+  AO.wireMailAttach = function (els, upload) {
+    const { dlg, button, input, cancel, text, note } = els;
+    let opened = 0;
+    const attach = AO.wireAttach({
+      button, input, compose: text, targets: [dlg], cancel,
+      composer: { classList: { contains: () => !AO.mailTo } },
+      fail: (m) => AO.toast(m), token: () => opened,
+      upload: async (f, ctl) => {
+        if (ctl.token !== opened) return null;
+        const path = await upload(AO.mailTo)(f, ctl);
+        return ctl.token === opened ? path : null;
+      },
+    });
+    // the ✕ of an upload still running is pressed when the dialog closes: its rest is not wanted
+    dlg.addEventListener("close", () => { opened++; if (!cancel.classList.contains("hidden")) cancel.click(); });
+    return {
+      attach,
+      open(id) {
+        AO.mailTo = id || ""; opened++;
+        button.hidden = !AO.mailTo;
+        if (note) { if (AO.mailTo) note.removeAttribute("title"); else note.title = "attach needs a session in the seat"; }
+      },
+    };
+  };
+  let mailAttach = null;
   AO.compose = function (o) {
     const dlg = $("#mailbox");
+    if (!mailAttach && $("#mailattach")) {
+      const button = $("#mailattach");
+      mailAttach = AO.wireMailAttach(
+        { dlg, button, input: $("#mailattachfile"), cancel: $("#mailattachcancel"), text: $("#mailtext"), note: $("#mailnote") },
+        (id) => AO.attachUpload(id, Number(button.dataset.piece)),
+      );
+    }
+    if (mailAttach) mailAttach.open(o.id);
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
     $("#mailkindrow").hidden = !!o.reply;
     // §4.8 (TD-171): the role's line, the definition's words as text; a Reply shows none — the
@@ -703,6 +764,8 @@
       if (action === "message" || action === "reply") {
         const m = await AO.compose({
           to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote, line: b.dataset.line || "",
+          // the addressee's session for Attach (TD-531): a Message's own card, a Reply's sender — none on a seat
+          id: action === "reply" ? b.dataset.from || "" : b.dataset.seat ? "" : id,
           when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" }, text: b.dataset.begun || "",
         });
         if (!m) return;
@@ -1032,7 +1095,7 @@
         : "open · no bound";
     }
     const reply = (e.from === "person" || e.from === "system") ? ""
-      : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}" data-when-note="${esc(e.reply_when || "")}">Reply</button>`;
+      : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-from="${esc(e.from)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}" data-when-note="${esc(e.reply_when || "")}">Reply</button>`;
     const confirmText = "Delete this entry from this session's inbox? The sender keeps its copy.";
     return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
       + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
@@ -3757,18 +3820,7 @@
       targets: [$("#term"), compose, ...($("#composerbar") ? [$("#composerbar")] : [])],
       fail: banner, cancel: $("#attachcancel"),
       unfold: cbar ? cbar.open : null, mirror: cbar ? { button: $("#cbattach"), cancel: $("#cbcancel") } : null,
-      upload: (f, ctl) => AO.uploadPieces(f, {
-        name: AO.attachName(f, new Date()), piece: Number($("#attach").dataset.piece) || 2 * 1024 * 1024,
-        progress: ctl.progress, cancelled: ctl.cancelled,
-        post: async ({ file, name, ...fields }) => {
-          const fd = new FormData();
-          for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
-          if (file) fd.append("file", file, name);
-          const r = await fetch(`/api/sessions/${id}/attach`, { method: "POST", body: fd });
-          if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
-          return r.json();
-        },
-      }),
+      upload: AO.attachUpload(id, Number($("#attach").dataset.piece)),
     });
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }

@@ -2429,7 +2429,8 @@ def test_a_passed_up_question_is_the_askers_row_with_the_recommendation_drawn_as
         assert "<button" not in rec and "data-act" not in rec  # text, never a control
         assert "suggested by tl" in html and "suggested by w1" not in html
         assert html.index("&ldquo;keep the old name&rdquo;") < html.index("&ldquo;rename it&rdquo;")
-        assert 'data-act="reply" data-id="person" data-msg="' + e["id"] + '" data-name="w1"' in html  # to the asker
+        reply = f'data-act="reply" data-id="person" data-msg="{e["id"]}" data-from="{e["from"]}" data-name="w1"'
+        assert reply in html  # to the asker, its session for Attach (TD-531)
         assert html.index("recommends:") < html.index('class="row gap wrap sugg"')
 
 

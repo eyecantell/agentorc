@@ -114,7 +114,7 @@
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>
     {% elif next_act == 'message' %}
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
-      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
+      <button class="btn sm next" data-act="message" data-id="{{ s.id }}"{% if s.seat %} data-seat="1"{% endif %} data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
     {% elif next_act == 'close' %}
       <button class="btn sm next" data-act="close" data-id="{{ s.id }}" title="{{ help_title('close') }}">Close session</button>
     {% endif %}
@@ -133,7 +133,7 @@
         <button data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free." title="forget the scheduled record: nothing ran">Cancel</button>
         {#- those two alone: nothing runs, so nothing else has anything to act on (TD-328) -#}
         {%- else %}
-        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
+        <button data-act="message" data-id="{{ s.id }}"{% if s.seat %} data-seat="1"{% endif %} data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
         {%- if nopane %}
         {#- §4.5 row 6 *The menu draws what applies to the state* (TD-266): the process or the pane is
             gone, so Message…, Restart where restartable, and Forget — the rest are left out, not dimmed -#}

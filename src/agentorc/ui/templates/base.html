@@ -71,8 +71,14 @@
     <div class="note" id="mailquote"></div>
     <textarea class="input tall" id="mailtext" placeholder="First what you want, then why."></textarea>
     <div class="row gap">
-      <span class="note">Mail lands in the inbox and is read when the session next looks. It types nothing into the pane — that is <b>Send</b>.</span>
+      <span class="note" id="mailnote">Mail lands in the inbox and is read when the session next looks. It types nothing into the pane — that is <b>Send</b>.</span>
       <span class="grow"></span>
+      {#- §4.5a *Message and Reply dialog: Attach / drop / paste* (TD-530, built by TD-531): the Focus
+          composer's road to the addressee's `attach`, each path at the caret; hidden with no session
+          to attach for (a seat with nobody in it, a board's Reply) -#}
+      <button type="button" class="btn ghost" id="mailattach" data-piece="{{ attach_piece }}" hidden title="attach files for the addressee: their paths go into the text (or drop them on this dialog, or paste an image)"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
+      <input type="file" id="mailattachfile" multiple hidden>
+      <button type="button" class="btn ghost hidden" id="mailattachcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
       <button class="btn ghost" value="cancel">Cancel</button>
       <button class="btn primary" value="send" id="mailsend">✉ Mail it</button>
     </div>

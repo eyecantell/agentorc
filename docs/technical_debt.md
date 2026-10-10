@@ -45,8 +45,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-525 | The Focus side panel's **Session** card gains the session's recent files as file links, and **Open** (the worktree in the editor) in place of the header's editor button | Medium | Designed 2026-10-10 — build TD-527 |
 | TD-527 | Build the Session card's recent files and its editor button (TD-525): the hook's `file`, the record's `files`, the card's row and summary button, the rail's ‹›, the header's button gone | Medium | Open — record half built (#1474); page half left |
-| TD-530 | The Message and Reply dialog takes no file: a screenshot or a document for a session goes through Focus's composer and a send, or not at all | Medium | Designed 2026-10-10 — build TD-531 |
-| TD-531 | Build the Message and Reply dialog's Attach / drop / paste (TD-530): the Focus road on `#mailbox`, the addressee's id to `AO.compose`, the path at the caret, no Attach on an empty seat | Medium | Open |
 
 ---
 
@@ -677,49 +675,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-525 (the design), TD-524 / TD-526 (the file form's line and window), TD-501 (the pane's links), TD-408 (the rail), TD-156 (the Session card).
 
-## TD-530: The Message and Reply dialog takes no file: a screenshot or a document for a session goes through Focus's composer and a send, or not at all
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-10 (Paul, through Add entry; drafted by ao-agentorc-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-10 (the designer; mockup `Message.dc.html`, shots `docs/mockups/reviews/2026-10-10-td530-*.png`) — (1) §4.5a's new row *Message and Reply dialog: Attach / drop / paste*: the Focus composer's road on the one dialog, the picker, a drop on the dialog, a paste into its textarea, the same pieces, bound, progress label with ✕ and refusal words. (2) The file lands under the **addressee's** `attachments/<session>/` (a Reply's addressee is the asker) and lives as that session's run log does (§4.4); not drawn on a seat with nobody in it, since no session exists to hold the file; a node's session refused as the Focus road is. (3) The envelope: the path is text in the body, nothing new on `MailEntry`, `ao inbox` prints it as written (§4.10 *A file for a session*); a structured `files` field set aside until the path has been used. Built by TD-531. Was: Open.
-**Blocked by:** TD-531
-**Location:** design §4.5a **Message** (the card's *more ▾* and the Focus header) and **Inbox row: `ask`** (Reply) — the one dialog, which today is a textarea and a kind; §4.5a *Focus composer* **Attach** / drop / paste and §4.4 *Attachment drop* (the road that exists); §4.10 *A look* (`shots`, the one structured file on an envelope) and its closed markdown subset (*no headings, images, tables*); `src/agentorc/ui/static/app.js` (`AO.compose`, the dialog; `AO.wireAttach` and `AO.pasteData`, the Focus road), `src/agentorc/ui/templates/base.html` (`#mailbox`), `src/agentorc/ui/app.py` (`attach_file`), `src/sessionorc/agent_mail.py` (`rpc_msg`), `src/sessionorc/mail.py` (`SHOTS_MAX`, `SHOT_RE`), `src/sessionorc/models.py` (`MailEntry.shots`)
-
-**Why:** Paul's words, 2026-10-10, through Add entry: *when we create or reply to an inbox message we should be able to copy files/images into the message; this should probably use the same mechanism we use for the focus screen.* The Message and Reply dialog (§4.5a **Message**: one dialog for a message from the person and a Reply on an Inbox row) takes text alone; a message's body is a closed markdown subset that draws no image (§4.10), and the one structured file an envelope carries is a look's `shots` — four `.png` paths under `docs/mockups/reviews/` of the sender's repo, a session's road to the person and refused the other way (§4.10 *A look*). So a person with a screenshot or a document for a session has one road: open its Focus, attach there and **Send** — a prompt typed into the pane, the act of control, which is not what a message is (§4.5a **Message**: *mail, not a send*) — and on an `unattended` session's Focus the composer is closed (*Focus watches*, §4.5), so for the sessions mail exists for there is no road at all. The road itself is built and paid for: the Focus composer's **Attach** / drop / paste uploads in pieces to `~/.agentorc/attachments/<session>/` through the `attach` RPC, a person's own act, bounded by `person.attach.max`, the file swept with the session's run logs (§4.4 *Attachment drop*, *An attachment's life*; TD-002, TD-478, TD-469), and puts the path at the caret, which Claude Code reads as a file in a prompt. The dialog has none of it.
-
-**Fix:** a design round first — a control not in §4.5a's table does not exist, and the dialog's row says nothing of a file:
-1. §4.5a **Message** and the Reply row gain **Attach** / drop / paste as the *Focus composer* row has them: the file picker, a file dropped on the dialog, an image pasted into its textarea (named `paste-<date>-<time>.<ext>` as there), the same pieces, the same bound and refusal words, *Attaching deck.pptx · 37%* with its ✕ in the dialog, the path inserted into the text at the caret and nothing sent until **Send**.
-2. Where the file lands: the **addressee session's** `attachments/<session>/` — the reader is the session, and the file then lives as that session's run log does (§4.4 *An attachment's life*) — for a Message and for a Reply alike (a Reply's addressee is the asker). A message to a node's session is refused as the Focus road is (*does not cross the link*; phase 2, §7), in the RPC's words.
-3. What the envelope carries: Paul's words say *the same mechanism*, so the lean is the Focus reading — the path is text in the body, nothing new on `MailEntry`, `ao inbox` prints it as written — against the other reading, a structured `files` field drawn as file names and thumbnails as `shots` is (§4.10 *A look*). The round decides; if the structured field is wanted it is a second slice, after the path lands.
-4. Then the build: one wiring, since the card's *more ▾*, the Focus header's **Message** and every Inbox **Reply** open the one `#mailbox` dialog (`AO.compose`); `AO.wireAttach` already takes its elements as arguments. Builder's UI check on a scratch home (§4.9b *A UI change is verified by its builder*).
-
-**Done when** a file picked, dropped or pasted in the Message or Reply dialog lands whole under the addressee's attachments directory, in pieces up to `person.attach.max`, its path is in the text the session receives, the row and `ao inbox` draw the message as before, and the design's rows say so.
-
-**Related:** TD-002 (the Focus road), TD-473 / TD-478 (pieces), TD-419 / TD-469 (the attachment's life), TD-472 (paste on the terminal), TD-290 / TD-292 (`shots`, the envelope's only file today), TD-003 (the phone's share sheet).
-
-## TD-531: Build the Message and Reply dialog's Attach / drop / paste (TD-530): the Focus road on `#mailbox`, the addressee's id to `AO.compose`, the path at the caret, no Attach on an empty seat
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (the designer, TD-530's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Message and Reply dialog: Attach / drop / paste*, **Message**, **Inbox row: `ask`** (Reply); §4.4 *Attachment drop* (*The Message and Reply dialog takes the same road*); §4.10 *A file for a session*; `src/agentorc/ui/templates/base.html` (`#mailbox`: an **Attach** button, its hidden file input, the **✕**, the label), `src/agentorc/ui/static/app.js` (`AO.compose`: an `id` option — the addressee's session id — and `AO.wireAttach` on the dialog; the Focus upload (`AO.uploadPieces` with its `post` to `/api/sessions/<id>/attach`, ~L3755) lifted into one `AO.attachUpload(id)` the Focus and the dialog share; every `AO.compose` caller passing the id — the card's *more ▾* and the Focus header (the session), the Inbox and Focus-panel **Reply** and **Overrule** rows (the sender's id on the row's dataset), a seat's **Message…** (none); paste on `#mailtext` through `AO.pasteData`), `src/agentorc/ui/app.py` (nothing new: `attach_file` as it is), `tests/test_attach.py`, `tests/test_ui_composer_bar.py` (the shape of the dialog's wiring), mockup `Message.dc.html` (TD-530's shots)
-
-**Why:** TD-530: Paul's screenshot or document for a session has no road through mail — the dialog takes text alone, and on an unattended session's Focus the composer is closed.
-
-**Fix:**
-1. `#mailbox`: **📎 Attach** beside **Cancel**, a hidden `<input type=file multiple>`, the label that reads *Attaching <name> · n%* and the **✕** that cancels, as the Focus composer's; the dialog is the drop target; a paste into `#mailtext` with a file and no `text/plain` takes the road.
-2. `AO.compose(o)`: `o.id` the addressee's session id; with it the dialog wires `AO.wireAttach` (button, input, `composer` the dialog itself — never *shut*, `compose` the textarea, `targets` the dialog, `upload` the shared `AO.attachUpload(o.id)`, `fail` a toast); without it the button is hidden and a title on the dialog's note says *attach needs a session in the seat*. Each path goes into the textarea at the caret; **Mail it** sends the text as today, nothing else on the envelope.
-3. Callers: the card's *more ▾* **Message** and the Focus header pass the session's id; the Inbox page's and the Focus panel's **Reply** and **Overrule** pass the row's sender id (`data-from`, added to the rows where it is missing); a seat card's **Message…** passes none.
-4. The host agent and `app.py` unchanged: `attach` is a person's act for a session on this host, refusing a node's in its own words, which the dialog draws as a toast.
-5. Tests: a dialog opened with an id draws Attach and an upload inserts the path at the caret; without an id no Attach; the shared upload posts to the addressee's `/attach`; a paste with a file takes the road and one with text does not.
-6. UI check on a scratch home (§4.9b): a Message to an unattended session with a pasted screenshot and a dropped file — the paths in the text, the files whole under that session's `attachments/`, the row drawing the paths as text, `ao inbox` printing them; a Reply the same, under the asker's directory; a seat's Message… without Attach. Shots `docs/mockups/reviews/2026-10-10-td531-*.png` in the PR.
-
-**Done when** a file picked, dropped or pasted in the Message or Reply dialog lands whole under the addressee's attachments directory, in pieces up to `person.attach.max`, its path is in the text the session receives, the row and `ao inbox` draw the message as before, and the tests pin the wiring.
-
-**Related:** TD-530 (the design), TD-002 / TD-478 (the Focus road), TD-419 / TD-469 (the attachment's life), TD-292 (`shots`), TD-171 (the dialog's role line).
