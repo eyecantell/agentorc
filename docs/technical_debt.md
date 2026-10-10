@@ -973,7 +973,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-10 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
+**Added:** 2026-10-09 (test-audit-ao-1, auditing the tests of the last 10 merged PRs)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
