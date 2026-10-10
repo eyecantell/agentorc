@@ -43,7 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-472 | An image pasted into the Focus terminal does nothing: only the composer takes a pasted file down the attachment road | Low | Designed 2026-10-09 — build TD-479 |
 | TD-474 | The Focus terminal freezes or jitters with nothing on the page to say why: no mark for a reconnecting or silent terminal socket | Low | Designed 2026-10-09 — build TD-480 |
-| TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Open |
+| TD-479 | Build the terminal's file paste (TD-472): `navigator.clipboard.read()` behind Paste, a file-only clipboard to the attach road, the path pasted into the terminal | Low | Built — live check #1448 |
 | TD-480 | Build the terminal mark (TD-474): *reconnecting…* after the grace, the bridge's `{clients, window}` frame and *resized by another client*, *no output for Ns* on a working session, the console log | Low | Open |
 | TD-485 | The card draws no restart note: a member the tick or the doorbell restarted reads like a fresh start, and §4.5a has no row for one | Low | Designed 2026-10-09 — build TD-487 |
 | TD-487 | Build the card's **restarted** chip (TD-485): the newest restart inside `RESTART_WINDOW` in `ending.restart_words`' words on the card and the Focus header, the window's entries and the ceiling count on hover | Low | Open |
@@ -54,6 +54,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-500 | Build the composer's bar (TD-491): the fold, the terminal's height to it, the overlay over the terminal's foot, `c`, the draft on the bar, `person.composer` on the You card, the shots re-taken from the built page | Low | Open |
 | TD-501 | Build the pane's path link (TD-493): the `paths` read RPC on the record's host, `editor.file` served to Focus, the page's link provider beside the web-links addon, the help paragraph | Low | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
+| TD-520 | A text paste with Ctrl+V on the Focus terminal is typed twice: `pasteClip` pastes it and the browser's own paste event reaches xterm.js as well | Low | Open |
 
 ---
 
@@ -640,8 +641,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** feature
 **Added:** 2026-10-09 (the designer, TD-472's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1448
+**Status:** Built — PR #1448 (grinder-ao-2, 2026-10-10): `AO.clipPaste` reads `clipboard.read()`; a file and no text goes up the attach road whether or not the composer is open and its path is pasted into the terminal; checked on a scratch home with a shell session (the path at bash's prompt as a bracketed paste, unsent). A file dropped on the terminal still goes to the composer's caret, as §4.5a's Attach row says. **To read once #1448 is live:** a screenshot copied to the clipboard and pasted with Ctrl+V on the terminal of an interactive Claude Code session on this host puts its `~/.agentorc/attachments/<session>/paste-…png` path in the tool's prompt, unsent. Only a person's own press shows it, so it ends in a look (design §4.10 *A look*)
 **Location:** design §4.5a *Copy / Paste* and *Attach / drop / paste*, §4.4 *Attachment drop*; `src/agentorc/ui/static/app.js` (`pasteClip` ~L3266 — the one road every terminal paste takes: Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click, the header's Paste; `AO.wireAttach` ~L152 and its `shut()` rule; `AO.attachName` ~L131; the Focus wiring ~L3353)
 
 **Why:** TD-472: `pasteClip` reads `navigator.clipboard.readText()`, so a clipboard holding only an image pastes nothing and says nothing, while the same screenshot pasted into the composer is attached; the terminal is where a person's eyes are.
@@ -821,3 +822,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
+
+## TD-520: A text paste with Ctrl+V on the Focus terminal is typed twice: `pasteClip` pastes it and the browser's own paste event reaches xterm.js as well
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (grinder-ao-2, met while building TD-479)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (Focus: `term.attachCustomKeyEventHandler`, the Ctrl+V / Ctrl+Shift+V / Shift+Insert lines that call `pasteClip` and `return false`)
+
+**Why:** On a scratch home (`scripts/look_home.py`, headless Chromium under Playwright, clipboard permissions granted), `MARK` on the clipboard and Ctrl+V on a shell session's terminal put `MARKMARK` at the prompt — on `origin/main`'s `app.js` as on TD-479's. The key handler's `return false` stops xterm.js from handling the key, but not the browser's default: the keydown still raises a `paste` event on xterm's textarea, which xterm.js pastes itself, beside `pasteClip`'s `term.paste`. A file-only clipboard is not doubled (xterm's own handler takes text alone), so TD-479's screenshot paste uploads once. Not yet seen in a headed browser, where a person would see a pasted command twice — a `git commit -m "…"` pasted into a shell would run with its text doubled.
+
+**Fix:** Read the doubling in a headed Chrome and Firefox first. If it holds there, take one road: either `preventDefault()` the key events `pasteClip` handles (the custom handler gets the `KeyboardEvent`), or let the native `paste` event carry text and call `pasteClip` only for the file case. A node test against stubs, as `tests/test_attach.py` runs the page's functions, pins that one Ctrl+V pastes once.
+
+**Related:** TD-479 (the terminal's file paste), TD-472.

@@ -577,3 +577,85 @@ async def test_a_link_that_fails_leaves_no_part(agent, tmp_path, monkeypatch):
         with pytest.raises(AgentError):
             await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
         assert not list(where.iterdir()) and not agent._uploads
+
+
+CLIP_PROBE = (
+    PRELUDE
+    + """
+const now = new Date(2026, 9, 7, 17, 4, 9);
+const tick = () => new Promise((r) => setImmediate(r));
+const blob = (body, type) => new Blob([body], { type });
+const item = (parts) => ({ types: Object.keys(parts), getType: async (t) => blob(parts[t], t) });
+async function paste(clip) {
+  const got = { text: [], file: [], toast: [] };
+  await AO.clipPaste(clip, { now, text: (t) => got.text.push(t), toast: (m) => got.toast.push(m),
+    file: (f) => got.file.push({ name: f.name, type: f.type, size: f.size }) });
+  return got;
+}
+const stub = (extra) => { const on = {}; return Object.assign({ on, classList: { contains: () => false },
+  addEventListener: (k, f) => { on[k] = f; }, dispatchEvent: () => {}, focus: () => {}, click: () => {} }, extra); };
+async function run() {
+  const out = {};
+  out.shot = await paste({ read: async () => [item({ "image/png": "PNGDATA" })], readText: async () => "" });
+  out.text = await paste({ read: async () => [item({ "text/plain": "hello", "text/html": "<b>hello</b>" })] });
+  out.html_image = await paste({ read: async () => [item({ "text/html": "<img>", "image/png": "P" })] });
+  out.blank_text_image = await paste({ read: async () => [item({ "text/plain": "", "image/png": "P" })] });
+  out.empty = await paste({ read: async () => [], readText: async () => "" });
+  out.no_read = await paste({ readText: async () => "" });
+  out.no_read_text = await paste({ readText: async () => "typed" });
+  out.refused = await paste({ read: async () => { throw new Error("denied"); }, readText: async () => "plain" });
+  out.blocked = await paste({ readText: async () => { throw new Error("denied"); } });
+  out.none = await paste(undefined);
+  // the terminal's road: the composer closed, the path to `put`, nothing at the caret
+  const uploaded = [], put = [];
+  const button = stub({ lastChild: { textContent: "Attach" }, disabled: false });
+  const composer = stub({ classList: { contains: (c) => c === "hidden" } });
+  const compose = stub({ value: "draft", selectionStart: 5, selectionEnd: 5 });
+  const attach = AO.wireAttach({ button, input: stub({ files: [] }), composer, compose, targets: [], fail: () => {},
+    upload: async (f) => { uploaded.push(f.name); await tick(); return "/a/" + f.name; } });
+  await attach([{ name: "paste-1.png" }], (p) => put.push(p));
+  await attach([{ name: "shut.png" }]);
+  out.road = { uploaded, put, value: compose.value, label: button.lastChild.textContent, disabled: button.disabled };
+  console.log(JSON.stringify(out));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.mark.unit
+def test_a_screenshot_pasted_on_the_terminal_takes_the_attach_road(tmp_path):
+    """§4.5a *Copy / Paste* (TD-472, TD-479), under node: a clipboard holding a file and no text is
+    handed to the attach road as a File named for the moment, an image before other types; one
+    carrying `text/plain` is the text's and never a file; a browser without `read()` pastes text
+    alone and says so when there is none, one that refuses `read()` falls back to `readText()`, and a
+    clipboard it cannot read is a toast. The terminal's road attaches with the composer closed and
+    hands each path to the caller, never to the composer's caret."""
+    got = _node(tmp_path, CLIP_PROBE)
+    shot = {"name": "paste-20261007-170409.png", "type": "image/png", "size": 7}
+    assert got["shot"] == {"text": [], "file": [shot], "toast": []}
+    assert got["text"] == {"text": ["hello"], "file": [], "toast": []}
+    assert got["html_image"]["file"] == [{**shot, "size": 1}] and got["html_image"]["text"] == []
+    assert got["blank_text_image"]["file"] == [{**shot, "size": 1}]  # an empty text is no text
+    assert got["empty"] == {"text": [], "file": [], "toast": []}
+    assert got["no_read"] == {"text": [], "file": [], "toast": ["this browser pastes text only"]}
+    assert got["no_read_text"] == {"text": ["typed"], "file": [], "toast": []}
+    assert got["refused"] == {"text": ["plain"], "file": [], "toast": []}
+    blocked = {"text": [], "file": [], "toast": ["clipboard blocked (needs https or localhost)"]}
+    assert got["blocked"] == blocked and got["none"] == blocked
+    assert got["road"] == {
+        "uploaded": ["paste-1.png"], "put": ["/a/paste-1.png"], "value": "draft", "label": "Attach", "disabled": False,
+    }  # fmt: skip
+
+
+@pytest.mark.unit
+def test_the_terminals_paste_reads_nothing_on_a_read_only_focus():
+    """§4.5a *Copy / Paste*: Paste is inert on a read-only Focus — the toast comes before the clipboard
+    is read — and every paste, text or file, goes through `AO.clipPaste` to the terminal."""
+    js = (UI / "static" / "app.js").read_text()
+    body = js[js.index("const pasteClip = () => {") :]
+    body = body[: body.index("\n    };\n")]
+    ro = body.index('if (readOnly) { AO.toast("watching: paste is off — Take over to type"); return; }')
+    assert ro < body.index("AO.clipPaste(navigator.clipboard") and "readText" not in body
+    assert "attachFiles([f], (path) => { if (live()) term.paste(path); })" in body
+    assert "attachFiles = AO.wireAttach({" in js
