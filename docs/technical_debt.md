@@ -45,12 +45,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Designed 2026-10-10 — build TD-542 |
 | TD-542 | Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list | Medium | Open |
-<<<<<<< HEAD
-| TD-543 | The Session card lists no links: a PR, CI run or doc URL a session printed is found again only by scrolling the pane; read recent URLs from the transcript, off the keystroke path | Medium | Designed 2026-10-10 — build TD-544 |
-| TD-544 | Build the Session card's recent links (TD-543): the adapter's `links` read from a cursor, the record's `links` on the tick, the card's row | Medium | Open |
-=======
-| TD-541 | Build the recent files from git (TD-538): the branch's changed paths beside the status read, `{path, at, sha}`, computed and never kept, the hook's `file` dropped | Medium | Open |
->>>>>>> origin/main
 | TD-545 | `person.file_link` is merged field by field and no test says so: dropping `file_link` from `_person_change`'s nested table leaves the whole suite green | Low | Open |
 
 ---
