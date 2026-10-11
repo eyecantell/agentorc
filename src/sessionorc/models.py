@@ -81,6 +81,7 @@ NODE_OWNED = frozenset(
         "context",
         "subagents",
         "files",
+        "links",
         "wrapup_sent_at",
         "gated",
         "wrapup_at",
@@ -700,6 +701,8 @@ WAKE_FIELDS = ("state", "exit_code")
 
 # How many changed files a record carries (design §4.2, TD-538): the newest twenty.
 RECENT_FILES = 20
+# How many printed URLs a record keeps (design §4.2 *The record's `links`*, TD-543): the newest twenty.
+RECENT_LINKS = 20
 
 
 def wake_digest(session: dict[str, Any]) -> str:
@@ -932,6 +935,10 @@ class Session:
     # newest first, a path once, at most `RECENT_FILES`, `sha` absent on a dirty path. The Focus Session
     # card's recent files; computed on each read, never kept between them. Read on the record's host.
     files: list[dict[str, Any]] = field(default_factory=list)
+    # The URLs the session printed (design §4.2 *The record's `links`*, TD-543): `{url, at}` from the
+    # adapter's `links` read of the transcript on the tick, newest first, a URL once at its newest `at`, at
+    # most `RECENT_LINKS` — the Focus Session card's recent links. Read on the record's host, so the node's.
+    links: list[dict[str, Any]] = field(default_factory=list)
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):

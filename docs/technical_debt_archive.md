@@ -9315,6 +9315,7 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 
 **Resolved:** 2026-10-10 (PR #1496) — `tests/test_ui_focus_paths.py::test_open_editor_toasts_unless_quiet_and_a_pair_toasts_once` runs the real `AO.openEditor` under node, with `AO.toast` and the hidden frame recorded. A launch toasts once, a quiet one none, and `AO.openFile`'s pair sends both frames under one toast. With the guard reverted to `if (true)`, the test fails.
 
+<<<<<<< HEAD
 ## TD-538: The Session card's recent files come from the Edit/Write hook alone: a file a session changes by shell, or a commit's files once committed, never shows; read the list from git instead
 
 **Priority:** Medium
@@ -9360,3 +9361,64 @@ The design's list (§4.3 *A kill the guard refuses*) names `pkill`/`killall` *as
 **Related:** TD-538 (the design), TD-525 / TD-527 (the card and its first, hook-fed list, #1474 / #1476), TD-532 / TD-535 / TD-536 (the file link's launches), TD-112 (adapter neutrality), TD-080 (`git_info` and one measure of pushed); the base is `ledger.default_ref`'s (cadence §9's default-branch rule).
 
 **Resolved:** 2026-10-10 (PR #1497) — `gitinfo.changed_files` reads the paths changed against `merge-base HEAD origin/<default>` (the tree alone with no origin or no merge base) with their time and sha; `agent_tick._refresh_git` reads it beside the status when its `oid` or porcelain moved and sets `files` to it; the hook's `file` and `EDIT_TOOLS` dropped; `AO.recentFiles`' hover names the commit. Tests: `tests/test_recent_files.py`, `tests/test_ui_focus_recent_files.py`; UI check on a scratch home in the PR (`docs/mockups/reviews/2026-10-10-td541-*.png`).
+=======
+## TD-546: The Settings You form's `file_link` and template `file` collection and its two toggles are in no test: five mutations of `app.js` leave the suite green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1492, TD-537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (the `you:` collector ~L4636-4650, the `input` handler's `#setfilelink` / `wait.disabled` lines ~L4691, the `#setopenin` change handler and the `folder_first` change handler ~L4751-4757); `tests/test_ui_settings.py::test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file`
+
+**Why:** that test posts JSON to `/api/settings/you` itself and reads the server-rendered page, so no line of the form's own JavaScript runs under it, and its docstring (*"the wait input disabled with the switch off"*) is true only of the first paint. Each of these mutations of `app.js`, made one at a time in a scratch worktree, left `test_ui_open_in.py`, `test_ui_settings.py`, `test_ui_focus_paths.py` and `test_ui_focus_recent_files.py` at `67 passed`:
+- `wait: f.elements.wait.value === "" ? null : Number(…)` replaced by `wait: 1` — an edited wait is never saved, and an emptied one never cleared;
+- `folder_first: f.elements.folder_first.checked` replaced by `true` — the switch can never be saved off;
+- `open_in.file = f.elements.file.value.trim()` removed — a template's **file** is never sent;
+- the `#setopenin` handler's `fl.classList.toggle("hidden", openin.value === "none")` replaced by `false` — the file link rows stay drawn under *none*;
+- `wait.disabled = !first.checked` removed — the wait stays editable with the switch off.
+This is the part of #1492 a person touches; the PR body's scratch-home UI check is its only guard.
+
+
+**Related:** TD-537 (the build), TD-536 (the design), TD-290 (a UI change is verified by the grinder), TD-545.
+
+**Resolved:** 2026-10-10 (PR #1502) — `tests/test_ui_settings_you.py` runs `AO.settings()` under node against a fake You form: what Save posts for `file_link` and a template's `file`, the editor pick's rows and the switch's wait, and Cancel's redraw. Each of the five mutations above fails it, as do the same two lines removed from Cancel.
+
+## TD-543: The Session card lists no links: a PR, CI run or doc URL a session printed is found again only by scrolling the pane; read recent URLs from the transcript, off the keystroke path
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (ao-paul, Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-10 (the designer; mockup `Focus.dc.html`, shot `docs/mockups/reviews/2026-10-10-td543-session-card.png`) — (1) the source: the transcript on the record's host, read by a new adapter read `links(session_id, cwd, profile, cursor)` incrementally from a byte cursor as `spend` reads (§4.3), on the tick once per `LINKS_EVERY` for every live record with a tool session id, attended too; the record keeps `links` `{url, at}`, a URL once at its newest time, newest first, twenty — kept, since the file is append-only and the cursor makes each pass read only what was appended; a rewrite (compaction) restarts at 0 (§4.2). (2) Drawn as host and path on one line, the scheme dropped, the middle elided past forty-eight characters, a GitHub PR or issue as *owner/repo#n*; the full URL and time on hover; a plain click opens a new tab `noopener`, as the pane's Ctrl+click does; nothing fetched, no title. (3) The session's output and tool results count; a person's prompt does not; `localhost` and loopback hosts are left out. (4) No tool session id (`shell`, a command run) or no read: no row; the read is named in TD-112's conformance suite. (5) Never from the pane (TD-422, TD-501 read the row under the pointer only). §4.5 item 4, a §4.5a row, §4.2, §4.3. Built by TD-544. Was: Open.
+**Location:** design §4.5 item 4 (the **Session** card, beside *recent files*), §4.6 *A URL in the pane is a link* (http/https only, Ctrl+click), §4.3 (the adapter contract: the transcript read); `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path` ~L587, `read_transcript` ~L676), `src/sessionorc/agent.py` (`rpc_transcript` ~L2237), `src/agentorc/ui/static/app.js` (`AO.paneLink`, the web-links addon, `AO.pathProvider`)
+
+**Why:** Paul, 2026-10-10: *we currently check the terminal input/output in order to add browser and file links where they are applicable … do we leverage that and add the recent urls and files from the terminal to our list?* The pane's detection cannot be reused for a list. The web-links addon and `AO.pathProvider` run only when the mouse hovers over a row, and only on that row (TD-422, TD-501), so they never see the output whole. Scanning every row painted would put work on the path keystrokes and output take. The files half is TD-538 / TD-541 (from git). The links half has no source: a PR link, a CI run, a doc a session printed is gone once it scrolls away. The transcript already holds every message and tool result whole, on the host, and `ao transcript` reads it.
+
+**Fix:** a design round settles a **recent links** row on the Session card: (1) the source, the session's transcript read on the record's host, the http/https URLs in the assistant's text and tool results, newest first, de-duplicated, a cap like the files' twenty; computed on read or kept, and never by scanning the pane; (2) what each draws (the URL shortened, a PR as *#n* with its title if cheap, the time on hover) and how it opens (the pane's rule: http/https only, a new tab); (3) which URLs count: the session's own output, or the person's prompts too, and whether to drop noise (localhost, the UI's own pages); (4) a tool with no readable transcript shows no row, and this is named in TD-112's conformance suite as a transcript read every adapter declares or lacks; (5) cost: when the read runs (the card unfolded, on a tick, at a stop) so a long transcript is not reparsed per request. **Done when** the design says it and the build entry it names is ledgered.
+
+**Related:** TD-538 / TD-541 (recent files from git), TD-525 / TD-527 (the card), TD-422 (URL links in the pane), TD-501 (path links), TD-112 (adapter neutrality).
+
+**Resolved:** 2026-10-10 (PRs #1498, #1501) — designed in #1498 (§4.2 *The record's `links`*, §4.3 `links`, §4.5 item 4, §4.5a **recent links**) and built by TD-544 in #1501.
+
+## TD-544: Build the Session card's recent links (TD-543): the adapter's `links` read from a cursor, the record's `links` on the tick, the card's row
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-10 (the designer, TD-543's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 (*The record's `links`*), §4.3 (the `links` read), §4.5 item 4, §4.5a *Focus side panel, Session card: recent links*; `src/agentorc/adapters/claude_code/__init__.py` (`links`: beside `read_transcript` ~L676 and the `spend` cursor read — the entries past `cursor`, the `assistant` text blocks and the tool results' text, one URL regex (`https?://` to the first whitespace, a closing bracket or quote, trailing `.,;:)` stripped), `Link(url, at)`), `src/sessionorc/adapters.py` (the `Adapter` Protocol ~L34: the optional method on the contract; `ShellAdapter` ~L237 lacks it), `src/sessionorc/agent_common.py` (`LINKS_EVERY`, sixty seconds), `src/sessionorc/agent_tick.py` (a `_refresh_links` beside `_refresh_model` ~L3117: every live record with `adapter_id` and `dir`, attended too, the cursor per record in memory, reset to 0 when past the file's end; merge into `s.links` a URL once at its newest `at`, newest first, `RECENT_LINKS` twenty, the loopback and prompt rules in the adapter), `src/sessionorc/models.py` (`links`, `RECENT_LINKS`), `src/agentorc/ui/static/app.js` (`AO.recentLinks` beside `AO.recentFiles` ~L3503: the shortening, *owner/repo#n* for `github.com/<o>/<r>/(pull|issues)/<n>`, `target=_blank rel=noopener`), `docs/mockups/gen.py` (TD-543's row), TD-112's conformance suite (the read declared or lacked), `tests/test_recent_links.py` (new), `tests/test_ui_focus_recent_files.py` (the row), the adapter's transcript tests
+
+**Why:** TD-543: a PR, a CI run or a doc URL a session printed is gone once it scrolls away; the pane's link detection reads only the hovered row and must stay off the keystroke path, while the transcript holds every message whole on the host.
+
+
+**Done when** the Session card lists the URLs a session printed, newest first, twenty, read from the transcript by cursor on the tick and never from the pane, a plain click opening each in a new tab, prompts and loopback hosts left out, nothing on a `shell` session, and the tests pin it.
+
+**Related:** TD-543 (the design), TD-538 / TD-541 (recent files from git, the row above), TD-525 / TD-527 (the card), TD-421 / TD-422 (the pane's URL links), TD-501 (path links), TD-128 (the `spend` cursor read), TD-112 (the conformance suite).
+
+**Resolved:** 2026-10-10 (PR #1501) — `agentorc/adapters/claude_code/transcript.py` `links` (the read by cursor), `sessionorc/agent_tick.py` `_refresh_links` (the merge), the record's `links`, `AO.recentLinks` in `app.js`; pinned by `tests/test_recent_links.py`.
+>>>>>>> origin/main
