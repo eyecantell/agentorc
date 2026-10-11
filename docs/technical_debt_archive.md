@@ -9420,3 +9420,21 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-538 (the design), TD-525 / TD-527 (the card and its first, hook-fed list, #1474 / #1476), TD-532 / TD-535 / TD-536 (the file link's launches), TD-112 (adapter neutrality), TD-080 (`git_info` and one measure of pushed); the base is `ledger.default_ref`'s (cadence §9's default-branch rule).
 
 **Resolved:** 2026-10-10 (PR #1497) — `gitinfo.changed_files` reads the paths changed against `merge-base HEAD origin/<default>` (the tree alone with no origin or no merge base) with their time and sha; `agent_tick._refresh_git` reads it beside the status when its `oid` or porcelain moved and sets `files` to it; the hook's `file` and `EDIT_TOOLS` dropped; `AO.recentFiles`' hover names the commit. Tests: `tests/test_recent_files.py`, `tests/test_ui_focus_recent_files.py`; UI check on a scratch home in the PR (`docs/mockups/reviews/2026-10-10-td541-*.png`).
+
+## TD-545: `person.file_link` is merged field by field and no test says so: `_person_change`'s nested table can lose `file_link` and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-10 (test-audit-ao-1, auditing #1492, TD-537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_settings.py` (`_person_change`'s `nested` table, the `"file_link": settings_mod.FILE_LINK_KEYS` line added by #1492); `tests/test_ui_settings.py::test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file`
+
+**Why:** the docstring #1492 wrote says *"`terminal`, `inbox`, `attach` and `file_link` merged field by field, a field set to None cleared"*. The only test that saves `file_link` posts both fields at once (`{"folder_first": False, "wait": 2.5}`) and then clears the whole key, so a whole-key replace gives the same answers. Probe: delete that one line from `nested` in a scratch worktree and run `tests/test_ui_open_in.py tests/test_ui_settings.py tests/test_ui_focus_paths.py tests/test_ui_focus_recent_files.py` — `67 passed`, as without the change. The merge is what lets the Settings form send `{wait: 3}` and leave the person's `folder_first: false` alone; without it that save silently turns the folder back on.
+
+**Fix:** a test in `test_ui_settings.py` (or beside `terminal`'s merge test): save `{folder_first: false}`, then `{wait: 3}`, read `person.file_link` back and expect both; then `{wait: null}` and expect `{folder_first: false}` alone.
+
+**Related:** TD-537 (the build), TD-536 (the design), TD-546 (the form's side).
+
+**Resolved:** 2026-10-10 (PR #1503) — `tests/test_ui_settings.py::test_the_you_card_draws_and_saves_the_file_link_and_a_templates_file` saves `{folder_first: false}`, then `{wait: 3}` alone, and reads both back; then `{wait: null}` and reads `{folder_first: false}` alone. With the `file_link` line removed from `_person_change`'s `nested` table, the test fails.
