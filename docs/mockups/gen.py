@@ -233,7 +233,7 @@ def topbar(active="Org", narrow=False):
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
   <div style="flex-grow: 1;"></div>
-  {"" if narrow else '<span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
+  {"" if narrow else '<span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #f59e0b; font-weight: 600;" title="the build chip (TD-539): the live commit local time; main +n amber with the merges not yet live on hover">live 10-10 15:41 · main +2</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;">{ICON["term"]}Shell</span><span class="btn primary" style="height: 26px;">{ICON["plus"]}New session</span>
 </div>'''
 

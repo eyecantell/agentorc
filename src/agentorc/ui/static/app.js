@@ -1179,8 +1179,30 @@
     if (Array.isArray(got.answered_marks)) { answeredMarks = got.answered_marks; syncAnsweredMarks(); }
     // the Org rollup's *m overdue* (TD-178): `null` is not known, and the rollup keeps what it showed
     if (typeof got.overdue_n === "number") { overdueN = got.overdue_n; if (typeof syncSummaries === "function") syncSummaries(); }
+    if (got.build_chip) drawBuildChip(got.build_chip);
     return got;
   };
+  // §4.5a top bar **build** chip (TD-539): *live <MM-DD HH:MM>* in the browser's zone — the year in
+  // front only when it is not this one — from `data-at`, then `data-rest`. Drawn at load and again
+  // from each Inbox poll's `build_chip`, so a merge shows without a reload.
+  function buildStamp(at) {
+    const d = new Date(Date.parse(at || ""));
+    if (isNaN(d)) return "";
+    const p = (n) => String(n).padStart(2, "0");
+    const md = `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}-${md}`;
+  }
+  function drawBuildChip(c) {
+    const el = $("#buildchip");
+    if (!el) return;
+    if (c) {
+      el.className = `mono ${c.cls || ""}`; el.title = c.title || "";
+      if (c.at) { el.dataset.at = c.at; el.dataset.rest = c.rest || ""; } else { delete el.dataset.at; delete el.dataset.rest; el.textContent = c.text || ""; }
+    }
+    const when = el.dataset.at ? buildStamp(el.dataset.at) : "";
+    if (when) el.textContent = `live ${when}${el.dataset.rest || ""}`;
+  }
+  drawBuildChip(null);
   if ($("#personneeds")) {
     // the Org page and the Inbox page render the count server-side; every other page reads it at
     // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.

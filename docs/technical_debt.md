@@ -43,8 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-489 | A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m | High | Designed 2026-10-09 — builds TD-496, TD-497 |
 | TD-497 | Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line | High | Built — live check of #1407 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-539 | No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes | Medium | Designed 2026-10-10 — build TD-542 |
-| TD-542 | Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list | Medium | Open |
 
 ---
 
@@ -627,42 +625,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-## TD-539: No screen says which build is live: what was promoted against what was merged is read only by `ao promote status` and `ao doctor`, in commit hashes
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (ao-paul, Paul's ask)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-10 (the designer) — the §4.5a **build** chip row rewritten, not a new row: (1) where — the top bar of every page beside the usage chip, always drawn (today only when behind), the Settings page left as it is; (2) what — the live commit's committer time as a local date and time (*live 10-10 15:41*), from a new `live_at` on the home's promote readings; hover: the sha and subject, built and started times, then *not live yet:* with the pending commits' `<sha7> <subject>` (ten, the rest counted) from a new `pending` reading, one `git log` per pass (§6); (3) marks — *main +n* amber from the reading's `ahead`, *promoting…* in flight, *held* after a rollback, *main unknown*, *build unknown*; (4) the page's own build on hover where it differs from the agent's, and a linked node's where it is `stale` (§4.4a); (5) nothing pressable, Promote stays the Inbox row's. No mockup: the chip's shape is a word and a time in the bar it already sits in. Built by TD-542. Was: Open.
-**Blocked by:** TD-542
-**Location:** design §4.5 (the top bar, or the Settings page), §4.5a (a new display row), §6 *Promote*; the host agent's `build.info()` (`src/sessionorc/agent.py` ~L367, read once at start: the commit its install was built from), `ao promote status` (live sha, main sha, *n ahead*)
-
-**Why:** Paul, 2026-10-10, testing what had merged: *Should we add an ao version to the screens to be able to check which version is being used (what was promoted vs just merged) — I am thinking we could use a date+timestamp to make it easy on the user (me).* Through the day he could not tell from the page whether a fix he was asked to look at was live: `ao promote status` (`live a4cff5c · main e372bf1, 1 ahead`) and `ao service status` say it, in hashes, in a terminal.
-
-**Fix:** a design round settles a display of the live build on the page: where (top bar beside the usage, the Settings page, or both); what it reads (the live commit's time as a local date and time, e.g. *live 10-10 15:41*, with the hash and the commits not yet live on hover or press); a mark when `main` holds merges not yet live (*main +1, not live*) and when a promote is running or held; the UI's own build against the host agent's after a promote restarts one before the other; a node's build (`ao host status`). Display only, no control. **Done when** the design says it and the build entry it names is ledgered.
-
-**Related:** TD-062 (the promoted install), TD-120 / TD-132 (Promote), TD-226 (rollback, whose hold the display should name).
-
-## TD-542: Build the always-drawn build chip (TD-539): the live commit's local time, *main +n*, the readings' `live_at` and `pending`, the hover's list
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-10 (the designer, TD-539's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Org top bar: build chip*, §6 *Promote* (the readings); `src/sessionorc/promote.py` (`read_main` ~L107 reads `main` and `moved`; `live` and `ahead` are set in the tick's pass ~L520–528, where the two new readings go: `live_at` — `git log -1 --format=%cI <live>` — and `pending` — `git log --format=%h%x09%s <live>..<main>`, ten plus a count; both empty when live or main is unknown), `src/sessionorc/build.py` (`chip` ~L83: always a dict, `{"text", "title", "cls"}` with `cls` `live` / `behind` / `inflight` / `held` / `unknown`; `line` gains the pending list; the time drawn local to the page — the chip carries the ISO time in `data-at` and `app.js` prints it in the browser's zone, as other times are), `src/agentorc/ui/app.py` ~L1170 (`build_chip` on every page's context, with the page's own `build.info()` and the host's linked nodes' builds), `src/agentorc/ui/templates/base.html` ~L32 (the chip unconditional, `data-at`), `src/agentorc/ui/static/app.js` (the local-time print, the Inbox poll redraw), `tests/test_build.py`, `tests/test_promote.py`, `tests/test_ui_promote.py`, mockups `Main.dc.html`/`MainDark.dc.html` (`docs/mockups/gen.py`: the chip in the bar)
-
-**Why:** TD-539: Paul could not tell from the page whether a fix he was asked to look at was live; the hashes are in a terminal, and the chip today is nothing in the common case.
-
-**Fix:**
-1. `promote.py`: the readings gain `live_at` (live's committer time) and `pending` (`[{sha, subject}]`, newest first, ten, plus `pending_more`), read in the same pass after `main` and `live` are known; a failed read leaves them absent.
-2. `build.chip`: never None. Text *live <MM-DD HH:MM>* (the year in front when not this year), then *· main +n* / *· promoting…* / *· held* / *· main unknown* as the reading says; *build unknown* without a record. `title`: `line`'s sentence, a blank line, *not live yet:* and the pending lines, *… and n more*; *this page: <sha7> <time>* when the UI's `build.info()` commit differs; *<node>: <sha7>, stale* per linked node marked so.
-3. `base.html` / `app.js`: the chip always in the bar, `data-at` the ISO time, printed in the browser's zone on load and on the Inbox poll; `cls` colours — dim in the common case, amber `behind`, blue `inflight`, dim-amber `held`, dim `unknown`.
-4. Tests: the readings' two new fields on a scratch repo (live behind main by three commits: three pending; live at main: empty); `chip` for each `cls`; the page draws the chip when live is main's head; the hover carries the pending subjects; `ao promote status` unchanged.
-5. UI check on a scratch home (§4.9b): the bar reads *live <today's time>*; merge one commit to the scratch repo's main — *main +1* and its subject on hover within the readings' cadence; promote — *promoting…*, then the new time. Shots `docs/mockups/reviews/2026-10-10-td-542-*.png` in the PR.
-
-**Done when** every page's top bar names the live build by its commit's local date and time, says *main +n* when merges are not yet live with their subjects on hover, says *promoting…* and *held* when the readings do, shows the page's own build when it differs, and the tests pin it.
-
-**Related:** TD-539 (the design), TD-062 (the promoted install), TD-120 / TD-132 (Promote; slice 5 built the first chip), TD-226 (rollback and its hold), TD-233 (the usage chip beside it).
