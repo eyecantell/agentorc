@@ -79,6 +79,14 @@ class Adapter(Protocol):
     #                                                      `raw`, the file's last `turns` lines as text. None
     #                                                      when there is no file. No field name of the tool's
     #                                                      leaves it (design §4.3, §4.5 screen 9, TD-165)
+    #   links(session_id: str, cwd: Path, profile: str, *, cursor: int) -> tuple[list[Link], int] | None
+    #                                                      the http/https URLs the transcript holds past byte
+    #                                                      `cursor` in the assistant's text and tool results —
+    #                                                      a person's prompt and a loopback host left out — and
+    #                                                      the new cursor (a cursor past the file's end reads
+    #                                                      from 0), for the record's `links` (design §4.2, §4.3,
+    #                                                      TD-543); None when there is no file. An adapter
+    #                                                      without a transcript lacks it, which is the `shell` case
     #   account_for(profile: str) -> str | None           the account the profile runs under (§4.2a, TD-122):
     #                                                      usage is polled, cached and backed off once per
     #                                                      `(adapter, account)`; None, or no method, keys on
@@ -124,6 +132,15 @@ class Adapter(Protocol):
 # -- the transcript's neutral shape (design §4.5 screen 9 *The adapter renders, the core draws*) --
 
 ENTRY_KINDS = ("prompt", "text", "thought", "tool", "compaction", "sidechain")
+
+
+@dataclass
+class Link:
+    """A URL the session printed (design §4.2 *The record's `links`*, TD-543): the `url` as written, and
+    `at`, the time of the transcript entry it was printed in (None when the entry carries none)."""
+
+    url: str
+    at: str | None = None
 
 
 @dataclass

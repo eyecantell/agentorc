@@ -300,6 +300,9 @@
         {# **recent files** (design §4.5a, TD-525): the record's `files`, drawn by the page's script from
            the view and each delta (`AO.recentFiles`); absent until the run's first edit #}
         <dt id="frecentdt" class="hidden">recent files</dt><dd class="mono small recentfiles hidden" id="frecent"></dd>
+        {# **recent links** (design §4.5a, TD-543): the record's `links`, the URLs the session printed, drawn
+           by the page's script from the view and each delta (`AO.recentLinks`); absent while it holds none #}
+        <dt id="flinksdt" class="hidden">recent links</dt><dd class="mono small recentlinks hidden" id="flinks"></dd>
         {# the rounds line (design §4.5a, TD-191): the round log's last two lines, display only #}
         {% if rounds is defined and rounds is not none %}<dt>rounds</dt><dd class="small" title="ao log --tail --id {{ s.id }} reads the whole round log">{% for r in rounds.lines %}<div><span class="mono">{{ r.at[5:16].replace("T", " ") }}</span> {{ r.text }}{% if r.earlier %} <span class="dim">· from an earlier run</span>{% endif %}</div>{% else %}<span class="dim">no round log</span>{% endfor %}</dd>{% endif %}
         {# design §4.5a **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}

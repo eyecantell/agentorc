@@ -531,7 +531,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .termro { margin: 0 0 4px; }
 .inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
 .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
-.gitfiles { line-height: 1.7; margin-top: 6px; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
+.gitfiles { line-height: 1.7; margin-top: 6px; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .recentlinks { line-height: 1.7; min-width: 0; } .recentlinks div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
 @media (max-width: 720px) {
   /* §4.5 screen 6 *Narrow* (TD-137): one column; the rail leaves the page for the sheet, a chip row
      stands under the title, and a row's controls are 44 px high as the phone's Org cards' are */

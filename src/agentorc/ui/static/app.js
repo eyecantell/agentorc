@@ -3532,6 +3532,32 @@
     row.innerHTML = rf;
     row.classList.toggle("hidden", !rf); dt.classList.toggle("hidden", !rf);
   };
+  // The Session card's **recent links** (§4.5 item 4, §4.5a, TD-543): the record's `links`, the URLs the
+  // session printed, newest first, each drawn as its host and path (the scheme dropped, the middle elided
+  // past forty-eight characters), a GitHub pull request or issue as *owner/repo#n*; the full URL and the
+  // time it was printed on hover; a plain click opens it in a new tab, `noopener`, as the pane's Ctrl+click
+  // does. Nothing is fetched for it. "" when the record holds none.
+  AO.shortLink = function (url) {
+    const gh = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)(?:[/?#]|$)/.exec(url);
+    if (gh) return `${gh[1]}/${gh[2]}#${gh[3]}`;
+    const bare = url.replace(/^https?:\/\//, "");
+    return bare.length > 48 ? `${bare.slice(0, 30)}…${bare.slice(-17)}` : bare;
+  };
+  AO.recentLinks = function (v) {
+    const links = v.links || [];
+    return links.map((k) => {
+      const url = String(k.url || "");
+      if (!/^https?:\/\//.test(url)) return "";
+      const title = esc(`${url}${k.at ? ` — printed ${String(k.at).slice(0, 16).replace("T", " ")}Z` : ""}`);
+      return `<div><a href="${esc(url)}" target="_blank" rel="noopener" title="${title}">${esc(AO.shortLink(url))}</a></div>`;
+    }).join("");
+  };
+  // …painted into its row and term from the view and each delta: shown with the first URL, hidden with none
+  AO.paintLinks = function (v, row, dt) {
+    const rl = AO.recentLinks(v);
+    row.innerHTML = rl;
+    row.classList.toggle("hidden", !rl); dt.classList.toggle("hidden", !rl);
+  };
   // The provider the page registers beside the web-links addon when the Session card has an editor button:
   // a row with candidates asks the `paths` route once — the answer kept by the row's text until
   // `clear` (a re-attach) — and the runs the host resolved are links; a failed ask is no link and is
@@ -4102,6 +4128,7 @@
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
+      AO.paintLinks(v, $("#flinks"), $("#flinksdt"));
       renderReports(v);
       renderInbox(v);
       renderGrants(v);
