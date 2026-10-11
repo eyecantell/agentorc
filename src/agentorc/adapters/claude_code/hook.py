@@ -68,9 +68,9 @@ SESSION_START_AT_THE_COMPOSER = {"resume"}
 # idle grinder was turned `working` four seconds after its Stop, with no turn behind it, and read
 # `stalled?` for 13 hours unrung (TD-201). The line names the event the next time it happens.
 TOOL_EVENTS = {"PreToolUse", "PostToolUse"}
-# The tools whose `PostToolUse` names the file they edited, and the key it is under (design §4.2,
-# TD-527): the record keeps it as `files`, the Focus Session card's recent files. A read is no edit.
-EDIT_TOOLS = {"Edit": "file_path", "Write": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path"}
+# A tool event carries no `file`: the record's recent files are git's, read with the status, so a change
+# a shell or a script made counts as an edit does and every adapter shows the same list (design §4.2
+# *The record's `files`*, TD-538).
 
 # idle_prompt (Claude idle for a minute) is deliberately absent: an idle session waiting for you is
 # `idle`, the normal state, not an alert (design §4.2, first-use finding 2026-09-06).
@@ -140,10 +140,6 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         return {**out, "subagent_delta": -1}
     if ev in TOOL_EVENTS:
         tool = payload.get("tool_name")
-        if ev == "PostToolUse" and (key := EDIT_TOOLS.get(tool or "")):
-            path = (payload.get("tool_input") or {}).get(key)
-            if isinstance(path, str) and path:
-                out["file"] = path
         return {**out, "state": STATE_EVENTS[ev], "pending": None, "event": f"{ev}:{tool}" if tool else ev}
     if ev == "UserPromptSubmit":
         # `prompt`: a prompt went in, which is what the host agent's typed brief waits on (§4.1 *No

@@ -43,7 +43,7 @@ const v = {
   dir: "/w/wt", repo: "/w/main",
   files: [
     { path: "/w/wt/src/new file.py", at: "2026-10-10T20:05:09Z" },
-    { path: "/w/wt/README.md", at: "2026-10-10T20:01:00Z" },
+    { path: "/w/wt/README.md", at: "2026-10-10T20:01:00Z", sha: "3f2a9c1d0e8b" },
     { path: "/w/main/docs/x.md", at: "2026-10-10T19:00:00Z" },
     { path: "/etc/hosts", at: "2026-10-10T18:00:00Z" },
   ],
@@ -130,6 +130,8 @@ def test_the_row_draws_the_records_files_newest_first_relative_with_their_marks_
     ) in rows[0]
     # the absolute path and the edit's time on hover
     assert 'title="/w/wt/src/new file.py — edited 2026-10-10 20:05Z"' in rows[0]
+    # a committed one: the commit's time and its short sha (TD-538)
+    assert 'title="/w/wt/README.md — committed 3f2a9c1 2026-10-10 20:01Z"' in rows[1]
 
 
 @pytest.mark.unit

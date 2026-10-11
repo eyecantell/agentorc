@@ -75,7 +75,7 @@ from sessionorc.agent_common import (
 )
 from sessionorc.agent_spend import _metered_of
 from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
-from sessionorc.gitinfo import git_info, work_left
+from sessionorc.gitinfo import changed_files, git_info, work_left
 from sessionorc.models import (
     PERSON,
     PR_CLOSED,
@@ -3010,6 +3010,12 @@ class TickMixin:
             return
         results = await asyncio.gather(*(asyncio.to_thread(git_info, s.dir) for s in due), return_exceptions=True)
         infos = {s.id: (r if not isinstance(r, BaseException) else None) for s, r in zip(due, results, strict=True)}
+        # the recent files (§4.2 *The record's `files`*, TD-538): read again only when the status's
+        # `oid` or its porcelain moved since the last read, or none was read for this record yet
+        keys = {sid: (i.oid, i.dirty, tuple(i.files)) for sid, i in infos.items() if i is not None}
+        stale = [s for s in due if s.id in keys and keys[s.id] != self._files_read.get(s.id)]
+        read = await asyncio.gather(*(asyncio.to_thread(_recent_files, s.dir) for s in stale), return_exceptions=True)
+        files = {s.id: r for s, r in zip(stale, read, strict=True) if isinstance(r, list)}
         for s in due:
             live = self.sessions.get(s.id)
             if live is None:
@@ -3017,8 +3023,13 @@ class TickMixin:
             self._git_checked[s.id] = now
             info = infos.get(s.id)
             new = info.to_dict() if info else None
-            if new != live.git:
-                live.git = new
+            changed = new != live.git
+            live.git = new
+            if s.id in files:  # a read that failed keeps the list it had, and is taken again next time
+                self._files_read[s.id] = keys[s.id]
+                changed = changed or files[s.id] != live.files
+                live.files = files[s.id]
+            if changed:
                 self.store.save(live)
 
     async def _derive_reports(self, now: datetime) -> None:
@@ -3707,10 +3718,6 @@ class TickMixin:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
-        if isinstance(f := event.get("file"), str) and f and not stale:
-            # a main-thread edit's path (§4.2, TD-527): to the top of `files`, once, the newest twenty; a
-            # stale queued edit is dropped, since at the top it would read newer than the edits after it
-            s.files = [{"path": f, "at": now_iso()}, *(x for x in s.files if x.get("path") != f)][:RECENT_FILES]
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
             # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
             # typed by the tick, or a person's or a manager's send that cures *brief not sent*
@@ -3750,6 +3757,7 @@ class TickMixin:
         forgotten or replaced in place by a new session of the same name (§4.1)."""
         for side in (
             self._git_checked,
+            self._files_read,
             self._derived_at,
             self._model_checked,
             self._context_checked,
@@ -3831,6 +3839,13 @@ class TickMixin:
             last.pop(sid, None)
         self._scrub(sid)
         self._gone.append(sid)
+
+
+def _recent_files(directory: str) -> list[dict[str, Any]] | None:
+    """A record's recent files (§4.2 *The record's `files`*, TD-538): what the work in `directory` changed
+    against `merge-base HEAD origin/<default>` by the cadence's default-branch rule — the tree alone with
+    no origin — or None when a read failed. Blocking: a thread's."""
+    return changed_files(directory, ledger_mod.default_ref(directory, timeout=5.0), RECENT_FILES)
 
 
 def _span(seconds: float) -> str:
