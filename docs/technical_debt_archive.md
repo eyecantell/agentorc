@@ -15405,7 +15405,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-17 (the designer, from TD-845)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Built (2026-10-17, #2036).
 **Location:** `src/sessionorc/tmux.py` (`attach_argv`), `src/sessionorc/containers.py` (`attach_argv_in`), `src/shiftlead/ui/pty_bridge.py` (`attach_argv`) and `src/shiftlead/ui/app.py` (the terminal websocket), `src/shiftlead/cli.py` (`ao focus`, unchanged), `src/shiftlead/ui/static/app.js` (`AO.focus`, `AO.paneLink`), `src/shiftlead/ui/help.py`
 
 **Why:** design §4.6 *A hyperlink in the pane is a link* and §4.5a's **a hyperlink is a link** row (TD-845). Claude Code prints Artifacts, PRs and docs as OSC 8 labels inside tmux; the pty bridge's plain `tmux attach` gets the label without its target, so the Focus pane shows dead text.
