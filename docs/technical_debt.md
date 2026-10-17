@@ -66,7 +66,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Designed — built by TD-811, TD-812 |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
-| TD-812 | Build TD-804 (2): this repo's smoke — `scripts/smoke.py`, every page loaded and `ao` read against the live copy, and `smoke:` in `.shiftlead.yml` | Medium | Open |
+| TD-812 | Build TD-804 (2): this repo's smoke — `scripts/smoke.py`, every page loaded and `ao` read against the live copy, and `smoke:` in `.shiftlead.yml` | Medium | Built #2040 — live check |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Open |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
@@ -1311,9 +1311,8 @@ Then the build entries, named in `Blocked by:`.
 **Type:** feature
 **Added:** 2026-10-16 (TD-804's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-811
+**Kind:** live-check #2040
+**Status:** Built #2040 (2026-10-17, grinder-ao-1). It passed a read-only run against the live UI, with every page 200, the `ao` reads at exit 0, and the browser half ok. Left: the *Done when*'s last clause. Once #2040 is live (`ao promote status`) and a promote has concluded after it, read that promote's log (`ao promote status` names it; read-only) and check for the lines after `── smoke ──` and the note's *smoke passed in <s> s*. The browser half runs only once Paul has run `--setup` (on the board, due 2026-10-24); until then the log says *browser half skipped*, which still holds.
 **Location:** design §6 *The smoke* (*This repo's smoke*); `scripts/smoke.py` (new; not a synced file); `.shiftlead.yml` `promote:`; `src/shiftlead/service.py` (`UNIT_DIR`, the `shiftlead-ui.service` unit's `--port`, `DEFAULT_PORT`); `tests/`
 
 **Why:** TD-804, slice 2: the first repo's smoke, so a build that breaks a page or an `ao` read on Paul's real state is put back within minutes rather than found by him.

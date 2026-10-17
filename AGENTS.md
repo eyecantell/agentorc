@@ -82,6 +82,9 @@ $V/pip install --upgrade '/home/kmaster/shiftlead[ui]' && $V/ao service install
 pair replaces client and host agent together and restarts both units (sessions live in tmux and
 survive it), and writes the wheel of what it installed to `~/.shiftlead/wheels/`, which is what a
 container node is provisioned from (`ao host up`, design §4.4a). Never promote from a feature branch; a lead or a worker never promotes.
+Once `check` reads the commit, the home runs `.shiftlead.yml`'s `smoke:` (`scripts/smoke.py`: every page but a Focus,
+and `ao`'s reads), and a failed smoke puts back what was live (design §6 *The smoke*); its browser half wants
+`~/.local/share/shiftlead-venv/bin/python scripts/smoke.py --setup`, run once by hand.
 The promote is designed as the repo's `promote:` block and a policy of the home's tick (design §5, §6 *Promote*,
 TD-120 step 2; TD-132 builds it); until that lands, the pair above is the press. One thing
 is still read from the checkout: a team's `brief:` files under `docs/briefs/`, at team start, so

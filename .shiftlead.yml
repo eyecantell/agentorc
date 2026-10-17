@@ -9,6 +9,10 @@ promote:
   check: >-
     "$HOME/.local/share/shiftlead-venv/bin/python" -c 'import sys; from sessionorc import build;
     c = build.info().get("commit"); print(c) if c else sys.exit("build unknown: the live install carries no build record")'
+  # once `check` reads the commit live, the home runs this in the tree and the promote is done only when it
+  # passes; a failure puts back what was live before (§6 *The smoke*, TD-812). It loads every page but a
+  # Focus and reads `ao` (never `ao inbox`); its browser half wants `scripts/smoke.py --setup`, run once.
+  smoke: '"$HOME/.local/share/shiftlead-venv/bin/python" scripts/smoke.py'
 
 # The paths a PR must have read before it merges (design §4.9c *What is the repo's: `held:`*; TD-310):
 # the host agent's package and the briefs. Under a flow every review stage holds them, whoever wrote
