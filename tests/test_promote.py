@@ -464,15 +464,16 @@ async def test_a_press_that_finds_its_run_done_files_the_note(agent, checkout):
 
 
 def test_this_repos_block_is_the_promote_pair_read_from_the_checkout():
-    """TD-132 slice 4: shiftlead's own `.shiftlead.yml` carries `promote:` with `run` and `check` alone —
-    `run` is CLAUDE.md's pair with the checkout's path taken from where it runs, `check` the live venv's
-    build record. Its `teams:` and `roles:` are TD-229 slice 2's (`tests/test_org.py`)."""
+    """TD-132 slice 4: shiftlead's own `.shiftlead.yml` carries `promote:` with `run`, `check` and `smoke`
+    (TD-812) — `run` is CLAUDE.md's pair with the checkout's path taken from where it runs, `check` the live
+    venv's build record, `smoke` `scripts/smoke.py` under the live venv. Its `teams:` and `roles:` are
+    TD-229 slice 2's (`tests/test_org.py`)."""
     root = Path(__file__).resolve().parent.parent
     doc = yaml.safe_load((root / ".shiftlead.yml").read_text())
-    assert "promote" in doc and set(doc["promote"]) == {"run", "check"}  # `auto` is settings.yml's
+    assert "promote" in doc and set(doc["promote"]) == {"run", "check", "smoke"}  # `auto` is settings.yml's
     b = promote.block(root)
     assert "/shiftlead-venv/bin" in b["run"] and '"$(pwd -P)[ui]"' in b["run"] and b["run"].endswith("service install")
-    assert "/home/kmaster" not in b["run"] + b["check"]  # never a hard-coded checkout or home
+    assert "/home/kmaster" not in b["run"] + b["check"] + b["smoke"]  # never a hard-coded checkout or home
     assert "build.info()" in b["check"] and "sys.exit(" in b["check"]  # no record → exit 1 saying why
 
 
